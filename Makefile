@@ -3,8 +3,17 @@
 #
 
 srcdir=src
-objdir=obj
 incdir=include
+
+ifeq ($(SINGLE),true)
+  TARGET=lib/libaed2_s.a
+  objdir=obj_s
+  moddir=mod_s
+else
+  TARGET=lib/libaed2.a
+  objdir=obj
+  moddir=mod
+endif
 
 ifeq ($(FC),f77)
 FC=gfortran
@@ -17,7 +26,7 @@ ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -warn all -i-static -mp1 -stand f03 -warn nounused $(DEFINES) $(INCLUDES)
+  FFLAGS=-fPIC -warn all -module ${moddir} -i-static -mp1 -stand f03 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check
   endif
@@ -34,7 +43,7 @@ else
   INCLUDES+=-I/usr/include
   DEBUG_FFLAGS=-g -fbacktrace
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -Wall -ffree-line-length-none -std=f2003 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused-dummy-argument -fno-range-check
+  FFLAGS=-fPIC -Wall -J ${moddir} -ffree-line-length-none -std=f2003 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused-dummy-argument -fno-range-check
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-fcheck=all
   endif
@@ -95,26 +104,31 @@ ${objdir}/aed2_test.o \
 ${objdir}/aed2_common.o
 
 
-all: libaed2.a
+all: $(TARGET)
 
+
+lib:
+	@mkdir lib
+
+${moddir}:
+	@mkdir ${moddir}
 
 ${objdir}:
 	@mkdir ${objdir}
 
-libaed2.a: ${objdir} ${OBJS}
+${TARGET}: ${objdir} ${OBJS} lib
 	ar rv $@ ${OBJS}
 	ranlib $@
 
 clean: ${objdir}
-	@touch ${objdir}/1.o
-	@touch 1.mod 1.i90
-	/bin/rm ${objdir}/*.o
-	/bin/rm *.mod *.i90
+	@touch ${objdir}/1.o 1.i90
+	@/bin/rm ${objdir}/*.o *.i90
 
 distclean: clean
-	@touch libaed2.a
-	/bin/rm libaed2.a
-	/bin/rmdir obj
+	@touch lib mod_s mod
+	@/bin/rm -rf lib
+	@/bin/rm -rf obj obj_s
+	@/bin/rm -rf mod mod_s
 
-${objdir}/%.o: ${srcdir}/%.F90 ${srcdir}/aed2_core.F90 ${incdir}/aed2.h
+${objdir}/%.o: ${srcdir}/%.F90 ${srcdir}/aed2_core.F90 ${incdir}/aed2.h ${moddir}
 	$(F90) $(FFLAGS) -g -c $< -o $@

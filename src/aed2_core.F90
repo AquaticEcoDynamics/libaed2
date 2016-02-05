@@ -180,16 +180,19 @@ END SUBROUTINE aed2_set_prefix
 !# These create space for the variables :
 
 !###############################################################################
-SUBROUTINE extend_allocated_variables(count)
+SUBROUTINE extend_allocated_variables(pcount)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   INTEGER,INTENT(in) :: count
+   INTEGER,INTENT(in) :: pcount
 !
 !LOCALS
    TYPE(aed2_variable_t),DIMENSION(:),ALLOCATABLE :: tmp
+   INTEGER count
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   count = pcount
+   IF ( count < 10 ) count = 10
    IF ( ALLOCATED(all_vars) ) THEN
       ALLOCATE(tmp(1:a_vars))
       tmp = all_vars

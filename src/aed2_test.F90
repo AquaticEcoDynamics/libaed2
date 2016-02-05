@@ -142,11 +142,14 @@ SUBROUTINE aed2_calculate_riparian_test(data,column,layer_idx, pc_wet)
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: ben, lh
+   AED_REAL :: ben, lh, matz
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    _DIAG_VAR_S_(data%id_tst_act) = pc_wet
+
+   matz = _STATE_VAR_S_(data%id_sed_zone)
+   _DIAG_VAR_(data%id_tst_zon_pel) = matz
 
    lh = _STATE_VAR_(data%id_tst_lh)
    IF (lh > 0.0) THEN
@@ -196,7 +199,7 @@ SUBROUTINE aed2_calculate_benthic_test(data,column,layer_idx)
 
    matz = _STATE_VAR_S_(data%id_sed_zone)
    _DIAG_VAR_S_(data%id_tst_zon_ben) = matz
-   _DIAG_VAR_(data%id_tst_zon_pel) = matz
+!  _DIAG_VAR_(data%id_tst_zon_pel) = matz
    _DIAG_VAR_(data%id_tst_zon_temp) = _STATE_VAR_(data%id_tem)
    _DIAG_VAR_(data%id_tst_zon_rad) = _STATE_VAR_(data%id_par)
    !## TEST FLUX VAR TO DIAGNOSE flux_pel beign disaggregated onto non-benthic variables, from sediment zones
