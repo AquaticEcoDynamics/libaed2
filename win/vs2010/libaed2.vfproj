@@ -5,7 +5,7 @@
 		<Platform Name="x64"/></Platforms>
 	<Configurations>
 		<Configuration Name="Debug|Win32" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="_FORTRAN_SOURCE_" F2003Semantics="true" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" F2003Semantics="true" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
@@ -14,7 +14,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release_DP|Win32" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="_FORTRAN_SOURCE_" F2003Semantics="true" RealKIND="realKIND8"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" F2003Semantics="true" RealKIND="realKIND8"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
@@ -23,7 +23,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug|x64" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="_FORTRAN_SOURCE_" F2003Semantics="true" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" F2003Semantics="true" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -32,7 +32,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release_DP|x64" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="_FORTRAN_SOURCE_" F2003Semantics="true" RealKIND="realKIND8"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" F2003Semantics="true" RealKIND="realKIND8"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -41,7 +41,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release_SP|Win32" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="SINGLE=true;_FORTRAN_SOURCE_" F2003Semantics="true" RealKIND="realKIND4"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="SINGLE=true" F2003Semantics="true" RealKIND="realKIND4"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
@@ -50,7 +50,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release_SP|x64" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="SINGLE=true;_FORTRAN_SOURCE_" F2003Semantics="true" RealKIND="realKIND4"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="SINGLE=true" F2003Semantics="true" RealKIND="realKIND4"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFResourceCompilerTool"/>
