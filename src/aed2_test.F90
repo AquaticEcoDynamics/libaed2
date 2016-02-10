@@ -104,7 +104,7 @@ END SUBROUTINE aed2_define_test
 
 
 !###############################################################################
-SUBROUTINE aed2_calculate_test(data,column,layer_idx)
+SUBROUTINE aed2_calculate_test(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_test_data_t),INTENT(in) :: data
@@ -129,7 +129,7 @@ END SUBROUTINE aed2_calculate_test
 
 
 !###############################################################################
-SUBROUTINE aed2_calculate_riparian_test(data,column,layer_idx, pc_wet)
+SUBROUTINE aed2_calculate_riparian_test(data, column, layer_idx, pc_wet)
 !-------------------------------------------------------------------------------
 ! Calculate riparian fluxes and benthic sink and source terms of AED test.
 ! Everything in units per surface area (not volume!) per time.
@@ -142,14 +142,11 @@ SUBROUTINE aed2_calculate_riparian_test(data,column,layer_idx, pc_wet)
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: ben, lh, matz
+   AED_REAL :: ben, lh
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    _DIAG_VAR_S_(data%id_tst_act) = pc_wet
-
-   matz = _STATE_VAR_S_(data%id_sed_zone)
-   _DIAG_VAR_(data%id_tst_zon_pel) = matz
 
    lh = _STATE_VAR_(data%id_tst_lh)
    IF (lh > 0.0) THEN
@@ -177,7 +174,7 @@ END SUBROUTINE aed2_calculate_riparian_test
 
 
 !###############################################################################
-SUBROUTINE aed2_calculate_benthic_test(data,column,layer_idx)
+SUBROUTINE aed2_calculate_benthic_test(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 ! Calculate pelagic bottom fluxes and benthic sink and source terms of AED test.
 ! Everything in units per surface area (not volume!) per time.
@@ -199,7 +196,7 @@ SUBROUTINE aed2_calculate_benthic_test(data,column,layer_idx)
 
    matz = _STATE_VAR_S_(data%id_sed_zone)
    _DIAG_VAR_S_(data%id_tst_zon_ben) = matz
-!  _DIAG_VAR_(data%id_tst_zon_pel) = matz
+   _DIAG_VAR_(data%id_tst_zon_pel) = matz
    _DIAG_VAR_(data%id_tst_zon_temp) = _STATE_VAR_(data%id_tem)
    _DIAG_VAR_(data%id_tst_zon_rad) = _STATE_VAR_(data%id_par)
    !## TEST FLUX VAR TO DIAGNOSE flux_pel beign disaggregated onto non-benthic variables, from sediment zones
@@ -209,7 +206,7 @@ END SUBROUTINE aed2_calculate_benthic_test
 
 
 !###############################################################################
-SUBROUTINE aed2_calculate_dry_test(data,column,layer_idx)
+SUBROUTINE aed2_calculate_dry_test(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 ! Calculate fluxes and values for dry column.
 ! Everything in units per surface area (not volume!) per time.
