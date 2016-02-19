@@ -123,10 +123,11 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
    LOGICAL  ::  extra_diag = .FALSE.
    CHARACTER(len=64)  :: oxy_variable = ''
    CHARACTER(4) :: trac_name
-
+   CHARACTER(len=128) :: dbase='aed2_pathogen_pars.nml'
 
    NAMELIST /aed2_pathogens/ num_pathogens, the_pathogens, &
-            num_ss, ss_set, ss_tau, ss_ke, sim_sedorgs, oxy_variable, extra_diag
+            num_ss, ss_set, ss_tau, ss_ke, sim_sedorgs, oxy_variable, &
+            dbase, extra_diag
 !-----------------------------------------------------------------------
 !BEGIN
    ! Read the namelist
@@ -138,7 +139,7 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
-   CALL aed2_pathogens_load_params(data, num_pathogens, the_pathogens)
+   CALL aed2_pathogens_load_params(data, dbase, num_pathogens, the_pathogens)
 
    IF ( num_ss > 0 ) THEN
       ALLOCATE(data%id_ss(num_ss))
@@ -178,11 +179,13 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
 END SUBROUTINE aed2_define_pathogens
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
 !###############################################################################
-SUBROUTINE aed2_pathogens_load_params(data, count, list)
+SUBROUTINE aed2_pathogens_load_params(data, dbase, count, list)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_pathogens_data_t),INTENT(inout) :: data
+   CHARACTER(len=*),INTENT(in) :: dbase
    INTEGER,INTENT(in) :: count
    INTEGER,INTENT(in) :: list(*)
 !
@@ -198,7 +201,7 @@ SUBROUTINE aed2_pathogens_load_params(data, count, list)
 !BEGIN
     minPath = 1e-10
     tfil = find_free_lun()
-    open(tfil,file="aed2_pathogen_pars.nml", status='OLD',iostat=status)
+    open(tfil,file=dbase, status='OLD',iostat=status)
     IF (status /= 0) STOP 'Error opening namelist pathogen_data'
     read(tfil,nml=pathogen_data,iostat=status)
     IF (status /= 0) STOP 'Error reading namelist pathogen_data'

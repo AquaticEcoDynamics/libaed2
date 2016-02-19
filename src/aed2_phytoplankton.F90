@@ -829,7 +829,6 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       ! Total internal nutrients
       tin = tin + INi
       tip = tip + IPi
-
    ENDDO
 
    _DIAG_VAR_(data%id_GPP) =  sum(cuptake)*secs_per_day
@@ -846,8 +845,6 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
    _DIAG_VAR_(data%id_TPHY) =  tphy
    _DIAG_VAR_(data%id_TIN)  =  tin
    _DIAG_VAR_(data%id_TIP)  =  tip
-
-
 END SUBROUTINE aed2_calculate_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -867,11 +864,9 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
    AED_REAL :: phy        ! State
    INTEGER  :: phy_i
    AED_REAL :: phy_flux
-
+!
 !-------------------------------------------------------------------------------
 !BEGIN
-
-
    DO phy_i=1,data%num_phytos
       ! Retrieve current (local) state variable values.
       phy = _STATE_VAR_(data%id_p(phy_i))! phytoplankton
@@ -881,9 +876,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
      ! Set bottom fluxes for the pelagic (change per surface area per second)
      ! Transfer sediment flux value to AED2.
      _FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + (phy_flux)
-
    ENDDO
-
 END SUBROUTINE aed2_calculate_benthic_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -907,8 +900,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
-    temp = _STATE_VAR_(data%id_tem)
+   temp = _STATE_VAR_(data%id_tem)
 
    DO phy_i=1,data%num_phytos
       SELECT CASE (data%phytos(phy_i)%w_model)
@@ -927,7 +919,6 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
 
       mobility(data%id_p(phy_i)) =  w_rho
    ENDDO
-
 END SUBROUTINE aed2_mobility_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -956,15 +947,8 @@ SUBROUTINE aed2_light_extinction_phytoplankton(data,column,layer_idx,extinction)
 
       ! Self-shading with explicit contribution from background phytoplankton concentration.
       extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
-
    ENDDO
-
-
 END SUBROUTINE aed2_light_extinction_phytoplankton
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
