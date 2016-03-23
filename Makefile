@@ -43,7 +43,7 @@ else
   INCLUDES+=-I/usr/include
   DEBUG_FFLAGS=-g -fbacktrace
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -Wall -J ${moddir} -ffree-line-length-none -std=f2003 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused-dummy-argument -fno-range-check
+  FFLAGS=-fPIC -Wall -J ${moddir} -ffree-line-length-none -std=f2008 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused-dummy-argument -fno-range-check
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-fcheck=all
   endif
@@ -92,7 +92,7 @@ ${objdir}/aed2_carbon.o \
 ${objdir}/aed2_nitrogen.o \
 ${objdir}/aed2_phosphorus.o \
 ${objdir}/aed2_organic_matter.o \
-${objdir}/aed2_phyto_utils.o \
+${objdir}/aed2_bio_utils.o \
 ${objdir}/aed2_phytoplankton.o \
 ${objdir}/aed2_zoop_utils.o \
 ${objdir}/aed2_zooplankton.o \

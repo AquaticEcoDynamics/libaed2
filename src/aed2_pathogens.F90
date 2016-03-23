@@ -12,6 +12,7 @@
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
 !# Created July 2012, Updated May 2015                                         #
+!# Update Mar, 2016                                                            #
 !#                                                                             #
 !###############################################################################
 
@@ -54,6 +55,8 @@ MODULE aed2_pathogens
       AED_REAL      :: coef_pred_kp20, coef_pred_theta_P   !-- Loss rate due to predation and temp multiplier
       AED_REAL      :: coef_sett_fa                        !-- Attached fraction in water column
       AED_REAL      :: coef_sett_w_path      !-- Sedimentation velocity (m/d) at 20C (-ve means down) for NON-ATTACHED orgs
+      AED_REAL      :: coef_resus_epsilonP   !âPathogen resuspension rate
+      AED_REAL      :: coef_resus_tauP_0     !âCritical shear stress for organism resuspension
    END TYPE
 
 !  TYPE pathogen_data
@@ -72,13 +75,19 @@ MODULE aed2_pathogens
       INTEGER  :: id_tem, id_sal                           ! Environemental IDs (3D)
       INTEGER  :: id_par, id_nir, id_uva, id_uvb           ! Environemental IDs (3D)
       INTEGER  :: id_I_0                                   ! Environmental ID (2D)
+      INTEGER  :: resuspension
+      INTEGER  :: id_epsilon, id_taub
 
       !# Model parameters
       INTEGER  :: num_pathogens
       TYPE(pathogen_nml_data),DIMENSION(:),ALLOCATABLE :: pathogens
       INTEGER  :: num_ss
+      AED_REAL :: tau_0_min, kTau_0
+      AED_REAL,ALLOCATABLE :: epsilon(:), tau_0(:), tau_r(:), Ke_ss(:)
+      AED_REAL,ALLOCATABLE :: epsilonP(:), tauP_0(:)
       AED_REAL,DIMENSION(:),ALLOCATABLE :: ss_set, ss_tau, ss_ke
       LOGICAL :: sim_sedorgs, extra_diag
+      AED_REAL :: att_ts
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_pathogens
@@ -87,7 +96,6 @@ MODULE aed2_pathogens
          PROCEDURE :: mobility          => aed2_mobility_pathogens
          PROCEDURE :: light_extinction  => aed2_light_extinction_pathogens
 !        PROCEDURE :: delete            => aed2_delete_pathogens
-
    END TYPE
 
 !===============================================================================
@@ -118,16 +126,22 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
    AED_REAL :: ss_tau(MAX_PATHO_TYPES)=one_
    AED_REAL :: ss_ke(MAX_PATHO_TYPES) =zero_
    AED_REAL :: ss_initial = zero_
+   AED_REAL :: epsilon(100)
+   AED_REAL :: tau_0(100)
+   AED_REAL :: tau_r(100)
+   AED_REAL :: tau_0_min, Ktau_0
+   AED_REAL :: att_ts = (1./(86400.*7.)) ! attachment fraction re-equilibrates over a week
+   INTEGER  :: resuspension
    INTEGER  :: i
-   LOGICAL  ::  sim_sedorgs = .FALSE.
-   LOGICAL  ::  extra_diag = .FALSE.
+   LOGICAL  :: sim_sedorgs = .FALSE.
+   LOGICAL  :: extra_diag = .FALSE.
    CHARACTER(len=64)  :: oxy_variable = ''
    CHARACTER(4) :: trac_name
    CHARACTER(len=128) :: dbase='aed2_pathogen_pars.nml'
 
-   NAMELIST /aed2_pathogens/ num_pathogens, the_pathogens, &
-            num_ss, ss_set, ss_tau, ss_ke, sim_sedorgs, oxy_variable, &
-            dbase, extra_diag
+   NAMELIST /aed2_pathogens/ num_pathogens, the_pathogens, resuspension, &
+            num_ss, ss_set, ss_tau, ss_ke, sim_sedorgs, oxy_variable,    &
+            epsilon, tau_0, tau_0_min, Ktau_0, dbase, extra_diag, att_ts
 !-----------------------------------------------------------------------
 !BEGIN
    ! Read the namelist
@@ -135,6 +149,9 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
    IF (status /= 0) STOP 'Error reading namelist aed2_pathogens'
 
    data%extra_diag = extra_diag
+   data%tau_0_min = tau_0_min
+   data%Ktau_0 = Ktau_0
+   data%att_ts = att_ts
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
@@ -147,6 +164,9 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
       ALLOCATE(data%ss_ke(num_ss))  ; data%ss_ke(1:num_ss)  = ss_ke(1:num_ss)
       ALLOCATE(data%ss_tau(num_ss)) ; data%ss_tau(1:num_ss) = ss_tau(1:num_ss)
 
+      ALLOCATE(data%epsilon(num_ss)); data%epsilon(1:num_ss) = epsilon(1:num_ss)
+      ALLOCATE(data%tau_0(num_ss))  ; data%tau_0(1:num_ss)   = tau_0(1:num_ss)
+
       trac_name = 'ss0'
       ! Register state variables
       DO i=1,num_ss
@@ -155,7 +175,9 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
                                                   ss_initial,minimum=zero_)
       ENDDO
    ENDIF
-
+   IF ( resuspension == 2 ) THEN
+      data%id_epsilon =  aed2_define_sheet_diag_variable('epsilon','g/m**2/s', 'Resuspension rate')
+   ENDIF
 
    ! Register state dependancies
    data%id_tss=-1
@@ -175,7 +197,10 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
    data%id_uva = aed2_locate_global('uva')
    data%id_uvb = aed2_locate_global('uvb')
    data%id_I_0 = aed2_locate_global_sheet('par_sf')
+   IF ( resuspension > 0 ) &
+      data%id_taub = aed2_locate_global_sheet('taub')
 
+   data%resuspension = resuspension
 END SUBROUTINE aed2_define_pathogens
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -199,7 +224,7 @@ SUBROUTINE aed2_pathogens_load_params(data, dbase, count, list)
    NAMELIST /pathogen_data/ pd
 !-------------------------------------------------------------------------------
 !BEGIN
-    minPath = 1e-10
+    minPath = 1e-5
     tfil = find_free_lun()
     open(tfil,file=dbase, status='OLD',iostat=status)
     IF (status /= 0) STOP 'Error opening namelist pathogen_data'
@@ -239,7 +264,7 @@ SUBROUTINE aed2_pathogens_load_params(data, dbase, count, list)
 
 
        ! Check if we need to registrer a variable for the attached fraction
-      IF (data%pathogens(i)%coef_sett_fa > zero_) THEN
+       IF (data%pathogens(i)%coef_sett_fa > zero_) THEN
          data%id_pa(i) = aed2_define_variable(                                &
                              TRIM(data%pathogens(i)%p_name)//'_a',            &
                              'orgs/m**3', 'pathogen attached',                &
@@ -248,7 +273,7 @@ SUBROUTINE aed2_pathogens_load_params(data, dbase, count, list)
                              minimum=minPath,                                 &
                              !minimum=pd(list(i))%p0,                         &
                              mobility = data%pathogens(i)%coef_sett_w_path)
-      ENDIF
+       ENDIF
 
       !IF (data%pathogens(i)%p_name == 'crypto') THEN
          ! Register a state variable for dead fraction
@@ -264,16 +289,16 @@ SUBROUTINE aed2_pathogens_load_params(data, dbase, count, list)
 
        IF (data%sim_sedorgs) THEN
           data%id_ps(i) = aed2_define_sheet_variable( TRIM(data%pathogens(i)%p_name)//'_s', 'orgs/m2', 'pathogens in sediment')
+          PRINT *,'WARNING: sim_sedorgs is not complete, and sediment population is not growing or resuspending'
        ENDIF
 
-      data%id_total(i) = aed2_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_t', 'orgs/m3', 'total')
-      IF (data%extra_diag) THEN
+       data%id_total(i) = aed2_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_t', 'orgs/m3', 'total')
+       IF (data%extra_diag) THEN
           data%id_growth(i) = aed2_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_g', 'orgs/m3/day', 'growth')
           data%id_sunlight(i) = aed2_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_l', 'orgs/m3/day', 'sunlight')
           data%id_mortality(i) = aed2_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_m', 'orgs/m3/day', 'mortality')
-      ENDIF
-
-    ENDDO
+       ENDIF
+   ENDDO
 END SUBROUTINE aed2_pathogens_load_params
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -372,12 +397,20 @@ SUBROUTINE aed2_calculate_pathogens(data,column,layer_idx)
 
       ! Attachment of free orgs to particles (as impacted by SS and desired attachment ratio)
       attachment = zero_
-      IF (data%pathogens(pth_i)%coef_sett_fa > zero_) THEN
+      IF (data%pathogens(pth_i)%coef_sett_fa > zero_ .AND. (pth_f+pth_a) > 1e-2) THEN
          ! First check if ratio at last time step is less than desired (ie coef_sett_fa)
-         att_frac= pth_a/(pth_a+pth_f)
+         att_frac = pth_a/(pth_a+pth_f)
          IF (att_frac<data%pathogens(pth_i)%coef_sett_fa) THEN
-            ! Assume rate of attachment is slow (orgs/m3/s)
-            attachment = 0.0001*pth_f  ! CAREFUL FIX ME
+            ! Assume rate of attachment is slow based on att_ts (orgs/m3/s)
+            ! Small fraction fo the "attachment deficit" is redistributed each time step
+            attachment = data%att_ts * (data%pathogens(pth_i)%coef_sett_fa*pth_a - pth_f)
+            IF(attachment>zero_ .AND. attachment > _FLUX_VAR_(data%id_pf(pth_i)))THEN
+              ! proposed attachment is more than is available.
+              attachment = 0.5 * _FLUX_VAR_(data%id_pf(pth_i))
+            ELSEIF(attachment<zero_ .AND. attachment > _FLUX_VAR_(data%id_pa(pth_i)))THEN
+              ! proposed de-attachment is more than is available.
+              attachment = 0.5 * _FLUX_VAR_(data%id_pa(pth_i))
+            ENDIF
          ENDIF
       ENDIF
 
@@ -424,21 +457,47 @@ SUBROUTINE aed2_calculate_benthic_pathogens(data,column,layer_idx)
    AED_REAL :: resus_flux, sett_flux, kin_flux
    AED_REAL :: pth_sed, pth_wat_free, pth_wat_att
 
+   AED_REAL :: bottom_stress, dummy_tau
+
    ! Parameters
 !
 !-------------------------------------------------------------------------------
 !BEGIN
- !  vel = _STATE_VAR_(data%id_vel)
+!  vel = _STATE_VAR_(data%id_vel)
 
-   ! Sediment organisms
+   IF ( data%resuspension  > 0) THEN
+      bottom_stress = _STATE_VAR_S_(data%id_taub)
+      bottom_stress = MIN(bottom_stress, 100.)
+   ENDIF
+
+   ! SEDIMENT PARTICULATE RESUSPENSION - WHAT PATHOGENS ARE ATTACHED TO
+   IF (data%num_ss>0) THEN
+      DO ss_i=1,data%num_ss
+         ss = _STATE_VAR_(data%id_ss(ss_i))     ! ss conc of ith group
+
+         IF ( data%resuspension > 0 ) THEN
+            IF (bottom_stress > data%tau_0(ss_i)) THEN
+               resus_flux = data%epsilon(ss_i) * ( bottom_stress - data%tau_0(ss_i)) / data%tau_r(ss_i)
+            ELSE
+               resus_flux = 0.
+            ENDIF
+         ENDIF
+
+         _FLUX_VAR_(data%id_ss(ss_i)) = _FLUX_VAR_(data%id_ss(ss_i)) + resus_flux
+      ENDDO
+   ENDIF
+
+   ! SEDIMENT ORGANISMS - KINETICS AND RESUSPENSION
    IF (data%sim_sedorgs) THEN
+
+      ! Dynamic sediment pool of organisms that increase and decrease
       sett_flux = zero_
 
       DO pth_i=1,data%num_pathogens
          ! Retrieve current (local) state variable values.
          pth_wat_free = _STATE_VAR_(data%id_pf(pth_i))     ! pathogen (benthic water - free)
          IF (data%pathogens(pth_i)%coef_sett_fa>zero_) THEN
-            pth_wat_att  = _STATE_VAR_(data%id_pa(pth_i))    ! pathogen (benthic water - attached)
+            pth_wat_att  = _STATE_VAR_(data%id_pa(pth_i))  ! pathogen (benthic water - attached)
          END IF
 
          pth_sed = _STATE_VAR_S_(data%id_ps(pth_i)) ! pathogen (sediment pool)
@@ -465,18 +524,33 @@ SUBROUTINE aed2_calculate_benthic_pathogens(data,column,layer_idx)
             _FLUX_VAR_(data%id_pa(pth_i)) = _FLUX_VAR_(data%id_pa(pth_i)) + (resus_flux)*data%pathogens(pth_i)%coef_sett_fa
          ENDIF
       ENDDO
-   ENDIF
+   ELSE
 
-   ! Sediment particulates
-   IF (data%num_ss>0) THEN
-      DO ss_i=1,data%num_ss
+      ! Unresolved sediment pool of organisms, but we will still predict generic resuspension flux
+      DO pth_i=1,data%num_pathogens
 
-         ss = _STATE_VAR_(data%id_ss(ss_i))     ! ss conc of ith group
+         ! Compute the resuspension flux from the sediment to water
+         IF ( data%resuspension > 0 ) THEN
+            resus_flux = 0.
+            IF (bottom_stress > data%tauP_0(pth_i)) THEN
+               ! Pathogens need to resuspend
+               resus_flux = data%epsilonP(pth_i) * ( bottom_stress - data%tauP_0(pth_i)) / data%tau_r(1)
 
-         resus_flux = zero_
-         _FLUX_VAR_(data%id_ss(ss_i)) = _FLUX_VAR_(data%id_ss(ss_i)) + resus_flux
+              ! Add to respective pools in water (free/attached)
+              IF (bottom_stress > data%tau_0(1) .AND. data%pathogens(pth_i)%coef_sett_fa>zero_) THEN
+                ! Attached and free organisms lifting in association with uplifted ss
+                _FLUX_VAR_(data%id_pf(pth_i)) = _FLUX_VAR_(data%id_pf(pth_i)) + (resus_flux)*(1.-data%pathogens(pth_i)%coef_sett_fa)
+                _FLUX_VAR_(data%id_pa(pth_i)) = _FLUX_VAR_(data%id_pa(pth_i)) + (resus_flux)*data%pathogens(pth_i)%coef_sett_fa
+              ELSE
+                ! Free organisms only (surfical organisms lifting before sediment uplift)
+                _FLUX_VAR_(data%id_pf(pth_i)) = _FLUX_VAR_(data%id_pf(pth_i)) + (resus_flux)
+              ENDIF
+            ENDIF
+         ENDIF
+
       ENDDO
    ENDIF
+
 END SUBROUTINE aed2_calculate_benthic_pathogens
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

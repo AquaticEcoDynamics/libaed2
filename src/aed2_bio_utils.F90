@@ -1,6 +1,6 @@
 !###############################################################################
 !#                                                                             #
-!# aed2_phyto_utils.F90                                                        #
+!# aed2_bio_utils.F90                                                          #
 !#                                                                             #
 !# Developed by :                                                              #
 !#     AquaticEcoDynamics (AED) Group                                          #
@@ -17,9 +17,9 @@
 
 #include "aed2.h"
 
-MODULE aed2_phyto_utils
+MODULE aed2_bio_utils
 !-------------------------------------------------------------------------------
-!  aed2_phyto_utils --- utility functions for phytoplankton biogeochemical model
+!  aed2_bio_utils --- utility functions for phytoplankton biogeochemical model
 !-------------------------------------------------------------------------------
    USE aed2_core
 
@@ -424,21 +424,21 @@ END FUNCTION findMin
 
 
 !###############################################################################
-FUNCTION phyto_respiration(phytos,group,temp) RESULT(respiration)
+FUNCTION bio_respiration(R_resp,theta_resp,temp) RESULT(respiration)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
-   INTEGER,INTENT(in)                          :: group
-   AED_REAL,INTENT(in)                         :: temp
+   AED_REAL,INTENT(in) :: R_resp
+   AED_REAL,INTENT(in) :: theta_resp
+   AED_REAL,INTENT(in) :: temp
 !
 !LOCALS
    AED_REAL :: respiration ! Returns the phytoplankton respiration.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   respiration = phytos(group)%R_resp * phytos(group)%theta_resp**(temp-20.0)
+   respiration = R_resp * theta_resp**(temp-20.0)
 
-END FUNCTION phyto_respiration
+END FUNCTION bio_respiration
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -508,7 +508,7 @@ END FUNCTION phyto_salinity
 
 
 !###############################################################################
-FUNCTION phyto_light(phytos, group, par, extc, Io, dz) RESULT(fI)
+FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESULT(fI)
 !-------------------------------------------------------------------------------
 ! Light limitation of pytoplankton via various model approaches. Refer to
 ! overview presented in Table 1 of:
@@ -521,8 +521,9 @@ FUNCTION phyto_light(phytos, group, par, extc, Io, dz) RESULT(fI)
 !
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
-   INTEGER,INTENT(in)                          :: group
+   INTEGER,INTENT(in)                          :: lightModel
+   AED_REAL,INTENT(in)                         :: I_K
+   AED_REAL,INTENT(in)                         :: I_S
    AED_REAL,INTENT(in)                         :: par
    AED_REAL,INTENT(in)                         :: extc
    AED_REAL,INTENT(in)                         :: Io
@@ -547,7 +548,7 @@ FUNCTION phyto_light(phytos, group, par, extc, Io, dz) RESULT(fI)
    par_b = par_t * EXP( -extc * dz )
    par_c = par_t * EXP( -extc * dz/2. )
 
-   SELECT CASE (phytos(group)%lightModel)
+   SELECT CASE (lightModel)
       CASE ( 0 )
          ! Light limitation without photoinhibition.
          ! This is the Webb et al (1974) model solved using the numerical
@@ -555,8 +556,8 @@ FUNCTION phyto_light(phytos, group, par, extc, Io, dz) RESULT(fI)
 
          IF (Io == zero_) RETURN
 
-         z1 = -par_t / phytos(group)%I_K
-         z2 = -par_b / phytos(group)%I_K
+         z1 = -par_t / I_K
+         z2 = -par_b / I_K
 
          z1 = exp_integral(z1)
          z2 = exp_integral(z2)
@@ -570,14 +571,14 @@ FUNCTION phyto_light(phytos, group, par, extc, Io, dz) RESULT(fI)
          ! Light limitation without photoinhibition.
          ! This is the Monod (1950) model.
 
-         x = par_c/phytos(group)%I_K
+         x = par_c/I_K
          fI = x / (one_ + x)
 
       CASE ( 2 )
          ! Light limitation with photoinhibition.
          ! This is the Steele (1962) model.
 
-         x = par_c/phytos(group)%I_S
+         x = par_c/I_S
          fI = x * EXP(one_ - x)
          IF (par_t < 5e-5 .OR. fI < 5e-5) fI = 0.0
 
@@ -585,41 +586,41 @@ FUNCTION phyto_light(phytos, group, par, extc, Io, dz) RESULT(fI)
          ! Light limitation without photoinhibition.
          ! This is the Webb et al. (1974) model.
 
-         x = par_c/phytos(group)%I_K
+         x = par_c/I_K
          fI = one_ - EXP(-x)
 
       CASE ( 4 )
          ! Light limitation without photoinhibition.
          ! This is the Jassby and Platt (1976) model.
 
-         x = par_c/phytos(group)%I_K
+         x = par_c/I_K
          fI = TANH(x)
 
       CASE ( 5 )
          ! Light limitation without photoinhibition.
          ! This is the Chalker (1980) model.
 
-         x = par_c/phytos(group)%I_K
+         x = par_c/I_K
          fI = (EXP(x * (one_ + eps)) - one_) / &
               (EXP(x * (one_ + eps)) + eps)
 
       CASE ( 6 )
          ! Light limitation with photoinhibition.
          ! This is the Klepper et al. (1988) / Ebenhoh et al. (1997) model.
-         x = par_c/phytos(group)%I_S
+         x = par_c/I_S
          fI = ((2.0 + A) * x) / ( one_ + (A * x) + (x * x) )
 
       CASE ( 7 )
          ! Light limitation with photoinhibition.
          ! This is an integrated form of Steele model.
 
-         fI = ( EXP(1-par_b/phytos(group)%I_S) - &
-                EXP(1-par_t/phytos(group)%I_S)   ) / (extc * dz)
+         fI = ( EXP(1-par_b/I_S) - &
+                EXP(1-par_t/I_S)   ) / (extc * dz)
    END SELECT
 
    IF ( fI < zero_ ) fI = zero_
-END FUNCTION phyto_light
+END FUNCTION photosynthesis_irradiance
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-END MODULE aed2_phyto_utils
+END MODULE aed2_bio_utils

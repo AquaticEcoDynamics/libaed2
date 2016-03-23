@@ -37,9 +37,13 @@ MODULE aed2_tracer
       INTEGER :: num_tracers
       !# Variable identifiers
       INTEGER,ALLOCATABLE :: id_ss(:)
+
+      AED_REAL :: tau_0_min, kTau_0
+      INTEGER  :: id_lnk_id, id_tau_0, id_epsilon
+
       INTEGER :: id_temp, id_retain, id_taub
       INTEGER :: id_d_taub
-      LOGICAL :: resuspension
+      INTEGER :: resuspension
 
       !# Model parameters
       AED_REAL,ALLOCATABLE :: decay(:), settling(:), Fsed(:)
@@ -84,12 +88,17 @@ SUBROUTINE aed2_define_tracer(data, namlst)
    AED_REAL :: tau_r(100)
    AED_REAL :: Ke_ss(100)
    AED_REAL :: trace_initial = zero_
+   AED_REAL :: tau_0_min
+   AED_REAL :: kTau_0
+   CHARACTER(len=64) :: macrophyte_link_var = ''
    INTEGER  :: i
    LOGICAL  :: retention_time = .FALSE.
-   LOGICAL  :: resuspension = .FALSE.
+   INTEGER  :: resuspension = 0
    CHARACTER(4) :: trac_name
 
-   NAMELIST /aed2_tracer/ num_tracers,decay,settling,Fsed,resuspension,epsilon,tau_0,tau_r,Ke_ss,retention_time
+   NAMELIST /aed2_tracer/ num_tracers,decay,settling,Fsed,resuspension,epsilon, &
+                          tau_0, tau_0_min, Ktau_0, macrophyte_link_var, &
+                          tau_r, Ke_ss,retention_time
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -100,6 +109,8 @@ SUBROUTINE aed2_define_tracer(data, namlst)
    tau_0 = 0.01
    tau_r = 1.0
    Ke_ss = 0.02
+   tau_0_min = 0.01
+   kTau_0 = 1.0
 
    ! Read the namelist
    read(namlst,nml=aed2_tracer,iostat=status)
@@ -128,6 +139,19 @@ SUBROUTINE aed2_define_tracer(data, namlst)
                                                   trace_initial,minimum=zero_,mobility=(settling(i)/secs_per_day))
       ENDDO
    ENDIF
+   data%tau_0_min = tau_0_min
+   data%kTau_0    = kTau_0
+   IF ( resuspension == 2 ) THEN
+      data%id_tau_0 =  aed2_define_sheet_diag_variable('tau_0','N/m**2', 'dynamic bottom drag')
+      data%id_epsilon =  aed2_define_sheet_diag_variable('epsilon','g/m**2/s', 'Resuspension rate')
+      IF ( macrophyte_link_var .NE. '' ) THEN
+         data%id_lnk_id = aed2_locate_variable(macrophyte_link_var)
+         IF ( data%id_lnk_id .LE. 0 ) THEN
+            print *, "Macrophyte Link Variable ", TRIM(macrophyte_link_var), " is not defined."
+            STOP
+         ENDIF
+      ENDIF
+   ENDIF
    IF (retention_time) THEN
       data%id_retain = aed2_define_variable("ret",'sec','tracer', &
                                    trace_initial,minimum=zero_)
@@ -137,7 +161,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
 
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
-   IF ( resuspension ) THEN
+   IF ( resuspension > 0 ) THEN
       data%id_taub = aed2_locate_global_sheet('taub')
       data%id_d_taub = aed2_define_sheet_diag_variable('d_taub','N/m**2',  'taub diagnostic')
    ENDIF
@@ -191,7 +215,7 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
    AED_REAL :: ss, bottom_stress
 
    ! Temporary variables
-   AED_REAL :: ss_flux, theta_sed_ss = 1.0, resus_flux = 0.
+   AED_REAL :: ss_flux, theta_sed_ss = 1.0, resus_flux = 0., dummy_tau
    INTEGER  :: i
 
 !-------------------------------------------------------------------------------
@@ -200,19 +224,28 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
-   IF ( data%resuspension ) THEN
+   IF ( data%resuspension  > 0) THEN
       bottom_stress = _STATE_VAR_S_(data%id_taub)
       bottom_stress = MIN(bottom_stress, 100.)
       _DIAG_VAR_S_(data%id_d_taub) = bottom_stress
    ENDIF
 
+   IF ( data%resuspension == 2 .AND. data%id_lnk_id > 0 ) &
+      _DIAG_VAR_S_(data%id_tau_0) = data%tau_0_min + data%kTau_0 * _STATE_VAR_S_(data%id_lnk_id)
+
    DO i=1,ubound(data%id_ss,1)
       ! Retrieve current (local) state variable values.
       ss = _STATE_VAR_(data%id_ss(i))
 
-      IF ( data%resuspension ) THEN
+      IF ( data%resuspension > 0 ) THEN
+         IF ( data%resuspension == 2 .AND. i == 1 ) THEN
+            dummy_tau = _DIAG_VAR_S_(data%id_tau_0)
+         ELSE
+            dummy_tau =  data%tau_0(i)
+         ENDIF
+
          IF (bottom_stress > data%tau_0(i)) THEN
-            resus_flux = data%epsilon(i) * ( bottom_stress - data%tau_0(i)) / data%tau_r(i)
+            resus_flux = data%epsilon(i) * ( bottom_stress - dummy_tau) / data%tau_r(i)
          ELSE
             resus_flux = 0.
          ENDIF

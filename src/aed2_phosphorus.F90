@@ -99,12 +99,13 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
    AED_REAL          :: w_po4ads = 0.00
    INTEGER  :: PO4AdsorptionModel = 1
    CHARACTER(len=64) :: po4sorption_target_variable=''
+   CHARACTER(len=64) :: pH_variable='CAR_pH'
 
    NAMELIST /aed2_phosphorus/ frp_initial,frp_min,frp_max,Fsed_frp,Ksed_frp,theta_sed_frp, &
                              phosphorus_reactant_variable,Fsed_frp_variable,   &
                              simPO4Adsorption,ads_use_external_tss,            &
                              po4sorption_target_variable, PO4AdsorptionModel,  &
-                             ads_use_pH,Kpo4p,Kadsratio,Qmax,w_po4ads
+                             ads_use_pH,Kpo4p,Kadsratio,Qmax,w_po4ads, pH_variable
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -161,7 +162,7 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
                       zero_,minimum=zero_,mobility=data%w_po4ads)
 
      IF (data%ads_use_pH) THEN
-       data%id_pH = aed2_locate_variable('aed2_carbon_pH')
+       data%id_pH = aed2_locate_variable(pH_variable)
      ENDIF
    ENDIF
 

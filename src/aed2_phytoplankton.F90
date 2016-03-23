@@ -31,7 +31,7 @@ MODULE aed2_phytoplankton
                        exp_integral,  &
                        aed2_bio_temp_function, &
                        fTemp_function
-   USE aed2_phyto_utils
+   USE aed2_bio_utils
 
    IMPLICIT NONE
 
@@ -592,7 +592,8 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       extc = _STATE_VAR_(data%id_extc)
       ! dz = 0.5     !MH: to fix
       dz = _STATE_VAR_(data%id_dz)
-      fI = phyto_light(data%phytos, phy_i, par, extc, Io, dz)
+      fI = photosynthesis_irradiance(data%phytos(phy_i)%lightModel, &
+               data%phytos(phy_i)%I_K, data%phytos(phy_i)%I_S, par, extc, Io, dz)
       ! fI = 0.1
 
 
@@ -613,7 +614,7 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
 
       ! Respiration and general metabolic loss
 
-      respiration(phy_i) = phyto_respiration(data%phytos,phy_i,temp)
+      respiration(phy_i) = bio_respiration(data%phytos(phy_i)%R_resp,data%phytos(phy_i)%theta_resp,temp)
 
       ! Salinity stress effect on respiration
       fSal =  phyto_salinity(data%phytos,phy_i,salinity)
