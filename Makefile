@@ -116,7 +116,7 @@ ${moddir}:
 ${objdir}:
 	@mkdir ${objdir}
 
-${TARGET}: ${objdir} ${OBJS} lib
+${TARGET}: ${objdir} ${moddir} ${OBJS} lib
 	ar rv $@ ${OBJS}
 	ranlib $@
 
@@ -130,5 +130,5 @@ distclean: clean
 	@/bin/rm -rf obj obj_s
 	@/bin/rm -rf mod mod_s
 
-${objdir}/%.o: ${srcdir}/%.F90 ${srcdir}/aed2_core.F90 ${incdir}/aed2.h ${moddir}
+${objdir}/%.o: ${srcdir}/%.F90 ${srcdir}/aed2_core.F90 ${incdir}/aed2.h
 	$(F90) $(FFLAGS) -g -c $< -o $@
