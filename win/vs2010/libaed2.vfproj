@@ -64,6 +64,7 @@
 		<File RelativePath="..\..\include\aed2.h"/></Filter>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath="..\..\src\aed2_bio_utils.F90"/>
 		<File RelativePath="..\..\src\aed2_bivalve.F90"/>
 		<File RelativePath="..\..\src\aed2_carbon.F90"/>
 		<File RelativePath="..\..\src\aed2_chlorophylla.F90"/>
@@ -74,7 +75,6 @@
 		<File RelativePath="..\..\src\aed2_oxygen.F90"/>
 		<File RelativePath="..\..\src\aed2_pathogens.F90"/>
 		<File RelativePath="..\..\src\aed2_phosphorus.F90"/>
-		<File RelativePath="..\..\src\aed2_phyto_utils.F90"/>
 		<File RelativePath="..\..\src\aed2_phytoplankton.F90"/>
 		<File RelativePath="..\..\src\aed2_sedflux.F90"/>
 		<File RelativePath="..\..\src\aed2_silica.F90"/>
