@@ -59,6 +59,7 @@ MODULE aed2_core
       !# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       CONTAINS
          procedure :: define             => aed2_define
+         procedure :: initialize         => aed2_initialize
          procedure :: calculate_surface  => aed2_calculate_surface
          procedure :: calculate          => aed2_calculate
          procedure :: calculate_benthic  => aed2_calculate_benthic
@@ -66,6 +67,10 @@ MODULE aed2_core
          procedure :: calculate_dry      => aed2_calculate_dry
          procedure :: equilibrate        => aed2_equilibrate
          procedure :: light_extinction   => aed2_light_extinction
+         procedure :: rain_loss          => aed2_rain_loss
+         procedure :: light_shading      => aed2_light_shading
+         procedure :: bio_drag           => aed2_bio_drag
+         procedure :: particle_bgc       => aed2_particle_bgc
          procedure :: mobility           => aed2_mobility
          procedure :: validate           => aed2_validate
          procedure :: delete             => aed2_delete
@@ -81,6 +86,7 @@ MODULE aed2_core
       AED_REAL,             POINTER :: flux_atm
       AED_REAL,DIMENSION(:),POINTER :: flux_pel
       AED_REAL,             POINTER :: flux_ben
+      AED_REAL,             POINTER :: flux_rip
    END TYPE aed2_column_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -233,7 +239,6 @@ SUBROUTINE extend_allocated_variables(pcount)
 
 END SUBROUTINE extend_allocated_variables
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !# These define names and defaults for variables, returning their index:
@@ -559,6 +564,18 @@ END SUBROUTINE aed2_define
 
 
 !###############################################################################
+SUBROUTINE aed2_initialize(data,column, layer_idx)
+!-------------------------------------------------------------------------------
+   CLASS (aed2_model_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!-------------------------------------------------------------------------------
+!print*,"Default aed2_initialize ", trim(data%aed2_model_name)
+END SUBROUTINE aed2_initialize
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed2_calculate(data,column,layer_idx)
 !-------------------------------------------------------------------------------
    CLASS (aed2_model_data_t),INTENT(in) :: data
@@ -658,6 +675,51 @@ END SUBROUTINE aed2_mobility
 
 
 !###############################################################################
+SUBROUTINE aed2_rain_loss(data, column, layer_idx, infil)
+!-------------------------------------------------------------------------------
+! Get the soil moisture deficit, so host model can infiltrate rain accordingly
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_model_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: infil
+!-------------------------------------------------------------------------------
+!BEGIN
+!print*,"Default aed2_rain_loss ", trim(data%aed2_model_name)
+END SUBROUTINE aed2_rain_loss
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_light_shading(data, column, layer_idx, shade_frac)
+!-------------------------------------------------------------------------------
+   CLASS (aed2_model_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: shade_frac
+!-------------------------------------------------------------------------------
+!BEGIN
+!print*,"Default aed2_light_shading ", trim(data%aed2_model_name)
+END SUBROUTINE aed2_light_shading
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_bio_drag(data, column, layer_idx, drag)
+!-------------------------------------------------------------------------------
+   CLASS (aed2_model_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: drag
+!-------------------------------------------------------------------------------
+!BEGIN
+!print*,"Default aed2_bio_drag ", trim(data%aed2_model_name)
+END SUBROUTINE aed2_bio_drag
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed2_light_extinction(data,column,layer_idx,extinction)
 !-------------------------------------------------------------------------------
    CLASS (aed2_model_data_t),INTENT(in) :: data
@@ -667,6 +729,18 @@ SUBROUTINE aed2_light_extinction(data,column,layer_idx,extinction)
 !-------------------------------------------------------------------------------
 !print*,"Default aed2_light_extinction ", trim(data%aed2_model_name)
 END SUBROUTINE aed2_light_extinction
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_particle_bgc(data,column,layer_idx,ppid)
+   CLASS (aed2_model_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   INTEGER,INTENT(inout) :: ppid
+!-------------------------------------------------------------------------------
+!print*,"Default aed2_particle_bgc ", trim(data%aed2_model_name)
+END SUBROUTINE aed2_particle_bgc
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

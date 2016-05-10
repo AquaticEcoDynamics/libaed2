@@ -61,7 +61,8 @@ MODULE aed2_common
 
    PUBLIC aed2_calculate, aed2_calculate_surface, aed2_calculate_benthic
    PUBLIC aed2_light_extinction, aed2_delete, aed2_equilibrate
-   PUBLIC aed2_calculate_riparian, aed2_calculate_dry
+   PUBLIC aed2_initialize, aed2_calculate_riparian, aed2_calculate_dry
+   PUBLIC aed2_rain_loss, aed2_light_shading, aed2_bio_drag, aed2_particle_bgc
 
    !# Re-export these from aed2_core.
    PUBLIC aed2_model_data_t, aed2_variable_t, aed2_column_t
@@ -174,6 +175,24 @@ END SUBROUTINE aed2_define_model
 !# These are wrappers for the individual models.                               #
 !#                                                                             #
 !###############################################################################
+
+
+!###############################################################################
+SUBROUTINE aed2_initialize(column, layer_idx)
+!-------------------------------------------------------------------------------
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   CLASS (aed2_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%initialize(column, layer_idx)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed2_initialize
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
@@ -322,6 +341,86 @@ SUBROUTINE aed2_light_extinction(column, layer_idx, extinction)
       model => model%next
    ENDDO
 END SUBROUTINE aed2_light_extinction
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_rain_loss(column, layer_idx, infil)
+!-------------------------------------------------------------------------------
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: infil
+!
+!LOCALS
+   CLASS (aed2_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   infil = zero_
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%rain_loss(column, layer_idx, infil)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed2_rain_loss
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_light_shading(column, layer_idx, shade_frac)
+!-------------------------------------------------------------------------------
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: shade_frac
+!LOCALS
+   CLASS (aed2_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+!BEGIN
+   shade_frac = one_
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%light_shading(column, layer_idx, shade_frac)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed2_light_shading
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_bio_drag(column, layer_idx, drag)
+!-------------------------------------------------------------------------------
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: drag
+!
+!LOCALS
+   CLASS (aed2_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   drag = zero_
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%bio_drag(column, layer_idx, drag)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed2_bio_drag
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_particle_bgc(column, layer_idx, ppid)
+!-------------------------------------------------------------------------------
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   INTEGER,INTENT(inout) :: ppid
+!
+!LOCALS
+   CLASS (aed2_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   ppid = 0
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%particle_bgc(column, layer_idx, ppid)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed2_particle_bgc
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
