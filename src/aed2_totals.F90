@@ -35,19 +35,21 @@ MODULE aed2_totals
 !
    TYPE,extends(aed2_model_data_t) :: aed2_totals_data_t
       !# Variable identifiers
-      INTEGER  :: id_totals_tn, id_totals_tkn, id_totals_tp,                   &
-                  id_totals_toc, id_totals_tss, id_totals_turbidity,           &
+      INTEGER  :: id_totals_tn, id_totals_tkn, id_totals_tp, id_tfe, id_tal,      &
+                  id_totals_toc, id_totals_tss, id_totals_turbidity,              &
                   id_totals_light, id_totals_par, id_totals_uv, id_totals_extc
-      INTEGER  :: num_tn, num_tkn, num_tp, num_toc, num_tss, num_turb
+      INTEGER  :: num_tn, num_tkn, num_tp, num_toc, num_tss, num_turb, num_tfe, num_tal
       INTEGER  :: id_par, id_extc
-      INTEGER,ALLOCATABLE :: id_dep_tn(:), id_dep_tkn(:), id_dep_tp(:),        &
-                             id_dep_toc(:), id_dep_tss(:), id_dep_turb(:)
-      AED_REAL,ALLOCATABLE :: tn_varscale(:), tkn_varscale(:), tp_varscale(:), &
-                              toc_varscale(:), tss_varscale(:), turb_varscale(:)
+      INTEGER,ALLOCATABLE :: id_dep_tn(:), id_dep_tkn(:), id_dep_tp(:),           &
+                             id_dep_toc(:), id_dep_tss(:), id_dep_turb(:),        &
+                             id_dep_tfe(:), id_dep_tal(:)
+      AED_REAL,ALLOCATABLE :: tn_varscale(:), tkn_varscale(:), tp_varscale(:),    &
+                              toc_varscale(:), tss_varscale(:), turb_varscale(:), &
+                              tfe_varscale(:), tal_varscale(:)
 
 
       !# Model parameters
-      LOGICAL  :: outputLight
+      LOGICAL  :: outputLight, outputMetals
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_totals
@@ -80,24 +82,29 @@ SUBROUTINE aed2_define_totals(data, namlst)
 !LOCALS
    INTEGER  :: status
 
-   INTEGER           :: i, num_tn,num_tkn,num_tp,num_toc,num_tss,num_turb
+   INTEGER           :: i, num_tn,num_tkn,num_tp,num_toc,num_tss,num_turb,num_tfe,num_tal
    CHARACTER(len=40) :: tn_vars(100), tkn_vars(100), tp_vars(100)
    CHARACTER(len=40) :: toc_vars(100), tss_vars(100), turb_vars(100)
+   CHARACTER(len=40) :: tfe_vars(10), tal_vars(10)
    AED_REAL          :: tn_varscale(100), tkn_varscale(100), tp_varscale(100)
    AED_REAL          :: toc_varscale(100), tss_varscale(100), turb_varscale(100)
+   AED_REAL          :: tfe_varscale(10), tal_varscale(10)
    LOGICAL           :: outputLight = .FALSE.
 
    NAMELIST /aed2_totals/ tn_vars,  tn_varscale,  tkn_vars,  tkn_varscale,  &
                           tp_vars,  tp_varscale,  toc_vars, toc_varscale,   &
                           tss_vars, tss_varscale, turb_vars, turb_varscale, &
+                          tfe_vars, tfe_varscale, tal_vars, tal_varscale,   &
                           outputLight
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    tn_vars = '' ;       tkn_vars = '' ;      tp_vars = ''
    toc_vars = '' ;      tss_vars = '' ;      turb_vars = ''
+   tfe_vars = '' ;      tal_vars = '' ;
    tn_varscale = 1.0 ;  tkn_varscale = 1.0;  tp_varscale = 1.0
    toc_varscale = 1.0 ; tss_varscale = 1.0;  turb_varscale = 1.0
+   tfe_varscale = 1.0 ; tal_varscale = 1.0
 
    ! Read the namelist
    read(namlst,nml=aed2_totals,iostat=status)
@@ -111,6 +118,8 @@ SUBROUTINE aed2_define_totals(data, namlst)
    DO i=1,100 ; IF (toc_vars(i) .EQ. '' ) THEN ; num_toc = i-1 ; EXIT ; ENDIF ; ENDDO
    DO i=1,100 ; IF (tss_vars(i) .EQ. '' ) THEN ; num_tss = i-1 ; EXIT ; ENDIF ; ENDDO
    DO i=1,100 ; IF (turb_vars(i).EQ. '' ) THEN ; num_turb= i-1 ; EXIT ; ENDIF ; ENDDO
+   DO i=1,100 ; IF (tfe_vars(i) .EQ. '' ) THEN ; num_tfe = i-1 ; EXIT ; ENDIF ; ENDDO
+   DO i=1,100 ; IF (tal_vars(i) .EQ. '' ) THEN ; num_tal = i-1 ; EXIT ; ENDIF ; ENDDO
 
    ALLOCATE(data%id_dep_tn(num_tn))     ; ALLOCATE(data%tn_varscale(num_tn))
    ALLOCATE(data%id_dep_tkn(num_tkn))   ; ALLOCATE(data%tkn_varscale(num_tkn))
@@ -118,6 +127,8 @@ SUBROUTINE aed2_define_totals(data, namlst)
    ALLOCATE(data%id_dep_toc(num_toc))   ; ALLOCATE(data%toc_varscale(num_toc))
    ALLOCATE(data%id_dep_tss(num_tss))   ; ALLOCATE(data%tss_varscale(num_tss))
    ALLOCATE(data%id_dep_turb(num_turb)) ; ALLOCATE(data%turb_varscale(num_turb))
+   ALLOCATE(data%id_dep_tfe(num_tfe))   ; ALLOCATE(data%tfe_varscale(num_tfe))
+   ALLOCATE(data%id_dep_tal(num_tal))   ; ALLOCATE(data%tal_varscale(num_tal))
 
    data%num_tn   = num_tn
    data%num_tkn  = num_tkn
@@ -125,12 +136,14 @@ SUBROUTINE aed2_define_totals(data, namlst)
    data%num_toc  = num_toc
    data%num_tss  = num_tss
    data%num_turb = num_turb
+   data%num_tfe  = num_tfe
+   data%num_tal  = num_tal
 
    ! Register external state variable dependencies
    DO i=1,data%num_tn
       data%id_dep_tn(i) =  aed2_locate_variable(tn_vars(i))
       data%tn_varscale(i) =  tn_varscale(i)
-     print*,'TN : ', TRIM(tn_vars(i)), ' * ', data%tn_varscale(i)
+      print*,'TN : ', TRIM(tn_vars(i)), ' * ', data%tn_varscale(i)
    ENDDO
    DO i=1,data%num_tkn
       data%id_dep_tkn(i) =  aed2_locate_variable(tkn_vars(i))
@@ -157,6 +170,17 @@ SUBROUTINE aed2_define_totals(data, namlst)
       data%turb_varscale(i) = turb_varscale(i)
      print*,'TURB : ', TRIM(turb_vars(i)), ' * ', data%turb_varscale(i)
    ENDDO
+   DO i=1,data%num_tfe
+      data%id_dep_tfe(i) =  aed2_locate_variable(tfe_vars(i))
+      data%tfe_varscale(i) =  tfe_varscale(i)
+      print*,'TFE : ', TRIM(tfe_vars(i)), ' * ', data%tfe_varscale(i)
+   ENDDO
+   DO i=1,data%num_tal
+      data%id_dep_tal(i) =  aed2_locate_variable(tal_vars(i))
+      data%tal_varscale(i) =  tal_varscale(i)
+     print*,'TAL : ', TRIM(tal_vars(i)), ' * ', data%tal_varscale(i)
+   ENDDO
+
    ! Register environmental dependencies
    IF (data%outputLight) THEN
      data%id_par = aed2_locate_global('par')
@@ -192,6 +216,16 @@ SUBROUTINE aed2_define_totals(data, namlst)
    IF (data%num_turb>0) THEN
      data%id_totals_turbidity = aed2_define_diag_variable('turbidity', &
                      'NTU', 'Turbidity')
+   ENDIF
+
+   IF (data%num_tfe>0) THEN
+     data%id_tfe = aed2_define_diag_variable('tfe',                    &
+                     'mmol/m**3', 'Total Iron')
+   ENDIF
+
+   IF (data%num_tal>0) THEN
+     data%id_tal = aed2_define_diag_variable('tal',                    &
+                     'mmol/m**3', 'Total Aluminium')
    ENDIF
 
    IF (data%outputLight) THEN
@@ -276,6 +310,23 @@ SUBROUTINE aed2_calculate_totals(data,column,layer_idx)
      DO i=1,count ; val = _STATE_VAR_(data%id_dep_turb(i)); tot = tot + (val*data%turb_varscale(i)) ; ENDDO
      _DIAG_VAR_(data%id_totals_turbidity) =  tot
    ENDIF
+
+   ! Sum over TFe variables
+   IF (data%num_tfe>0) THEN
+     tot = 0.
+     count = ubound(data%id_dep_tfe,1)
+     DO i=1,count ; val = _STATE_VAR_(data%id_dep_tfe(i)); tot = tot + (val*data%tfe_varscale(i)) ; ENDDO
+     _DIAG_VAR_(data%id_tfe) =  tot
+   ENDIF
+
+   ! Sum over TAl variables
+   IF (data%num_tal>0) THEN
+     tot = 0.
+     count = ubound(data%id_dep_tal,1)
+     DO i=1,count ; val = _STATE_VAR_(data%id_dep_tal(i)); tot = tot + (val*data%tal_varscale(i)) ; ENDDO
+     _DIAG_VAR_(data%id_tal) =  tot
+   ENDIF
+
 
    ! Light and Extinction Coefficient
    IF (data%outputLight) THEN

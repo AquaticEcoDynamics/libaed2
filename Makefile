@@ -83,6 +83,7 @@ FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS)
 OBJS = \
 ${objdir}/aed2_core.o \
 ${objdir}/aed2_util.o \
+${objdir}/aed2_csv_reader.o \
 ${objdir}/aed2_sedflux.o \
 ${objdir}/aed2_chlorophylla.o \
 ${objdir}/aed2_oxygen.o \

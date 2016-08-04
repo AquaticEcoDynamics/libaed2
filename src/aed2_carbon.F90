@@ -41,14 +41,17 @@ MODULE aed2_carbon
       INTEGER  :: id_Fsed_dic, id_Fsed_ch4
       INTEGER  :: id_temp, id_salt
       INTEGER  :: id_wind
-      INTEGER  :: id_ch4ox
+      INTEGER  :: id_ch4ox, id_pco2
       INTEGER  :: id_sed_dic
       INTEGER  :: id_atm_co2_exch, id_atm_ch4_exch
+      INTEGER  :: id_par, id_extc, id_dz
 
       !# Model parameters
       AED_REAL :: Fsed_dic, Ksed_dic, theta_sed_dic
       AED_REAL :: Fsed_ch4, Ksed_ch4, theta_sed_ch4
-      AED_REAL :: Rch4ox, Kch4ox, vTch4ox, atmco2,ionic
+      AED_REAL :: Rch4ox, Kch4ox, vTch4ox, atmco2, ionic
+      AED_REAL :: maxMPBProdn, IkMPB
+
       LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4
       LOGICAL  :: simDIC, simCH4
 
@@ -104,10 +107,13 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    AED_REAL          :: atmco2 = 367.
    CHARACTER(len=64) :: methane_reactant_variable=''
 
+   AED_REAL :: maxMPBProdn = 40.     ! mmolC/m2/day                     !
+   AED_REAL :: IkMPB       = 180.0   ! Light sensitivity of MPB  !
 
    NAMELIST /aed2_carbon/ dic_initial,pH_initial,ionic,Fsed_dic,Ksed_dic,theta_sed_dic,Fsed_dic_variable, &
                          ch4_initial,Fsed_ch4,Ksed_ch4,theta_sed_ch4,Fsed_ch4_variable, &
-                         atmco2,Rch4ox,Kch4ox,vTch4ox,methane_reactant_variable
+                         atmco2,Rch4ox,Kch4ox,vTch4ox,methane_reactant_variable, &
+                         maxMPBProdn, IkMPB
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -134,6 +140,8 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    data%atmco2        = atmco2
    data%simDIC        = .false.
    data%simCH4        = .false.
+   data%maxMPBProdn   = maxMPBProdn
+   data%IkMPB         = IkMPB
 
 
 
@@ -167,6 +175,8 @@ SUBROUTINE aed2_define_carbon(data, namlst)
       data%id_Fsed_ch4 = aed2_locate_global_sheet(Fsed_ch4_variable)
 
    !# Register diagnostic variables
+   data%id_pco2 = aed2_define_diag_variable('pCO2','atm', 'pCO2')
+
    data%id_ch4ox = aed2_define_diag_variable('ch4ox','mmol/m**3/d', 'methane oxidation rate')
    data%id_sed_dic = aed2_define_sheet_diag_variable('sed_dic','mmol/m**2/d',        &
                                                       'CO2 exchange across sed/water interface')
@@ -180,6 +190,10 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    data%id_temp = aed2_locate_global('temperature')
    data%id_salt = aed2_locate_global('salinity')
    data%id_wind = aed2_locate_global_sheet('wind_speed')
+   data%id_extc = aed2_locate_global('extc_coef')
+   data%id_par = aed2_locate_global('par')
+   data%id_dz = aed2_locate_global('layer_ht')
+
 END SUBROUTINE aed2_define_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -290,15 +304,16 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
      Ko = exp(Ko)
 
      ! pCO2 in surface water layer
-     pCO2 = aed2_carbon_co2(data%ionic,temp,dic,ph) / Ko
+
+     !MH pCO2 = aed2_carbon_co2(data%ionic,temp,dic,ph) / Ko  (=atm)
+     pCO2 = _DIAG_VAR_(data%id_pco2)  ! this diagnostic is getting set in aed2_geocehmistry
+
 
      ! FCO2 = kCO2 * Ko * (pCO2 - PCO2a)
-     ! pCO2a = 367e-6 (Keeling & Wharf, 1999)
+     ! pCO2a = 367e-6 uatm (Keeling & Wharf, 1999)
 
-     !------ Yanti correction (20/5/2013) ----------------------------------------
-     ! pCO2 is actually in uatm (=ppm)
      ! mmol/m2/s = m/s * mmol/L/atm * atm
-     FCO2 = kCO2 * Ko * (pCO2 - data%atmco2)
+     FCO2 = kCO2 * (1e3*Ko) * (pCO2 - data%atmco2)
 
      ! FCO2 = - kCO2 * Ko*1e6 * ((pCO2 * 1e-6) - data%atmco2) ! dCO2/dt
      !----------------------------------------------------------------------------
@@ -366,13 +381,17 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp
+   AED_REAL :: temp, par, extc, dz
 
    ! State
-   AED_REAL :: dic,oxy
+   AED_REAL :: dic, oxy, mpb, ph
 
    ! Temporary variables
    AED_REAL :: dic_flux, ch4_flux, Fsed_dic, Fsed_ch4
+   !AED_REAL, PARAMETER :: maxMPBProdn = 40.     ! mmolC/m2/day                     !
+   !AED_REAL, PARAMETER :: IkMPB       = 180.0   ! Light sensitivity of MPB  !
+
+
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -382,9 +401,13 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
+   par = _STATE_VAR_(data%id_par) ! local par
+   dz = _STATE_VAR_(data%id_dz) ! local layer depth
+   extc = _STATE_VAR_(data%id_extc) ! local extinction
 
     ! Retrieve current (local) state variable values.
    dic = _STATE_VAR_(data%id_dic)! carbon
+   pH = _STATE_VAR_(data%id_pH)! pH
 
    IF ( data%use_sed_model_dic ) THEN
       Fsed_dic = _STATE_VAR_S_(data%id_Fsed_dic)
@@ -406,6 +429,17 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
       ! Sediment flux dependent on temperature only.
       dic_flux = Fsed_dic * (data%theta_sed_dic**(temp-20.0))
       ch4_flux = Fsed_ch4 * (data%theta_sed_ch4**(temp-20.0))
+   ENDIF
+
+
+   ! Allow photosynthetic production of CO2 in the benthos due to MPB if light and suitable pH
+   par = par * (exp(-extc*dz))
+   IF( par > 50. .AND. pH > 5.5 .AND. pH < 9.6 ) THEN
+     mpb = (data%maxMPBProdn/secs_per_day)*(1.0-exp(-par/data%IkMPB)) * (data%theta_sed_dic**(temp-20.0))
+     dic_flux = Fsed_dic - mpb
+     IF (data%use_oxy) THEN
+       _FLUX_VAR_(data%id_oxy) =  _FLUX_VAR_(data%id_oxy) + mpb
+     ENDIF
    ENDIF
 
    ! TODO:

@@ -189,8 +189,9 @@ END FUNCTION aed2_oxygen_sat
 
 !###############################################################################
 FUNCTION exp_integral(inp) RESULT(E_ib)
+!-------------------------------------------------------------------------------
 !ARGUMENTS
-   AED_REAL  :: inp
+   AED_REAL,INTENT(in) :: inp
 !
 !LOCALS
    AED_REAL  :: E_ib !-- Outgoing
