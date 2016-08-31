@@ -35,9 +35,6 @@ ifeq ($(F90),ifort)
   else
     FFLAGS+=-real-size 64
   endif
-  LIBS+=-lifcore -lsvml
-  LIBS+=-limf -lintlc
-  LIBS+=-L/opt/intel/lib -Wl,-rpath=/opt/intel/lib
 else
   F90=gfortran
   INCLUDES+=-I/usr/include
@@ -48,7 +45,6 @@ else
     FFLAGS+=-fcheck=all
   endif
   FFLAGS+=-fdefault-real-8 -fdefault-double-8
-  LIBS+=-lgfortran
 endif
 
 ifeq ($(COMPILATION_MODE),debug)
@@ -62,14 +58,6 @@ else
   OPT_CFLAGS=-O3
   # OPT_CFLAGS=
   # OPT_FFLAGS=
-endif
-
-LIBS+=-lnetcdff -lnetcdf
-ifeq ($(PLOTS),true)
-  LIBS+=-L$(PLOTDIR) -lplot -lgd -lpng -ljpeg -lm
-  ifeq ($(XPLOTS),true)
-    LIBS+=-lX11
-  endif
 endif
 
 ifeq ($(SINGLE),true)
