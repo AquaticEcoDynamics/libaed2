@@ -292,7 +292,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    data%Rdonr_miner     = Rdonr_miner/secs_per_day
    data%Rdopr_miner     = Rdopr_miner/secs_per_day
    data%Rcpom_bdown     = Rcpom_bdown/secs_per_day
-   data%w_cpom          = w_cpom
+   data%w_cpom          = w_cpom/secs_per_day
    data%X_cpom_n        = X_cpom_n
    data%X_cpom_p        = X_cpom_p
    data%KeDOMR          = KeDOMR
