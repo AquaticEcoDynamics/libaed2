@@ -13,7 +13,7 @@
 				<Tool Name="VFPreLinkEventTool"/>
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
-		<Configuration Name="Release_DP|Win32" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
+		<Configuration Name="Release|Win32" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" F2003Semantics="true" RealKIND="realKIND8"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
@@ -31,7 +31,7 @@
 				<Tool Name="VFPreLinkEventTool"/>
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
-		<Configuration Name="Release_DP|x64" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
+		<Configuration Name="Release|x64" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\src\;..\..\include\;.\$(PlatformName)-$(ConfigurationName)\" F2003Semantics="true" RealKIND="realKIND8"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
