@@ -184,14 +184,12 @@ SUBROUTINE aed2_define_geochemistry(data, namlst)
 
    !----------------------------------------------------------------------------
    ! Configure the geochemical solver
-!print*," geo 1"
    CALL ConfigEquilibriumSolver( num_components,  num_minerals,                &
                                  dis_components(1:num_components),             &
                                  the_minerals(1:num_minerals),                 &
                                  nDissTransportables, nPartTransportables,     &
                                  data%listDissTransVars,data%listPartTransVars)
 
-!print*," geo 2"
    data%num_comp = nDissTransportables
    data%num_mins = nPartTransportables
 
@@ -216,9 +214,7 @@ SUBROUTINE aed2_define_geochemistry(data, namlst)
      data%w_gch(i) = w_gch(i)
    END DO
 
-!print*," geo 3"
    CALL InitialiseGCProperties(data%DissComp, data%PartComp, 2)
-!print*," geo 4"
 
    print *,'data%DissComp',data%DissComp
    print *,'data%PartComp',data%PartComp
@@ -266,9 +262,7 @@ SUBROUTINE aed2_define_geochemistry(data, namlst)
    !----------------------------------------------------------------------------
    ! Register diagnostic variables
 
-!print*," geo 5"
    CALL GetListOfGeochemDiagnostics(speciesOutput,diagnosticList)
-!print*," geo 6"
 
    DO i=1,SIZE(diagnosticList)
      data%id_gcdiag(i) = aed2_define_diag_variable( diagnosticList(i), &
@@ -320,7 +314,6 @@ SUBROUTINE aed2_initialize_geochemistry(data, column, layer_idx)
    INTEGER  :: i
 !-------------------------------------------------------------------------------
 !BEGIN
-   !print *,'re_initializing pH'
 
    !-- Retrieve current environmental conditions for the cell.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
@@ -390,34 +383,7 @@ SUBROUTINE aed2_calculate_geochemistry(data,column,layer_idx)
 
    !-- 1. Iron  ---------------------------------------------------------------!
    IF (simIronRedox) THEN
-!
-!     !-- Reduction
-!     reduction = calcIronReduction(WQ%a3d(vdo3D,DICHM(FEIII)),                 &
-!                                   WQ%a3d(vdo3D,DO), GetTemp(vdo3D), vdo3D)
-!     IF(reduction*DDT > WQ3F%a3d(:,DICHM(FEIII)))THEN
-!       reduction = WQ3F%a3d(:,DICHM(FEIII))/DDT
-!     ENDIF
-!
-!     WQ3F%a3d(:,DOC(LABILE)) = WQ3F%a3d(:,DOC(LABILE)) - &
-!                               WQ3F%a3d(:,DOC(LABILE)) * reduction * 0.21505 * DDT
-!
-!     !-- Oxidation
-!     oxidation = calcIronOxidation(WQ%a3d(vdo3D,DICHM(FEII)),                  &
-!                                   WQ%a3d(vdo3D,DO), GetTemp(vdo3D), vdo3D)
-!     IF(oxidation*DDT > WQ3F%a3d(:,DICHM(FEII)))THEN
-!       oxidation = WQ3F%a3d(:,DICHM(FEII))/DDT
-!     ENDIF
-!
-!     WQ3F%a3d(:,DO) = WQ3F%a3d(:,DO) &
-!                    - MIN(WQ3F%a3d(:,DO), WQ3F%a3d(:,DO) * oxidation * 0.57278 * DDT)
-!
-!     !-- Update
-!     WQ3F%a3d(:,DICHM(FEII))  = WQ3F%a3d(:,DICHM(FEII))  +                     &
-!                                                     (reduction - oxidation)*DDT
-!
-!     WQ3F%a3d(:,DICHM(FEIII)) = WQ3F%a3d(:,DICHM(FEIII)) +                     &
-!                                                     (oxidation - reduction)*DDT
-!
+     !TBC
    END IF
 
 !  _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (diff_dic)
@@ -592,304 +558,5 @@ END SUBROUTINE aed2_equilibrate_geochemistry
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
-
-!
-!
-!!------------------------------------------------------------------------------!
-! SUBROUTINE performRedoxTransformations(WQ3F, WQ, vdo3D)                       !
-!   !-- Incoming                                                                !
-!   TYPE (WQ_3D), INTENT(INOUT)       :: WQ    ! Old water quality data         !
-!   TYPE (WQ_3F), INTENT(INOUT)       :: WQ3F  ! New water quality data         !
-!   INTEGER, DIMENSION(:), INTENT(IN) :: vdo3D ! Process map                    !
-!   !-- Local                                                                   !
-!   REAL (r_wq), DIMENSION(SIZE(vdo3D)) :: oxidation, reduction                 !
-!
-!   reduction = zero_
-!   oxidation = zero_
-!
-!   !-- 1. Iron  ---------------------------------------------------------------!
-!   IF (simIronRedox) THEN
-!
-!     !-- Reduction
-!     reduction = calcIronReduction(WQ%a3d(vdo3D,DICHM(FEIII)),                 &
-!                                   WQ%a3d(vdo3D,DO), GetTemp(vdo3D), vdo3D)
-!     WHERE(reduction*DDT > WQ3F%a3d(:,DICHM(FEIII)))
-!       reduction = WQ3F%a3d(:,DICHM(FEIII))/DDT
-!     ENDWHERE
-!
-!     WQ3F%a3d(:,DOC(LABILE)) = WQ3F%a3d(:,DOC(LABILE)) - &
-!                               WQ3F%a3d(:,DOC(LABILE)) * reduction * 0.21505 * DDT
-!
-!     !-- Oxidation
-!     oxidation = calcIronOxidation(WQ%a3d(vdo3D,DICHM(FEII)),                  &
-!                                   WQ%a3d(vdo3D,DO), GetTemp(vdo3D), vdo3D)
-!     WHERE(oxidation*DDT > WQ3F%a3d(:,DICHM(FEII)))
-!       oxidation = WQ3F%a3d(:,DICHM(FEII))/DDT
-!     ENDWHERE
-!
-!     WQ3F%a3d(:,DO) = WQ3F%a3d(:,DO) &
-!                    - MIN(WQ3F%a3d(:,DO), WQ3F%a3d(:,DO) * oxidation * 0.57278 * DDT)
-!
-!
-!     !-- Update
-!     WQ3F%a3d(:,DICHM(FEII))  = WQ3F%a3d(:,DICHM(FEII))  +                     &
-!                                                     (reduction - oxidation)*DDT
-!
-!     WQ3F%a3d(:,DICHM(FEIII)) = WQ3F%a3d(:,DICHM(FEIII)) +                     &
-!                                                     (oxidation - reduction)*DDT
-!
-!   END IF
-!
-!
-!   reduction = zero_
-!   oxidation = zero_
-!
-!   !-- 2. Manganese -----------------------------------------------------------!
-!   IF (simManganRedox) THEN
-!
-!     !-- Reduction
-!     reduction = (c%CHM%Manganese%kMnR * &
-!                 (c%CHM%Manganese%vMnR**(GetTemp(vdo3D)-20.0)) * &
-!                  c%CHM%Manganese%K_MnR / (c%CHM%Manganese%K_MnR+WQ%a3d(vdo3D,DO))) &
-!                  *WQ%a3d(vdo3D,DICHM(MNIV))
-!
-!     !-- Oxidation
-!     oxidation = (c%CHM%Manganese%kMnO * (c%CHM%Manganese%vMnO**(HYS%TEM(vdo3D)-20.0)) * WQ%a3d(vdo3D,DO)      &
-!               / (c%CHM%Manganese%K_MnO + WQ%a3d(vdo3D,DO))) * WQ%a3d(vdo3D,DICHM(MNII))
-!
-!     !-- Update
-!     WQ3F%a3d(:,DICHM(MNII))  = WQ3F%a3d(:,DICHM(MNII))  +                     &
-!                                                     (reduction - oxidation)*DDT
-!     WQ3F%a3d(:,DICHM(MNIV)) = WQ3F%a3d(:,DICHM(MNIV)) +                     &
-!                                                     (oxidation - reduction)*DDT
-!
-!   END IF
-!
-!   !-- 3. Sulfur --------------------------------------------------------------!
-!   IF (simSulfurRedox) THEN
-!
-!     !-- Reduction
-!     reduction = calcSulfurReduction(WQ%a3d(vdo3D,DICHM(SO4)),                 &
-!                                   WQ%a3d(vdo3D,DO), GetTemp(vdo3D), vdo3D)
-!     WHERE(reduction*DDT > WQ3F%a3d(:,DICHM(SO4)))
-!       reduction = WQ3F%a3d(:,DICHM(SO4))/DDT
-!     ENDWHERE
-!
-!     !-- Oxidation
-!     oxidation = calcSulfurOxidation(WQ%a3d(vdo3D,DICHM(H2S)),                 &
-!                                   WQ%a3d(vdo3D,DO), GetTemp(vdo3D), vdo3D)
-!     WHERE(oxidation*DDT > WQ3F%a3d(:,DICHM(H2S)))
-!       oxidation = WQ3F%a3d(:,DICHM(H2S))/DDT
-!     ENDWHERE
-!
-!     !-- Update
-!     WQ3F%a3d(:,DICHM(H2S)) = WQ3F%a3d(:,DICHM(H2S))  +                        &
-!                                                     (reduction - oxidation)*DDT
-!
-!     WQ3F%a3d(:,DICHM(SO4)) = WQ3F%a3d(:,DICHM(SO4))  +                        &
-!                                                     (oxidation - reduction)*DDT
-!
-!   END IF
-!
-!
-!   !-- 4. Arsenic -------------------------------------------------------------!
-!   IF (simArsenicRedox) THEN
-!
-!     !-- Reduction
-!     reduction = (c%CHM%Arsenic%kAsR * &
-!                 (c%CHM%Arsenic%vAsR**(GetTemp(vdo3D)-20.0)) * &
-!                  c%CHM%Arsenic%K_AsR / (c%CHM%Arsenic%K_AsR+WQ%a3d(vdo3D,DO))) &
-!                  *WQ%a3d(vdo3D,DICHM(ASV))
-!
-!     !-- Oxidation
-!     oxidation = (c%CHM%Arsenic%kAsO * (c%CHM%Arsenic%vAsO**(HYS%TEM(vdo3D)-20.0)) * WQ%a3d(vdo3D,DO)      &
-!               / (c%CHM%Arsenic%K_AsO + WQ%a3d(vdo3D,DO))) * WQ%a3d(vdo3D,DICHM(ASIII))
-!
-!     !-- Update
-!     WQ3F%a3d(:,DICHM(ASIII)) = WQ3F%a3d(:,DICHM(ASIII))  +                    &
-!                                                     (reduction - oxidation)*DDT
-!     WQ3F%a3d(:,DICHM(ASV))   = WQ3F%a3d(:,DICHM(ASV)) +                       &
-!                                                     (oxidation - reduction)*DDT
-!
-!
-!   END IF
-!
-!
-!
-!
-!   !-- 4. Carbon
-!   IF (simCarbonRedox) THEN
-!
-!     !-- No Reduction included
-!
-!     !-- CH4 Oxidation
-!     oxidation = calcMethaneOxidation(WQ%a3d(vdo3D,DICHM(CH4)),                 &
-!                                   WQ%a3d(vdo3D,DO), GetTemp(vdo3D), vdo3D)
-!     WHERE(oxidation*DDT > WQ3F%a3d(:,DICHM(CH4)))
-!       oxidation = WQ3F%a3d(:,DICHM(CH4))/DDT
-!     ENDWHERE
-!
-!     !-- Update
-!     WQ3F%a3d(:,DICHM(CH4)) = WQ3F%a3d(:,DICHM(CH4))  - oxidation*DDT
-!
-!     WQ3F%a3d(:,DICHM(CO3)) = WQ3F%a3d(:,DICHM(CO3))  + oxidation*DDT
-!
-!   END IF
-!
-!   reduction = zero_
-!   oxidation = zero_
-!
-!
-!
-! END SUBROUTINE performRedoxTransformations
-!!------------------------------------------------------------------------------!
-!
-!
-!
-!
-!!------------------------------------------------------------------------------!
-! FUNCTION calcIronOxidation(ironII, oxygen, temp, vdo) RESULT(OxidRate)        !
-!   !-- Incoming                                                                !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: ironII                            !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: oxygen                            !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: temp                              !
-!   INTEGER,     DIMENSION(:), INTENT(IN)  :: vdo                               !
-!   !-- Outgoing                                                                !
-!   REAL (r_wq), DIMENSION(SIZE(vdo))      :: OxidRate                          !
-!   !-- Local                                                                   !
-!   REAL (r_wq), PARAMETER :: ko = 2.14e-5  !@25C
-!   REAL (r_wq), PARAMETER :: k1 = 6.78e1   !@25C
-!   REAL (r_wq), PARAMETER :: k2 = 2.14e7   !@25C
-!   REAL (r_wq), DIMENSION(ngrids) :: Fe_2, FeOH, FeOH2
-!   REAL (r_wq)                    :: kb, kf
-!   INTEGER                        :: status
-!
-!
-!   kb = c%CHM%Iron%kFeOb
-!   kf = c%CHM%Iron%kFeOf
-!
-!   status = returnGCDerivedVector("Fe+2      ", Fe_2)
-!   IF(status/=1)Fe_2 = zero_
-!   status = returnGCDerivedVector("FeOH+     ", FeOH)
-!   IF(status/=1)FeOH = zero_
-!   status = returnGCDerivedVector("Fe(OH)2   ", FeOH2)
-!   IF(status/=1)FeOH2 = zero_
-!
-!   OxidRate = oxygen *  (                                                      &
-!              kf*ko*Fe_2(vdo) *VarDetails(DICHM(FEII))%MolWeight*1e3  +        &
-!              kf*k1*FeOH(vdo) *VarDetails(DICHM(FEII))%MolWeight*1e3  +        &
-!              kf*k2*FeOH2(vdo)*VarDetails(DICHM(FEII))%MolWeight*1e3  +        &
-!              kb*ironII ) * (c%CHM%Iron%vFeO**(temp-20.0))
-!
-!
-! END FUNCTION calcIronOxidation
-!!------------------------------------------------------------------------------!
-!
-!
-!
-!
-!!------------------------------------------------------------------------------!
-! FUNCTION calcIronReduction(ironIII, oxygen, temp, vdo) RESULT(RednRate)       !
-!   !-- Incoming                                                                !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: ironIII                           !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: oxygen                            !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: temp                              !
-!   INTEGER,     DIMENSION(:), INTENT(IN)  :: vdo                               !
-!   !-- Outgoing                                                                !
-!   REAL (r_wq), DIMENSION(SIZE(vdo))      :: RednRate                          !
-!   !-- Local                                                                   !
-!   REAL (r_wq), DIMENSION(ngrids)         :: light                             !
-!   REAL (r_wq), DIMENSION(ngrids)         :: FeOH2                             !
-!   REAL (r_wq), DIMENSION(ngrids)         :: ko                                !
-!   INTEGER     :: status
-!
-!   RednRate = zero_
-!
-!
-!   !-- Biotic rate: iron reducers
-!   RednRate  = (c%CHM%Iron%kFeR * (c%CHM%Iron%vFeR**(temp-20.0)) *             &
-!                c%CHM%Iron%K_FeR / (c%CHM%Iron%K_FeR + oxygen))  * ironIII
-!
-!   !-- Photo-reduction
-!   IF(simLight) THEN
-!
-!     light = zero_
-!     light(vdo) = GetLight(vdo,bwidth="TOTAL",units="W/m2")
-!
-!     !-- Photo-reduction rate (/day) is a linear function of PAR
-!     ko(vdo) = c%CHM%Iron%kFeRpr * light/2500
-!
-!     status = returnGCDerivedVector("FeOH+2     ", FeOH2)
-!     IF(status/=1)FeOH2 = zero_
-!
-!     !#MH: Causing ELCD crash 20090817. Temporailiy Disabled
-!     !RednRate = RednRate +                                                     &
-!     !           ko(vdo) * FeOH2(vdo) * VarDetails(DICHM(FEIII))%MolWeight*1e3
-!     RednRate = zero_
-!
-!   END IF
-!
-! END FUNCTION calcIronReduction
-!!------------------------------------------------------------------------------!
-!
-!
-!
-!!------------------------------------------------------------------------------!
-! FUNCTION calcSulfurReduction(sulfate, oxygen, temp, vdo) RESULT(RednRate)     !
-!   !-- Incoming                                                                !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: sulfate                           !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: oxygen                            !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: temp                              !
-!   INTEGER,     DIMENSION(:), INTENT(IN)  :: vdo                               !
-!   !-- Outgoing                                                                !
-!   REAL (r_wq), DIMENSION(SIZE(vdo))      :: RednRate                          !
-!   !-- Local                                                                   !
-!
-!   RednRate  = zero_
-!   RednRate  = c%CHM%Sulfur%kSuR * (c%CHM%Sulfur%vSuR**(temp-20.0))            &
-!                * sulfate * (c%CHM%Sulfur%K_SuR / (c%CHM%Sulfur%K_SuR + oxygen))
-!
-! END FUNCTION calcSulfurReduction
-!!------------------------------------------------------------------------------!
-!
-!
-!
-!!------------------------------------------------------------------------------!
-! FUNCTION calcSulfurOxidation(sulfide, oxygen, temp, vdo) RESULT(OxdnRate)     !
-!   !-- Incoming                                                                !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: sulfide                           !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: oxygen                            !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: temp                              !
-!   INTEGER,     DIMENSION(:), INTENT(IN)  :: vdo                               !
-!   !-- Outgoing                                                                !
-!   REAL (r_wq), DIMENSION(SIZE(vdo))      :: OxdnRate                          !
-!   !-- Local                                                                   !
-!
-!   OxdnRate  = c%CHM%Sulfur%kSuO * (c%CHM%Sulfur%vSuO**(temp-20.0))            &
-!                  * sulfide * (oxygen / (c%CHM%Sulfur%K_SuO + oxygen))
-!
-! END FUNCTION calcSulfurOxidation
-!!------------------------------------------------------------------------------!
-!
-!
-!
-!!------------------------------------------------------------------------------!
-! FUNCTION calcMethaneOxidation(methane, oxygen, temp, vdo) RESULT(OxdnRate)    !
-!   !-- Incoming                                                                !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: methane                           !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: oxygen                            !
-!   REAL (r_wq), DIMENSION(:), INTENT(IN)  :: temp                              !
-!   INTEGER,     DIMENSION(:), INTENT(IN)  :: vdo                               !
-!   !-- Outgoing                                                                !
-!   REAL (r_wq), DIMENSION(SIZE(vdo))      :: OxdnRate                          !
-!   !-- Local                                                                   !
-!
-!   OxdnRate  = c%CHM%Methane%kCH4O * (c%CHM%Methane%vCH4O**(temp-20.0))        &
-!                  * methane * (oxygen / (c%CHM%Methane%K_CH4O + oxygen))
-!
-! END FUNCTION calcMethaneOxidation
-!!------------------------------------------------------------------------------!
-!
 
 END MODULE aed2_geochemistry
