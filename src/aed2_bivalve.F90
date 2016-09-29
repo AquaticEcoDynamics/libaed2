@@ -318,16 +318,6 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
    data%num_biv = 0
    CALL aed2_bivalve_load_params(data, dbase, num_biv, the_biv)
 
-   ! Not required if we use the Spillman quadratic fT
-   !CALL aed2_bio_temp_function(data%num_biv,                 &
-   !                           data%bivalves%theta_resp_zoo, &
-   !                           data%bivalves%Tstd_zoo,       &
-   !                           data%bivalves%Topt_zoo,       &
-   !                           data%bivalves%Tmax_zoo,       &
-   !                           data%bivalves%aTn,            &
-   !                           data%bivalves%bTn,            &
-   !                           data%bivalves%kTn,            &
-   !                           data%bivalves%name)
 
    !Register link to prey state variables
    DO biv_i = 1,num_biv
@@ -516,13 +506,6 @@ SUBROUTINE aed2_calculate_benthic_bivalve(data,column,layer_idx)
 
       ! Get the temperature function impacting ingestion
       f_Temp = fTemp_function_biv(data,biv_i, temp)
-      !f_T = fTemp_function(1, data%bivalves(biv_i)%Tmax,       &
-      !                        data%bivalves(biv_i)%Tstd,       &
-      !                        data%bivalves(biv_i)%theta_resp, &
-      !                        data%bivalves(biv_i)%aTn,        &
-      !                        data%bivalves(biv_i)%bTn,        &
-      !                        data%bivalves(biv_i)%kTn,        &
-      !                        temp)
 
       ! Get the suspended solids function
       f_SS = fSS_function(data,biv_i,ss)
