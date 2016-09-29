@@ -336,7 +336,7 @@ SUBROUTINE aed2_calculate_benthic_cladophora(data,column,layer_idx)
    AED_REAL, PARAMETER :: b14 =  0.3120532E+00 !
    AED_REAL, PARAMETER :: b15 = -0.7267257E+00 !
 
-   AED_REAL :: malg
+   AED_REAL :: malg, nit, amm
    INTEGER  :: malg_i
    AED_REAL :: extc, dz, par, Io, temp, salinity
    AED_REAL :: matz
@@ -549,16 +549,8 @@ SUBROUTINE aed2_calculate_benthic_cladophora(data,column,layer_idx)
     print *,'IN/M',nu
 
     !-- Macroalgae nitrogen uptake
-    nu = UNmax(bb) * WQ%sed(SedCells,SED(M(macIndex))) * tf * (INmax(bb) - nu) &
-       / (INmax(bb)-INmin(bb)) * (WQ%a3d(BotCells,NO3) + WQ%a3d(BotCells,NH4)) &
-       / (WQ%a3d(BotCells,NO3) + WQ%a3d(BotCells,NH4) + KN(bb))
-
-    !-- Time series quantities
-    IF(macGroup == ms) THEN
-      map = DDT * nu(vs2)
-      mar = DDT * rf(vs2) * sf(vs2) * WQ%sed(SedCells(vs2),SED(INm(macIndex)))
-      mag = DDT * mf(vs2) * WQ%sed(SedCells(vs2),SED(INm(macIndex)))
-    END IF
+    !nu = data%malgdata(i)%R_nuptake  * malg * tf * (INmax(bb) - nu) &
+    !    / (INmax(bb)-INmin(bb)) * (nit + amm) ) / (nit + amm + KN(bb))
 
     !-- Update the internal nitrogen store
     !_FLUX_VAR_B_(data%id_malg_in(malg_i)) =  _FLUX_VAR_B_(data%id_malg_in(malg_i)) &
@@ -707,9 +699,9 @@ SUBROUTINE aed2_slough_cladophora(data,column,layer_idx)
 
       ! Lss = Lmax (T/Tcrit) * (X/Xmax)
 
-      !hf = 0.242 * exp(-0.3187 * (DWQ%LZ(BotCells)+DWQ%DZ(BotCells)))          &
-      !   * AvgStress / PCm(macGroup)                                 &
-      !   * WQ%sed(SedCells,SED(M(macIndex)))/ X_maxp
+      !hf = 0.242 * exp(-0.3187 * DEPTH)          &
+      !   * AvgStress / PCm                                 &
+      !   *malg / X_maxp
 
       hf = 0.0010 * (AvgStress - data%PCm(malg_i)) / one_  * malg/ X_maxp
       hf = hf * DDT    !??

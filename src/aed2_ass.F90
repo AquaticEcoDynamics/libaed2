@@ -15,70 +15,6 @@
 !#                                                                             #
 !###############################################################################
 
-! /AED/StudySites/CoorongLowerLakes/simulations/CoorongLowerLakes_i7/SeawaterEIS/010_anc_896_ASS01_yAB/caedym
-! ! -----------------------------------------------------------------------------!
-! ! Depth to perching (m)                                                        !
-!  1.50000E+00                 : ASS SOIL 1 - Sand with Low OM content           !
-!  1.50000E+00                 : ASS SOIL 2 - Clay with Low OM content           !
-!  1.50000E+00                 : ASS SOIL 3 - Sand with High OM content          !
-!  1.50000E+00                 : ASS SOIL 4 - Clay with High OM content          !
-! ! Sediment density (kg/m3)                                                     !
-!  1530.000000                 : ASS SOIL 1 - Sand with Low OM content           !
-!  1230.000000                 : ASS SOIL 2 - Clay with Low OM content           !
-!  1530.000000                 : ASS SOIL 3 - Sand with High OM content          !
-!  1230.000000                 : ASS SOIL 4 - Clay with High OM content          !
-! ! Potential Acidity (mol H+/kg)                                                !
-!  0.041000E+00                : ASS SOIL 1 - Sand with Low OM content           !
-!  0.250000E+00                : ASS SOIL 2 - Clay with Low OM content           !
-!  0.041000E+00                : ASS SOIL 3 - Sand with High OM content          !
-!  0.250000E+00                : ASS SOIL 4 - Clay with High OM content          !
-! ! Acidity production rate (- scaling factor for Taylor OxCOn algorithm)        !
-!  1.000000000                 : ASS SOIL 1 - Sand with Low OM content           !
-!  1.000000000                 : ASS SOIL 2 - Clay with Low OM content           !
-!  1.000000000                 : ASS SOIL 3 - Sand with High OM content          !
-!  1.000000000                 : ASS SOIL 4 - Clay with High OM content          !
-! ! ASS flux parameter - baseflow (/day)                                         !
-!  0.000000000                 : ASS SOIL 1 - Sand with Low OM content           !
-!  0.000000000                 : ASS SOIL 2 - Clay with Low OM content           !
-!  0.000000000                 : ASS SOIL 3 - Sand with High OM content          !
-!  0.000000000                 : ASS SOIL 4 - Clay with High OM content          !
-! ! ASS flux parameter - rain pulsing (/day) & (mm)                              !
-!  0.000 0.000                 : ASS SOIL 1 - Sand with Low OM content           !
-!  0.000 0.000                 : ASS SOIL 2 - Clay with Low OM content           !
-!  0.000 0.000                 : ASS SOIL 3 - Sand with High OM content          !
-!  0.000 0.000                 : ASS SOIL 4 - Clay with High OM content          !
-! ! ASS flux parameter - rewetting (Day1: mol H+/m2/day & Day2-90:mol H+/m2/day) !
-! 0.1380 0.0070                : ASS SOIL 1 - Sand with Low OM content           !
-! 0.1610 0.0100                : ASS SOIL 2 - Clay with Low OM content           !
-! 0.1380 0.0070                : ASS SOIL 3 - Sand with High OM content          !
-! 0.1610 0.0100                : ASS SOIL 4 - Clay with High OM content          !
-!#
-!# Translates to :
-!#
-!     AED_REAL :: aep(MAX_ASS_PARAMS)
-!     AED_REAL :: ass(MAX_ASS_PARAMS)
-!     AED_REAL :: Bss(MAX_ASS_PARAMS)
-!     AED_REAL :: Debs(MAX_ASS_PARAMS)
-!     AED_REAL :: Dper(MAX_ASS_PARAMS)
-!     AED_REAL :: Porosity(MAX_ASS_PARAMS)
-!     AED_REAL :: Density(MAX_ASS_PARAMS)
-!     AED_REAL :: zASS
-!
-! &aed2_ass
-!    nPars   = 4
-!    dPer    =  1.50000E+00,  1.50000E+00,  1.50000E+00,  1.50000E+00  ! Depth to perching (m)
-!    Density =  1530.000000,  1230.000000,  1530.000000,  1230.000000  ! Sediment density (kg/m3)
-
-!    pass_0 = 0.041000E+00, 0.250000E+00, 0.041000E+00, 0.250000E+00  ! Potential Acidity (mol H+/kg)
-!    Racid    =  1.000000000,  1.000000000,  1.000000000,  1.000000000  ! Acidity production rate
-!    flux_bf =  0.000000000,  0.000000000,  0.000000000,  0.000000000  ! ASS flux parameter - baseflow (/day)
-!    flux_rn=        0.000,        0.000,        0.000,        0.000  ! ASS flux parameter - rain pulsing (/day)
-!    flux_rn_max   =        0.000,        0.000,        0.000,        0.000  ! ASS flux parameter - rain pulsing (mm)
-!    flux_rw_a =       0.1380,       0.1610,       0.1380,       0.1610  ! ASS flux parameter - rewetting (Day1
-!    flux_rw_d =       0.0070,       0.0100,       0.0070,       0.0100  ! ASS flux parameter - rewetting (Day2
-! /
-
-
 #include "aed2.h"
 
 !
@@ -386,7 +322,6 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
    soiltemp = _STATE_VAR_S_(data%id_l_soiltemp)
 
 
-  ! WRITE(*,"('Start acid sulfate soils calculations...',I4)"),INT(matz)
 
    !---------------------------------------------------------------------------
    ! Zero dummy (working) variables
@@ -497,7 +432,6 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
        !-----------------------------------------------------------------------
        !-- Decrease in available acidity in SZ due to ANC/SO4 reduction
 
-       !newANC = c%SED%ASS%flux_rn_max(sIndex) * WQ%sed(i,SZAASS) * DDT
        !newANC = data%flux_rn_max(assz) * MIN(SZDepth,0.5) * area * DDT * 1e-3
        newANC = data%flux_rn_max(assz) * MIN(SZDepth,0.5) * DDT * 1e-3
        IF(newANC > SZAASS) newANC=SZAASS
@@ -507,7 +441,7 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
 
        acid_neut = acid_neut - newANC
 
-!print *,'newAcidity',newAcidity,newANC,PYROX
+       !print *,'newAcidity',newAcidity,newANC,PYROX
 
 
        !-----------------------------------------------------------------------
@@ -543,20 +477,14 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
          acid_flux1 = acid_flux1 + acidityFlux
 
         ! ! Store acidity flux in DissFluxRates  [ UNITS = mol /m2 /day ]
-        ! ! Used in UpdateBoundaryWaterConcs where non-vdo2D cells are fluxed
-        ! DissFluxRates(i,DICHM(chargeBalCol)) = DissFluxRates(i,DICHM(chargeBalCol)) &
-        !                                      + acidityFlux / ( ivec(1) * DDT)
 
         ! set diagnostic flux and update seepage tracer into the water: mol/m2/day
          ASSBFLW = acidityFlux/DDT
         _FLUX_VAR_R_(data%id_asstracer) = _FLUX_VAR_R_(data%id_asstracer) + ASSBFLW/secs_per_day
 
         ! ! Store acidity flux in DissFluxRates  [ UNITS = mol /m2 /day ]
-        ! ! Used in UpdateBoundaryWaterConcs where non-vdo2D cells are fluxed
-        ! DissFluxRates(i,DICHM(chargeBalCol)) = DissFluxRates(i,DICHM(chargeBalCol)) &
-        !                                      + acidityFlux / ( ivec(1) * DDT)
 
-!        _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + 1e-3*ASSBFLW/secs_per_day
+        ! _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + 1e-3*ASSBFLW/secs_per_day
         _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + ASSBFLW/secs_per_day
         IF ( data%id_g_so4>0 ) THEN
          _FLUX_VAR_R_(data%id_g_so4) = _FLUX_VAR_R_(data%id_g_so4) + (ASSBFLW/secs_per_day) * data%X_hso4
@@ -592,38 +520,12 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
         _FLUX_VAR_R_(data%id_asstracer) = _FLUX_VAR_R_(data%id_asstracer) + ASSSFLW/secs_per_day
 
         ! ! Store acidity flux in DissFluxRates  [ UNITS = mol /m2 /day ]
-        ! ! Used in UpdateBoundaryWaterConcs where non-vdo2D cells are fluxed
-        ! DissFluxRates(i,DICHM(chargeBalCol)) = DissFluxRates(i,DICHM(chargeBalCol)) &
-        !                                      + acidityFlux / ( ivec(1) * DDT )
         _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + ASSSFLW/secs_per_day
-!        _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + 1e-3*ASSSFLW/secs_per_day
+        ! _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + 1e-3*ASSSFLW/secs_per_day
         IF ( data%id_g_so4>0 ) THEN
          ! SO4 flux associated with pyrite oxidation (SHOULD THIS BE MULTIPLIED BY 1000 as SO4 in mmol/m3?)
          _FLUX_VAR_R_(data%id_g_so4) = _FLUX_VAR_R_(data%id_g_so4) + (ASSSFLW/secs_per_day) * data%X_hso4
         ENDIF
-
-
-
-         ! WQ%sed(i,SZAASS) = WQ%sed(i,SZAASS) + SedimentData(i,1,SED(DICHM(chargeBalCol)))
-         ! SedimentData(i,1,SED(DICHM(chargeBalCol))) = 0.0
-         !
-         !
-         ! acidityFlux = WQ%sed(i,SZAASS) * ( DDT * SoilCol(i)%qse / MIN(SZDepth,0.5) )
-         !
-         ! IF (acidityFlux > WQ%sed(i,SZAASS) ) THEN
-         !   acidityFlux = 0.9* WQ%sed(i,SZAASS)
-         ! END IF
-         !
-         ! acid_flux5 = acid_flux5 + acidityFlux
-         !
-         ! ! Store acidity flux in DissFluxRates  [ UNITS = mol /m2 /day ]
-         ! ! Used in UpdateBoundaryWaterConcs where non-vdo2D cells are fluxed
-         ! DissFluxRates(i,DICHM(chargeBalCol)) = DissFluxRates(i,DICHM(chargeBalCol)) &
-         !                                      + acidityFlux / ( ivec(1) * DDT )
-         !
-         ! WQ%sed(i,SZAASS) = WQ%sed(i,SZAASS) - acidityFlux
-         !
-         ! !WQ%sed(i,ASSBFLW)= acidityFlux/DDT
 
 
        END IF
@@ -735,13 +637,8 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
        SZpH = PH
 
        ! Store acidity flux in ASSRWET for update within routine
-       ! UpdateBottomWaterConcs [ UNITS = mol /m2 /day ]
        ASSRWET = acidityFlux * 1e-3
 
-  !     !IF (acidityFlux*DDT > SedimentData(i,1,SED(DICHM(chargeBalCol)))) THEN
-  !     !  acidityFlux = 0.9*SedimentData(i,1,SED(DICHM(chargeBalCol)))/DDT
-  !     !END IF
-  !     DissFluxRates(i,DICHM(chargeBalCol)) = acidityFlux * 1e-3
        _FLUX_VAR_B_(data%id_g_ubalchg) = _FLUX_VAR_B_(data%id_g_ubalchg) + ASSRWET/secs_per_day
        IF ( data%id_g_so4>0 ) THEN
          _FLUX_VAR_B_(data%id_g_so4) = _FLUX_VAR_B_(data%id_g_so4) + (ASSRWET/secs_per_day) * data%X_hso4
@@ -769,60 +666,6 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
    _DIAG_VAR_S_(data%id_pml)    = SoilCol%pastMaxLevel  ! _DIAG_VAR_S_(data%id_l_wt)
 
 
-
-   !---------------------------------------------------------------------------!
-   ! Write Acid Sulfate Soils ITS file                                         !
-   !
-   !   (1)  Time
-   !   (2)  Total moles potential H+ remaining (PASS)
-   !   (3)  Total soil volume containing potential H+
-   !   (4)  Change in potential ASS (PASS) in this timestep
-   !   (5)  Total moles available H+ in sediment (UZ)
-   !   (6)  Total moles available H+ in sediment (SZ)
-   !   (7)  Change in available acidity in this timestep
-   !   (8)  Change in available ANC in this timestep
-   !   (9)  ASS flux to SatZone 0  - recharge
-   !   (10)  ASS flux to water 1    - baseflow
-   !   (11) ASS flux to water 2    - rain pulsing
-   !   (12) ASS flux to water 3a   - rewetting (initial advective pulse)
-   !   (13) ASS flux to water 3b   - rewetting (subsequent diffusive flux)
-   !   (14) ASS flux to water 7    - SO4 reduction
-   !   (15) ASS flux to water 5    - ponding and runoff (subsequent diffusive flux)
-   !   (16) ASS flux to water 6    - UZ->SZ from rising water table
-   !   (17) CHGBAL change in water column due to boundary flux
-   !   (18) XSoilFluxi change in water column due to boundary flux
-   !   (19) Area of wet cells
-   !   (20) Area of dry cells
-   !   (21) Area of dry cells not topgraphically connected to water
-   !   (22) Average water level of domain
-   !   (23) Rainfall
-   !   (24) Boundary
-   !   (25) maxqse (ponding)
-   !   (26) SZ acid consumption
-   !                      SUM(WQ%sed(:,PASS)),                                  &
-   !                      pass_vol,                                             &
-   !                      acid_potl,                                            &
-   !                      SUM(WQ%sed(:,UZAASS)),                                &
-   !                      SUM(WQ%sed(:,SZAASS)),                                &
-   !                      acid_gen,                                             &
-   !                      acid_anc,                                             &
-   !                      acid_flux0,                                           &
-   !                      acid_flux1,                                           &
-   !                      acid_flux2,                                           &
-   !                      acid_flux3,                                           &
-   !                      acid_flux4,                                           &
-   !                      acid_flux7,                                           &
-   !                      acid_flux5,                                           &
-   !                      acid_flux6,                                           &
-   !                      ass_chgbal,                                           &
-   !                      XSoilFluxi(DICHM(chargeBalCol)),                      &
-   !                      wetarea, dryarea, lostarea,                           &
-   !                      avgLevel, rain,                                       &
-   !                      boundary_flux/DDT,                                    &
-   !                      maxqse,                                               &
-   !                      acid_neut
-   !
-   !---------------------------------------------------------------------------!
 
 CONTAINS
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1215,21 +1058,10 @@ SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
    ENDDO
    _DIAG_VAR_S_(data%id_passt) = zero_
 
-     !PASSContent(i,:)     = 0.0
-     !PASSContent0(i,1)    = WQ%sed(i,PASS)
-     !PASSContent0(i,2)    = WQ%sed(i,PASS)
-     !ANCContent(i,:)     = 0.0
-     !ANCContent0(i,1)    = WQ%sed(i,ANC)
-     !ANCContent0(i,2)    = WQ%sed(i,ANC)
-
 
 
    IF (.NOT. data%simProfiles)  RETURN
 
-!IF(theSoil%bathy > 0.5 .and. theSoil%PhreaticDepth>0.) THEN
-!   print *,'data%zASS(matz)',theSoil%bathy,data%zASS(matz),theSoil%Depth,theSoil%PhreaticHgt,middep
-!!PAUSE
-!ENDIF
 
    ! Lake Alex == 1
    IF( data%zASS(zindex)>0.5 .AND. data%zASS(zindex)<1.5) THEN
@@ -1647,9 +1479,6 @@ SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
 
      ! Constant
      ELSE
-
-      ! PASSContent0(i,3:20) = PASSContent0(i,1) !+ c%SED%ASS%KASS(sIndex) * (middep(3:20)-dep(1))
-      ! ANCContent0(i,3:20)  = ANCContent0(i,1)  !+  3.0 * (middep(3:20)-dep(1))
 
      END IF
 
