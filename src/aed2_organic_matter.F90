@@ -564,7 +564,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
       _FLUX_VAR_(data%id_don)  = _FLUX_VAR_(data%id_don)  + donr*donr_mineralisation + photolysis*photo_fmin*(donr/docr)
       _FLUX_VAR_(data%id_dopr) = _FLUX_VAR_(data%id_dopr) - dopr*dopr_mineralisation - photolysis*(dopr/docr)
       _FLUX_VAR_(data%id_dop)  = _FLUX_VAR_(data%id_dop)  + dopr*dopr_mineralisation + photolysis*photo_fmin*(dopr/docr)
-      _FLUX_VAR_(data%id_cpom) = _FLUX_VAR_(data%id_cpom) - cpom*cpom_breakdown
+      _FLUX_VAR_(data%id_cpom) = 0.00000 !_FLUX_VAR_(data%id_cpom) - cpom*cpom_breakdown
       _FLUX_VAR_(data%id_poc)  = _FLUX_VAR_(data%id_poc) + (cpom*cpom_breakdown)
       _FLUX_VAR_(data%id_pon)  = _FLUX_VAR_(data%id_pon) + (cpom*cpom_breakdown)*data%X_cpom_n
       _FLUX_VAR_(data%id_pop)  = _FLUX_VAR_(data%id_pop) + (cpom*cpom_breakdown)*data%X_cpom_p
