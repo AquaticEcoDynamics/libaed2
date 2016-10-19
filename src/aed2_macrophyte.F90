@@ -81,8 +81,8 @@ MODULE aed2_macrophyte
 
      CONTAINS
          PROCEDURE :: define             => aed2_define_macrophyte
-!        PROCEDURE :: calculate_riparian => aed2_calculate_riparian_macrophyte
          PROCEDURE :: calculate_benthic  => aed2_calculate_benthic_macrophyte
+         PROCEDURE :: calculate_riparian => aed2_calculate_riparian_macrophyte
 !        PROCEDURE :: mobility           => aed2_mobility_macrophyte
 !        PROCEDURE :: light_extinction   => aed2_light_extinction_macrophyte
 !        PROCEDURE :: delete             => aed2_delete_macrophyte
