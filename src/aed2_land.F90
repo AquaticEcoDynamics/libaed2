@@ -57,6 +57,7 @@ MODULE aed2_land
       AED_REAL, DIMENSION(:),ALLOCATABLE :: Zcap, Ztrn, zASS, Zebs
       AED_REAL, DIMENSION(:),ALLOCATABLE :: fc, phi, Porosity, Density
       AED_REAL, DIMENSION(:),ALLOCATABLE :: f0, fmin, Fmax, decay, regen
+      AED_REAL :: boundaryWThgt
 
       !# Active procedures
       CONTAINS
@@ -103,28 +104,35 @@ SUBROUTINE aed2_define_land(data, namlst)
    AED_REAL :: Porosity(MAX_ASS_PARAMS),Density(MAX_ASS_PARAMS)
    AED_REAL :: fc(MAX_ASS_PARAMS),phi(MAX_ASS_PARAMS)
    AED_REAL :: f0(MAX_ASS_PARAMS), fmin(MAX_ASS_PARAMS), Fmax(MAX_ASS_PARAMS), decay(MAX_ASS_PARAMS), regen(MAX_ASS_PARAMS)
+   AED_REAL :: boundaryWThgt
    CHARACTER(len=64) :: turbid_link = ''
 
    NAMELIST /aed2_land/ n_zones, active_zones, minbathy, Dper, &
                         aep, Zebs, ass, Bss,   &
                         Porosity, Density, Zcap, Ztrn, &
                         infil_model, fc, phi, f0, fmin, Fmax, decay, regen, &
-                        simTemp, simSalt, simErosion, turbid_link
+                        simTemp, simSalt, simErosion, turbid_link, &
+                        boundaryWThgt
 
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
+   ! Set defaults
+   boundaryWThgt = zero_
+
+   ! Process input file
    read(namlst,nml=aed2_land,iostat=status) ! Read the namelist
    IF (status /= 0) STOP 'Error reading namelist aed2_land'
 
+   ! Allocate spatial variables
+   data%n_zones = n_zones
    ALLOCATE(data%Zebs(n_zones),data%aep(n_zones))
    ALLOCATE(data%ass(n_zones),data%Bss(n_zones))
    ALLOCATE(data%Dper(n_zones),data%minbathy(n_zones),data%Ztrn(n_zones),data%Zcap(n_zones))
    ALLOCATE(data%Porosity(n_zones),data%Density(n_zones),data%fc(n_zones),data%phi(n_zones))
    ALLOCATE(data%f0(n_zones),data%fmin(n_zones))
    ALLOCATE(data%Fmax(n_zones),data%decay(n_zones),data%regen(n_zones))
-
-   data%n_zones = n_zones
    IF (n_zones > 0) THEN
       ALLOCATE(data%active_zones(n_zones))
       DO i=1,n_zones
@@ -136,6 +144,7 @@ SUBROUTINE aed2_define_land(data, namlst)
    data%simTemp = simTemp
    data%simSalt = simSalt
    data%simErosion = simErosion
+   data%boundaryWThgt = boundaryWThgt
    data%minbathy(1:n_zones) = minbathy(1:n_zones)  !
    data%Dper(1:n_zones) = Dper(1:n_zones)
    data%Zebs(1:n_zones) = Zebs(1:n_zones)
@@ -195,7 +204,7 @@ SUBROUTINE aed2_define_land(data, namlst)
    data%id_matz =     aed2_define_sheet_diag_variable('matz','-','material zone')
    data%id_rainloss = aed2_define_sheet_diag_variable('rainloss','m','rainloss')
 
-   ! Register environmental dependencies (vars from host model we need)
+   ! Register environmental dependencies (vars from host model we want to monitor)
    data%id_E_temp =     aed2_locate_global('temperature')
    data%id_E_rain =     aed2_locate_global_sheet('rain')
    data%id_E_area =     aed2_locate_global_sheet('layer_area')
@@ -214,8 +223,7 @@ END SUBROUTINE aed2_define_land
 !###############################################################################
 SUBROUTINE aed2_initialize_land(data, column, layer_idx)
 !-------------------------------------------------------------------------------
-! Routine to update the dynamics of "Acid Sulfate Soils" (ASS) and determine   !
-! the flux to the water column from exposed or re-wetted sediment              !
+! Routine to set the initial soil properties across the domain
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_land_data_t),INTENT(in) :: data
@@ -273,8 +281,8 @@ END SUBROUTINE aed2_initialize_land
 !###############################################################################
 SUBROUTINE aed2_calculate_dry_land(data, column, layer_idx)!
 !-------------------------------------------------------------------------------
-! Main interface routine for the hydrology/ass module. Assumes the module has
-! already been configured (ConfigureHydrology) and initialised (InitialHydrology)
+! Main interface routine for the soil hydrology module. Assumes the module has
+! already been configured and initialised (as above)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_land_data_t),INTENT(in)   :: data
@@ -474,11 +482,11 @@ SUBROUTINE InitialHydrology(data, column, layer_idx, avgLevel)
      SoilCol%PhreaticHgt = avgLevel
      SoilCol%PhreaticDepth = zero_
    ELSE
-     IF(bathy > 1.0) THEN
-       SoilCol%PhreaticHgt = 1.0
+     IF(bathy > boundaryWThgt) THEN
+       SoilCol%PhreaticHgt = boundaryWThgt
        SoilCol%PhreaticDepth = bathy - SoilCol%PhreaticHgt
      ELSE
-       SoilCol%PhreaticHgt = MIN( bathy, 0.5)! avgLevel
+       SoilCol%PhreaticHgt = bathy ! MIN( bathy, 0.5)! avgLevel
        SoilCol%PhreaticDepth = bathy - SoilCol%PhreaticHgt
      ENDIF
 
