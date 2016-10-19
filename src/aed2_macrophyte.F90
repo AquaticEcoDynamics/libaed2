@@ -35,6 +35,7 @@ MODULE aed2_macrophyte
    PUBLIC aed2_macrophyte_data_t
 
    TYPE :: macrophyte_data
+       INTEGER       :: growthForm
        CHARACTER(64) :: m_name
        AED_REAL      :: m0
        AED_REAL      :: R_growth
@@ -90,6 +91,9 @@ MODULE aed2_macrophyte
 
 
    LOGICAL :: debug = .TRUE.
+   INTEGER, PARAMETER :: SUBMERGED = 1
+   INTEGER, PARAMETER :: EMERGENT = 2
+   INTEGER, PARAMETER :: FLOATING = 3
 
 CONTAINS
 !===============================================================================
@@ -129,6 +133,8 @@ SUBROUTINE aed2_macrophyte_load_params(data, dbase, count, list)
 
     DO i=1,count
        ! Assign parameters from database to simulated groups
+       data%mphydata(i)%growthForm   = 1
+         IF(list(i)>5) data%mphydata(i)%growthForm   = 2   ! HACK FOR GELERAH
        data%mphydata(i)%m_name       = md(list(i))%m_name
        data%mphydata(i)%m0           = md(list(i))%m0
        data%mphydata(i)%R_growth     = md(list(i))%R_growth/secs_per_day
@@ -284,7 +290,7 @@ END FUNCTION in_zone_set
 !###############################################################################
 SUBROUTINE aed2_calculate_benthic_macrophyte(data,column,layer_idx)
 !-------------------------------------------------------------------------------
-! Calculate pelagic sedimentation of phytoplankton.
+! Calculate submerged macrophyte production and respiration etc
 ! Everything in units per surface area (not volume!) per time.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
@@ -407,6 +413,126 @@ SUBROUTINE aed2_light_extinction_macrophyte(data, column, layer_idx, extinction)
       extinction = extinction + (data%mphydata(mphy_i)%KeMAC * (mphy/dz) )
    ENDDO
 END SUBROUTINE aed2_light_extinction_macrophyte
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx)
+!-------------------------------------------------------------------------------
+! Calculate emergent macrophytes in the riparian zone.
+! Everything in units per surface area (not volume!) per time.
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_macrophyte_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   AED_REAL :: mphy        ! State
+   INTEGER  :: mphy_i
+   AED_REAL :: mphy_flux
+   AED_REAL :: fT, fI, fSal, fDO, fSM
+   AED_REAL :: extc, dz, par, Io, temp, salinity
+   AED_REAL :: primprod(data%num_mphy)
+   AED_REAL :: respiration(data%num_mphy)
+   AED_REAL :: matz
+   AED_REAL :: emergent_portion
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ! Check this cell is in an active zone for macrophytes
+   matz = _STATE_VAR_S_(data%id_sed_zone)
+   if ( .NOT. in_zone_set(matz, data%active_zones) ) return
+
+   ! Retrieve current environmental conditions
+   temp = _STATE_VAR_(data%id_atem)      ! local air temperature
+   theta = _STATE_VAR_(data%id_theta)       ! local soil moisture
+   Io = _STATE_VAR_S_(data%id_I_0)      ! surface short wave radiation
+
+   ! Initialise cumulative biomass diagnostics
+   _DIAG_VAR_S_(data%id_mac) = zero_
+   _DIAG_VAR_S_(data%id_mac_ag) = zero_
+   _DIAG_VAR_S_(data%id_mac_bg) = zero_
+   _DIAG_VAR_S_(data%id_lai) = zero_
+
+   DO mphy_i=1,data%num_mphy
+
+     ! Check for emergent species ( can grow in dry and wet )
+     IF( data%mphydata(mphy_i)%GrowthForm == EMERGENT ) THEN
+
+        ! Retrieve current (local) state variable values
+        mphy = _STATE_VAR_S_(data%id_mphy(mphy_i))! macrophyte group i
+
+        ! LIGHT
+        fI   = photosynthesis_irradiance(data%mphydata(mphy_i)%lightModel, &
+                       data%mphydata(mphy_i)%I_K, data%mphydata(mphy_i)%I_S, par, extc, Io, dz)
+        emergent_portion = 1.0 ! will depend on pc_wet and depth of water
+        fI   = fI * emergent_portion
+
+        ! TEMPERATURE
+        fT   = 1.
+
+        ! SOIL WATER AVAILABILITY
+        IF( pc_wet >0.8 ) THEN
+          fSM   = 1.
+        ELSE
+          fSM   = 0.1
+        ENDIF
+
+        primprod(mphy_i) = data%mphydata(mphy_i)%R_growth * fI * fT * fSM
+
+        ! Respiration and general metabolic loss
+        respiration(mphy_i) = bio_respiration(data%mphydata(mphy_i)%R_resp, data%mphydata(mphy_i)%theta_resp, temp)
+
+        ! Salinity stress effect on respiration
+        fSal = 1.0 ! phyto_salinity(data%mphydata,mphy_i,salinity)
+        fDO  = 1.0 ! phyto_oxygen(data%mphydata,mphy_i,oxygen)
+
+        respiration(mphy_i) = respiration(mphy_i) * fSal * fDO
+
+        IF( .NOT.data%simStaticBiomass ) THEN
+          mphy_flux = (primprod(mphy_i) - respiration(mphy_i)) *  mphy
+
+          ! Set bottom fluxes for the pelagic (change per surface area per second)
+          _FLUX_VAR_B_(data%id_mphy(mphy_i)) = _FLUX_VAR_B_(data%id_mphy(mphy_i)) + mphy_flux
+        ENDIF
+        IF( data%simMacFeedback ) THEN
+        !    _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + mphy_flux
+        !    _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) - mphy_flux
+        ENDIF
+
+        _DIAG_VAR_S_(data%id_mac) = _DIAG_VAR_S_(data%id_mac) + mphy
+        _DIAG_VAR_S_(data%id_mac_ag) = _DIAG_VAR_S_(data%id_mac_ag) + mphy*(one_-data%mphydata(mphy_i)%f_bg)
+        _DIAG_VAR_S_(data%id_mac_bg) = _DIAG_VAR_S_(data%id_mac_bg) + mphy*(data%mphydata(mphy_i)%f_bg)
+        _DIAG_VAR_S_(data%id_lai) = _DIAG_VAR_S_(data%id_lai) + (one_ - exp(-data%mphydata(mphy_i)%k_omega * mphy*(one_-data%mphydata(mphy_i)%f_bg)))
+
+      ELSEIF( data%mphydata(mphy_i)%GrowthForm == SUBMERGED ) THEN
+        ! Dry cell
+        IF( pc_wet <0.5 ) THEN
+          ! Retrieve current (local) state variable values
+          mphy = _STATE_VAR_S_(data%id_mphy(mphy_i))! macrophyte group i
+
+          IF( .NOT.data%simStaticBiomass ) THEN
+             mphy_flux = -(0.5/86400) *  mphy
+
+            ! Set bottom fluxes for the pelagic (change per surface area per second)
+            _FLUX_VAR_B_(data%id_mphy(mphy_i)) = _FLUX_VAR_B_(data%id_mphy(mphy_i)) + mphy_flux
+          ENDIF
+          _DIAG_VAR_S_(data%id_mac) = _DIAG_VAR_S_(data%id_mac) + mphy
+          _DIAG_VAR_S_(data%id_mac_ag) = _DIAG_VAR_S_(data%id_mac_ag) + mphy*(one_-data%mphydata(mphy_i)%f_bg)
+          _DIAG_VAR_S_(data%id_mac_bg) = _DIAG_VAR_S_(data%id_mac_bg) + mphy*(data%mphydata(mphy_i)%f_bg)
+          _DIAG_VAR_S_(data%id_lai) = _DIAG_VAR_S_(data%id_lai) + (one_ - exp(-data%mphydata(mphy_i)%k_omega * mphy*(one_-data%mphydata(mphy_i)%f_bg)))
+
+      ENDIF
+
+   ENDDO
+
+   ! Export diagnostic variables
+   IF( pc_wet <1.0 ) _DIAG_VAR_S_(data%id_diag_par)= Io
+   _DIAG_VAR_S_(data%id_gpp) = _DIAG_VAR_S_(data%id_gpp) + SUM(primprod)*secs_per_day
+
+
+END SUBROUTINE aed2_calculate_riparian_macrophyte
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
