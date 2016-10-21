@@ -73,9 +73,13 @@ MODULE aed2_organic_matter
                           theta_pop_miner, theta_dop_miner, theta_sed_dop
       AED_REAL :: docr_initial,donr_initial,dopr_initial,cpom_initial,  &
                           Rdocr_miner,Rdonr_miner,Rdopr_miner,Rcpom_bdown, &
-                          w_cpom,X_cpom_n,X_cpom_p,KeDOMR,KeCPOM
+                          X_cpom_n,X_cpom_p,KeDOMR,KeCPOM
       AED_REAL :: photo_fmin
+      AED_REAL :: sedimentOMfrac, Xsc, Xsn, Xsp
+      AED_REAL :: w_cpom, d_cpom, rho_cpom
+      AED_REAL :: w_pom, d_pom, rho_pom
 
+      INTEGER  :: resuspension, settling
       LOGICAL  :: simRPools,extra_diag,simphotolysis
       LOGICAL  :: use_oxy,use_amm,use_frp,use_dic,use_Fsed_model,use_Psed_model
 
@@ -189,7 +193,6 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    AED_REAL                  :: Rdonr_miner  = 0.01
    AED_REAL                  :: Rdopr_miner  = 0.01
    AED_REAL                  :: Rcpom_bdown  = 0.01
-   AED_REAL                  :: w_cpom       = 0.0
    AED_REAL                  :: X_cpom_n     = 0.0
    AED_REAL                  :: X_cpom_p     = 0.0
    AED_REAL                  :: KeDOMR = 0.0001
@@ -204,6 +207,10 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    AED_REAL                  :: photo_fmin = 0.9, photo_c = 7.52
 
    CHARACTER(len=64)         :: resus_link=''
+
+   AED_REAL :: sedimentOMfrac, Xsc, Xsn, Xsp
+   AED_REAL :: w_cpom, d_cpom, rho_cpom
+   AED_REAL :: w_pom, d_pom, rho_pom
 
    NAMELIST /aed2_organic_matter/ &
              poc_min, poc_max, doc_min, doc_max, &
@@ -227,10 +234,13 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
              Psed_poc_variable, Psed_pon_variable, Psed_pop_variable, &
              simRPools, docr_initial, donr_initial, dopr_initial, cpom_initial, &
              Rdocr_miner, Rdonr_miner, Rdopr_miner, Rcpom_bdown, &
-             w_cpom, X_cpom_n, X_cpom_p, KeDOMR, KeCPOM, &
+             X_cpom_n, X_cpom_p, KeDOMR, KeCPOM, &
            ! docr_miner_product_variable, donr_miner_product_variable,dopr_miner_product_variable, &
-             extra_diag, simphotolysis, photo_fmin, photo_c, &
-             resus_link
+             simphotolysis, photo_fmin, photo_c, &
+             resuspension, resus_link, sedimentOMfrac, Xsc, Xsn, Xsp,&
+             settling,  w_cpom, d_cpom, rho_cpom,w_pom, d_pom, rho_pom, &
+             extra_diag
+
 
 
 !-------------------------------------------------------------------------------
@@ -292,6 +302,9 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    data%w_cpom          = w_cpom/secs_per_day
    data%d_cpom          = d_cpom
    data%rho_cpom        = rho_cpom
+   IF( settling==0 ) THEN
+     w_poc=zero_;w_pon=zero_;w_pop=zero_;w_pom=zero_;w_cpom=zero_;
+   ENDIF
    !-- Sediment interaction parameters (basic model)
    data%resuspension    = resuspension
    data%sedimentOMfrac  = sedimentOMfrac
@@ -387,8 +400,11 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    ENDIF
 
    !-- resuspension link variable
-   IF ( .NOT. resus_link .EQ. '' ) &
+   IF ( .NOT. resus_link .EQ. '' ) THEN
       data%id_l_resus  = aed2_locate_global(TRIM(resus_link)) ! ('TRC_resus')
+   ELSE
+      data%resuspension = 0
+   ENDIF
 
    !-- light
    IF (simRPools) THEN
@@ -692,7 +708,7 @@ SUBROUTINE aed2_calculate_benthic_organic_matter(data,column,layer_idx)
       Fsed_poc = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsc *(bottom_stress - data%tau_0) / data%tau_r
       Fsed_pon = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsn *(bottom_stress - data%tau_0) / data%tau_r
       Fsed_pop = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsp *(bottom_stress - data%tau_0) / data%tau_r
-      IF( resus_link/='' )THEN
+      IF( data%resuspension>0 )THEN
         Fsed_poc = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsc
         Fsed_pon = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsn
         Fsed_pop = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsp
@@ -806,27 +822,35 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ! settling = 0 : no settling
+   ! settling = 1 : constant settling @ w_pom
+   ! settling = 2 : stokes settling (calculated below)
+
+   IF( data%settling<2 ) RETURN
+
    temp = _STATE_VAR_(data%id_temp)     ! local temperature
    salinity = _STATE_VAR_(data%id_sal) ! local salinity
 
-   ! Compute settling rate of particles
-   DO i=1,data%num_tracers
-      ! Update the settling rate and assign to mobility array
+   ! Calculate water density
+   water_rho = (0.02003*temp**3.-6.3335*temp**2.+26.8567*temp+1000012.72)*(1.+0.77*salinity)/1000.
 
-      ! Calculate water density
-      water_rho = (0.02003*temp**3.-6.3335*temp**2.+26.8567*temp+1000012.72)*(1.+0.77*salinity)/1000.
+   ! calclulate water viscosity
+   mu = (0.00005*temp**4.-0.01196*temp**3.+1.10961*temp**2.-56.59779*temp+1175.58155)/1000000.
 
-      ! calclulate water viscosity
-      mu = (0.00005*temp**4.-0.01196*temp**3.+1.10961*temp**2.-56.59779*temp+1175.58155)/1000000.
+   ! Calculate settling velocity according to Stokes law
+   !  vel = 9.807*data%d_pom(i)**2.*(data%rho_pom(i) - water_rho)/(18.*mu)   !CHECK THIS CALCULATION
 
-      ! Calculate settling velocity according to Stokes law
-    !  vel = 9.807*data%ss_diam(i)**2.*(data%ss_rho(i) - water_rho)/(18.*mu)   !CHECK THIS CALCULATION
+   ! Update the settling rate and assign to mobility array
+   mobility(data%id_poc) = data%w_pom !vel
+   mobility(data%id_pon) = data%w_pom !vel
+   mobility(data%id_pon) = data%w_pom !vel
+   IF(data%simRPools) THEN
+     !  vel = 9.807*data%d_cpom(i)**2.*(data%rho_cpom(i) - water_rho)/(18.*mu)   !CHECK THIS CALCULATION
+     mobility(data%id_pon) = data%w_cpom !vel
+   ENDIF
 
-      mobility(data%id_ss(i)) = data%wpoc(i) !vel
+   print*,'Settling velocity = ', mobility(data%id_poc)
 
-      print*,'Settling velocity = ', mobility(data%id_ss(i))
-
-   ENDDO
 
 
 END SUBROUTINE aed2_mobility_organic_matter
