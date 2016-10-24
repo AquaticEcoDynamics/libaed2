@@ -54,7 +54,7 @@ MODULE aed2_phytoplankton
       INTEGER :: id_par, id_tem, id_sal, id_dz, id_extc
       INTEGER :: id_I_0
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
-      INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP
+      INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP, id_MPB
       INTEGER :: id_NUP, id_PUP, id_CUP
       INTEGER,ALLOCATABLE :: id_NtoP(:)
       INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), id_fPho(:), id_fSil(:), id_fSal(:)
@@ -67,6 +67,7 @@ MODULE aed2_phytoplankton
       LOGICAL  :: do_Siuptake, do_DOuptake, do_N2uptake
       LOGICAL  :: do_Pmort, do_Nmort, do_Cmort, do_Simort
       LOGICAL  :: do_Pexc, do_Nexc, do_Cexc, do_Siexc
+      INTEGER  :: do_mpb
       INTEGER  :: nnup, npup
       AED_REAL :: dic_per_n
 
@@ -99,16 +100,6 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
 !
 !LOCALS
    INTEGER  :: status
-!  AED_REAL :: p_initial=0.
-!  AED_REAL :: p0=0.0225
-!  AED_REAL :: w_p=-1.157407e-05
-!  AED_REAL :: i_min=25.
-!  AED_REAL :: rmax=1.157407e-05
-!  AED_REAL :: alpha=0.3
-!  AED_REAL :: rpn=1.157407e-07
-!  AED_REAL :: rpdu=2.314814e-07
-!  AED_REAL :: rpdl=1.157407e-06
-
    INTEGER  :: i,tfil
    AED_REAL :: minNut
 
@@ -295,8 +286,10 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    CHARACTER(len=64)  :: si_uptake_target_variable=''
    CHARACTER(len=128) :: dbase='aed2_phyto_pars.nml'
 
-
    AED_REAL           :: zerolimitfudgefactor = 0.9 * 3600
+   AED_REAL           :: I_Kmpb
+   INTEGER            :: do_mpb
+
    NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, w_model,              &
                     p_excretion_target_variable,p_mortality_target_variable,   &
                      p1_uptake_target_variable, p2_uptake_target_variable,     &
@@ -307,7 +300,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                       c_uptake_target_variable, do_uptake_target_variable,     &
                     si_excretion_target_variable,si_mortality_target_variable, &
                       si_uptake_target_variable,                               &
-                    dbase, zerolimitfudgefactor, extra_debug
+                    dbase, zerolimitfudgefactor, extra_debug, do_mpb, I_Kmpb
 !-----------------------------------------------------------------------
 !BEGIN
    w_model = _MOB_CONST_
@@ -319,17 +312,17 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
-   CALL aed2_phytoplankton_load_params(data, dbase, num_phytos, the_phytos, w_model)
+   CALL aed2_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,w_model)
 
-   CALL aed2_bio_temp_function(data%num_phytos,             &
-                              data%phytos%theta_growth,     &
-                              data%phytos%T_std,            &
-                              data%phytos%T_opt,            &
-                              data%phytos%T_max,            &
-                              data%phytos%aTn,              &
-                              data%phytos%bTn,              &
-                              data%phytos%kTn,              &
-                              data%phytos%p_name)
+   CALL aed2_bio_temp_function(data%num_phytos,              &
+                               data%phytos%theta_growth,     &
+                               data%phytos%T_std,            &
+                               data%phytos%T_opt,            &
+                               data%phytos%T_max,            &
+                               data%phytos%aTn,              &
+                               data%phytos%bTn,              &
+                               data%phytos%kTn,              &
+                               data%phytos%p_name)
 
 
    ! Register link to nutrient pools, if variable names are provided in namelist.
@@ -417,6 +410,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_TPHY = aed2_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
    data%id_TIN = aed2_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed2_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
+   data%id_MPB = aed2_define_diag_variable('MPB','mmol/m**2', 'microphytobenthos')
 
    ! Register environmental dependencies
    data%id_tem = aed2_locate_global('temperature')
