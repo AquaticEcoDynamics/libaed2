@@ -53,7 +53,7 @@ MODULE aed2_tracer
          PROCEDURE :: define            => aed2_define_tracer
          PROCEDURE :: calculate         => aed2_calculate_tracer
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_tracer
-!        PROCEDURE :: mobility          => aed2_mobility_tracer
+         PROCEDURE :: mobility          => aed2_mobility_tracer
          PROCEDURE :: light_extinction  => aed2_light_extinction_tracer
 !        PROCEDURE :: delete            => aed2_delete_tracer
 
@@ -177,6 +177,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
 
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
+   data%id_sal = aed2_locate_global('salinity')
    IF ( resuspension > 0 ) THEN
       data%id_taub = aed2_locate_global_sheet('taub')
       data%id_d_taub = aed2_define_sheet_diag_variable('d_taub','N/m**2',  'taub diagnostic')
@@ -320,6 +321,52 @@ SUBROUTINE aed2_light_extinction_tracer(data,column,layer_idx,extinction)
       extinction = extinction + (data%Ke_ss(ss_i)*ss)
    ENDDO
 END SUBROUTINE aed2_light_extinction_tracer
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
+!-------------------------------------------------------------------------------
+! Get the vertical movement values
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_tracer_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: mobility(:)
+!
+!LOCALS
+   AED_REAL :: temp, salinity, water_rho, mu, vel
+   INTEGER  :: i
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   temp = _STATE_VAR_(data%id_temp)     ! local temperature
+   salinity = _STATE_VAR_(data%id_sal) ! local salinity
+
+
+   ! Compute settling rate of particles
+   DO i=1,data%num_tracers
+      ! Update the settling rate and assign to mobility array
+
+      ! Calculate water density
+      water_rho = (0.02003*temp**3.-6.3335*temp**2.+26.8567*temp+1000012.72)*(1.+0.77*salinity)/1000.
+
+      ! calclulate water viscosity
+      mu = (0.00005*temp**4.-0.01196*temp**3.+1.10961*temp**2.-56.59779*temp+1175.58155)/1000000.
+
+      ! Calculate settling velocity according to Stokes law
+    !  vel = 9.807*data%ss_diam(i)**2.*(data%ss_rho(i) - water_rho)/(18.*mu)   !CHECK THIS CALCULATION
+
+      mobility(data%id_ss(i)) = data%settling(i) !vel
+
+      print*,'Settling velocity = ', mobility(data%id_ss(i))
+
+   ENDDO
+
+
+END SUBROUTINE aed2_mobility_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
