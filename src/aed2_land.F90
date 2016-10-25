@@ -482,8 +482,8 @@ SUBROUTINE InitialHydrology(data, column, layer_idx, avgLevel)
      SoilCol%PhreaticHgt = avgLevel
      SoilCol%PhreaticDepth = zero_
    ELSE
-     IF(bathy > boundaryWThgt) THEN
-       SoilCol%PhreaticHgt = boundaryWThgt
+     IF(bathy > data%boundaryWThgt) THEN
+       SoilCol%PhreaticHgt = data%boundaryWThgt
        SoilCol%PhreaticDepth = bathy - SoilCol%PhreaticHgt
      ELSE
        SoilCol%PhreaticHgt = bathy ! MIN( bathy, 0.5)! avgLevel

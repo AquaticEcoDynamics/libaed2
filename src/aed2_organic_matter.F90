@@ -59,6 +59,7 @@ MODULE aed2_organic_matter
       INTEGER  :: id_sed_pop, id_sed_dop
       INTEGER  :: id_sed_poc, id_sed_doc
       INTEGER  :: id_bod, id_cdom
+      INTEGER  :: id_l_resus
 
       !# Model parameters
       AED_REAL :: w_poc,Rpoc_miner,Rdoc_miner,Fsed_poc,Fsed_doc,           &
@@ -78,6 +79,7 @@ MODULE aed2_organic_matter
       AED_REAL :: sedimentOMfrac, Xsc, Xsn, Xsp
       AED_REAL :: w_cpom, d_cpom, rho_cpom
       AED_REAL :: w_pom, d_pom, rho_pom
+      AED_REAL :: Ksed_dom, theta_sed_dom
 
       INTEGER  :: resuspension, settling
       LOGICAL  :: simRPools,extra_diag,simphotolysis
@@ -211,6 +213,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    AED_REAL :: sedimentOMfrac, Xsc, Xsn, Xsp
    AED_REAL :: w_cpom, d_cpom, rho_cpom
    AED_REAL :: w_pom, d_pom, rho_pom
+   AED_REAL :: Ksed_dom, theta_sed_dom
+   INTEGER  :: resuspension, settling
 
    NAMELIST /aed2_organic_matter/ &
              poc_min, poc_max, doc_min, doc_max, &
@@ -829,7 +833,7 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
    IF( data%settling<2 ) RETURN
 
    temp = _STATE_VAR_(data%id_temp)     ! local temperature
-   salinity = _STATE_VAR_(data%id_sal) ! local salinity
+   salinity = _STATE_VAR_(data%id_salt) ! local salinity
 
    ! Calculate water density
    water_rho = (0.02003*temp**3.-6.3335*temp**2.+26.8567*temp+1000012.72)*(1.+0.77*salinity)/1000.

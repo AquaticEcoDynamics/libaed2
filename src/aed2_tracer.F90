@@ -41,7 +41,7 @@ MODULE aed2_tracer
       AED_REAL :: tau_0_min, kTau_0
       INTEGER  :: id_lnk_id, id_tau_0, id_epsilon
 
-      INTEGER :: id_temp, id_retain, id_taub
+      INTEGER :: id_temp, id_retain, id_taub, id_salt
       INTEGER :: id_d_taub, id_resus
       INTEGER :: resuspension
 
@@ -177,7 +177,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
 
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
-   data%id_sal = aed2_locate_global('salinity')
+   data%id_salt = aed2_locate_global('salinity')
    IF ( resuspension > 0 ) THEN
       data%id_taub = aed2_locate_global_sheet('taub')
       data%id_d_taub = aed2_define_sheet_diag_variable('d_taub','N/m**2',  'taub diagnostic')
@@ -343,7 +343,7 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
 !-------------------------------------------------------------------------------
 !BEGIN
    temp = _STATE_VAR_(data%id_temp)     ! local temperature
-   salinity = _STATE_VAR_(data%id_sal) ! local salinity
+   salinity = _STATE_VAR_(data%id_salt) ! local salinity
 
 
    ! Compute settling rate of particles

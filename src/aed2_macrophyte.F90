@@ -72,6 +72,7 @@ MODULE aed2_macrophyte
       INTEGER :: id_diag_par, id_gpp, id_p2r, id_mac, id_sed_zone
       INTEGER :: id_MAC_ag, id_MAC_bg, id_lai
       INTEGER :: n_zones
+      INTEGER :: id_atem,id_theta
       AED_REAL,ALLOCATABLE :: active_zones(:)
 
       !# Model parameters
@@ -417,7 +418,7 @@ END SUBROUTINE aed2_light_extinction_macrophyte
 
 
 !###############################################################################
-SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx)
+SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx,pc_wet)
 !-------------------------------------------------------------------------------
 ! Calculate emergent macrophytes in the riparian zone.
 ! Everything in units per surface area (not volume!) per time.
@@ -426,13 +427,14 @@ SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx)
    CLASS (aed2_macrophyte_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(in) :: pc_wet
 !
 !LOCALS
    AED_REAL :: mphy        ! State
    INTEGER  :: mphy_i
    AED_REAL :: mphy_flux
    AED_REAL :: fT, fI, fSal, fDO, fSM
-   AED_REAL :: extc, dz, par, Io, temp, salinity
+   AED_REAL :: extc, dz, par, Io, temp, salinity, theta
    AED_REAL :: primprod(data%num_mphy)
    AED_REAL :: respiration(data%num_mphy)
    AED_REAL :: matz
@@ -524,7 +526,7 @@ SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx)
           _DIAG_VAR_S_(data%id_lai) = _DIAG_VAR_S_(data%id_lai) + (one_ - exp(-data%mphydata(mphy_i)%k_omega * mphy*(one_-data%mphydata(mphy_i)%f_bg)))
 
       ENDIF
-
+    ENDIF
    ENDDO
 
    ! Export diagnostic variables

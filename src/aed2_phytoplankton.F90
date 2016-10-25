@@ -19,7 +19,8 @@
 
 #define _MOB_CONST_ 0
 #define _MOB_TEMP_  1
-#define _MOB_CALC_  2
+#define _MOB_STOKES_  2
+#define _MOB_MOTILE_  3
 
 
 MODULE aed2_phytoplankton
@@ -71,6 +72,7 @@ MODULE aed2_phytoplankton
       AED_REAL :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
       INTEGER  :: nnup, npup
       AED_REAL :: dic_per_n
+      AED_REAL :: min_rho,max_rho
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_phytoplankton
@@ -183,7 +185,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
        data%phytos(i)%X_sicon      = pd(list(i))%X_sicon
 
        ! Register group as a state variable
-       data%id_p(i) = aed2_define_variable(                         &
+       data%id_p(i) = aed2_define_variable(                                    &
                               TRIM(data%phytos(i)%p_name),                     &
                               'mmol/m**3',                                     &
                               'phytoplankton '//TRIM(data%phytos(i)%p_name),   &
@@ -191,14 +193,14 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
                               minimum=pd(list(i))%p0,                          &
                               mobility = data%phytos(i)%w_p)
 
-       IF (data%phytos(i)%w_model == _MOB_CALC_) THEN
-          ! Register rho group as a state variable
-          data%id_rho(i) = aed2_define_variable(                    &
+       IF (data%phytos(i)%w_model == _MOB_STOKES_) THEN
+          ! Register rho (density) group as a state variable
+          data%id_rho(i) = aed2_define_variable(                               &
                               TRIM(data%phytos(i)%p_name)//'_rho',             &
-                              'mmol/m**3',                                     &
+                              'kg/m**3',                                       &
                         'phytoplankton '//TRIM(data%phytos(i)%p_name)//'_rho', &
-                              pd(list(i))%w_p,                                 &
-                              minimum=zero_,                                   &
+                              (data%min_rho+data%max_rho)/2.,                  &
+                              minimum=data%min_rho,                            &
                               mobility = data%phytos(i)%w_p)
 
        ENDIF
@@ -327,7 +329,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                                data%phytos%p_name)
 
    ! Register microphytbenthos as a state variable
-   IF (data%do_mpb) THEN
+   IF (data%do_mpb>0) THEN
      data%id_mpb = aed2_define_sheet_variable( 'mpb',                          &
                                                'mmol/m**2',                    &
                                                'microphytobenthos biomass',    &
@@ -894,7 +896,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
      fI = photosynthesis_irradiance(3,data%I_Kmpb,data%I_Kmpb,par,extc,Io,dz)
      ! Compute photosynthesis and respiration
      mpb_prod = data%R_mpbg*fI*(1.05**(temp-20.))*(1.-(mpb/data%mpb_max))
-     mpb_resp = (data%R_mpbr*(1.05**(temp-20.)) !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
+     mpb_resp = (data%R_mpbr*(1.05**(temp-20.))) !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
      mpb_flux = (mpb_prod-mpb_resp)*mpb
      ! Update the MPB biomass, and water O2/CO2
      _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux
@@ -940,7 +942,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
             w_rho = data%phytos(phy_i)%w_p
          CASE (_MOB_TEMP_)
             w_rho = data%phytos(phy_i)%w_p * temp !# MH to fix
-         CASE (_MOB_CALC_)
+         CASE (_MOB_STOKES_)
             !# MH to complete
              phy = _STATE_VAR_(data%id_p(phy_i))! phytoplankton
              w_rho = data%phytos(phy_i)%w_p
