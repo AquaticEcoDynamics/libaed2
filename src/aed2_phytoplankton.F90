@@ -28,17 +28,17 @@ MODULE aed2_phytoplankton
 !-------------------------------------------------------------------------------
    USE aed2_core
    USE aed2_util,ONLY : find_free_lun, &
-                       exp_integral,  &
-                       aed2_bio_temp_function, &
-                       fTemp_function
+                        exp_integral, &
+                        aed2_bio_temp_function, &
+                        fTemp_function
    USE aed2_bio_utils
 
    IMPLICIT NONE
 
    PRIVATE   ! By default make everything private
-!
+
    PUBLIC aed2_phytoplankton_data_t
-!
+
 
    TYPE,extends(aed2_model_data_t) :: aed2_phytoplankton_data_t
       !# Variable identifiers
@@ -54,7 +54,7 @@ MODULE aed2_phytoplankton
       INTEGER :: id_par, id_tem, id_sal, id_dz, id_extc
       INTEGER :: id_I_0
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
-      INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP, id_MPB
+      INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP, id_MPB, id_d_MPB, id_d_BPP
       INTEGER :: id_NUP, id_PUP, id_CUP
       INTEGER,ALLOCATABLE :: id_NtoP(:)
       INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), id_fPho(:), id_fSil(:), id_fSal(:)
@@ -68,6 +68,7 @@ MODULE aed2_phytoplankton
       LOGICAL  :: do_Pmort, do_Nmort, do_Cmort, do_Simort
       LOGICAL  :: do_Pexc, do_Nexc, do_Cexc, do_Siexc
       INTEGER  :: do_mpb
+      AED_REAL :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
       INTEGER  :: nnup, npup
       AED_REAL :: dic_per_n
 
@@ -287,7 +288,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    CHARACTER(len=128) :: dbase='aed2_phyto_pars.nml'
 
    AED_REAL           :: zerolimitfudgefactor = 0.9 * 3600
-   AED_REAL           :: I_Kmpb
+   AED_REAL           :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
    INTEGER            :: do_mpb
 
    NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, w_model,              &
@@ -300,7 +301,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                       c_uptake_target_variable, do_uptake_target_variable,     &
                     si_excretion_target_variable,si_mortality_target_variable, &
                       si_uptake_target_variable,                               &
-                    dbase, zerolimitfudgefactor, extra_debug, do_mpb, I_Kmpb
+                    dbase, zerolimitfudgefactor, extra_debug,                  &
+                    do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max
 !-----------------------------------------------------------------------
 !BEGIN
    w_model = _MOB_CONST_
@@ -324,6 +326,14 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                                data%phytos%kTn,              &
                                data%phytos%p_name)
 
+   ! Register microphytbenthos as a state variable
+   IF (data%do_mpb) THEN
+     data%id_mpb = aed2_define_sheet_variable( 'mpb',                          &
+                                               'mmol/m**2',                    &
+                                               'microphytobenthos biomass',    &
+                                                0.001,                         &
+                                                minimum=0.001)
+   ENDIF
 
    ! Register link to nutrient pools, if variable names are provided in namelist.
    data%do_Pexc = p_excretion_target_variable .NE. ''
@@ -410,7 +420,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_TPHY = aed2_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
    data%id_TIN = aed2_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed2_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
-   data%id_MPB = aed2_define_diag_variable('MPB','mmol/m**2', 'microphytobenthos')
+   data%id_d_MPB = aed2_define_diag_variable('MPB','mmol/m**2', 'microphytobenthos')
+   data%id_d_BPP = aed2_define_diag_variable('BPP','mmol/m**2/d', 'benthic productivity')
 
    ! Register environmental dependencies
    data%id_tem = aed2_locate_global('temperature')
@@ -419,6 +430,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_I_0 = aed2_locate_global_sheet('par_sf')
    data%id_dz = aed2_locate_global('layer_ht')
    data%id_extc = aed2_locate_global('extc_coef')
+
 END SUBROUTINE aed2_define_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -452,9 +464,6 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
    INTEGER  :: phy_i,c
    AED_REAL :: flux, available
 
-! MH to fix
-!  AED_REAL :: dt = 3600. ! just for now, hard code it
-!
 !-------------------------------------------------------------------------------
 !BEGIN
 
@@ -840,6 +849,7 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
    _DIAG_VAR_(data%id_TPHY) =  tphy
    _DIAG_VAR_(data%id_TIN)  =  tin
    _DIAG_VAR_(data%id_TIP)  =  tip
+
 END SUBROUTINE aed2_calculate_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -856,22 +866,49 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   AED_REAL :: phy        ! State
    INTEGER  :: phy_i
-   AED_REAL :: phy_flux
+   AED_REAL :: phy,mpb,temp,extc,par,dz,Io,fI        ! State
+   AED_REAL :: phy_flux,mpb_flux,mpb_prod,mpb_resp
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   DO phy_i=1,data%num_phytos
-      ! Retrieve current (local) state variable values.
-      phy = _STATE_VAR_(data%id_p(phy_i))! phytoplankton
+   ! Loop through pelagic plankton groups (CURRENTLY DISABLED)
+   !DO phy_i=1,data%num_phytos
+   !    ! Retrieve current (local) state variable values.
+   !    phy = _STATE_VAR_(data%id_p(phy_i))! phytoplankton
+   !    phy_flux = zero_  ! no groups currently accumulate biomass in the sediment
+   !    ! Set bottom fluxes for the pelagic (change per surface area per second)
+   !    !_FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + phy_flux
+   !    !_FLUX_VAR_B_(data%id_p(phy_i)) = _FLUX_VAR_B_(data%id_p(phy_i)) - phy_flux
+   !ENDDO
 
-      phy_flux = zero_  !data%phytos(phy_i)%w_p*MAX(phy,zero_)
+   ! Process microphytobenthos
+   IF ( data%do_mpb>0 ) THEN
+     ! Get local conditions
+     mpb = _STATE_VAR_S_(data%id_mpb) ! local mpb density
+     temp = _STATE_VAR_(data%id_tem)  ! local temperature
+     extc = _STATE_VAR_(data%id_extc) ! cell extinction
+     dz = _STATE_VAR_(data%id_dz)     ! cell depth
+     par = _STATE_VAR_(data%id_par)   ! local photosynthetically active radiation
+     Io = _STATE_VAR_S_(data%id_I_0)  ! surface short wave radiation
+     fI = photosynthesis_irradiance(3,data%I_Kmpb,data%I_Kmpb,par,extc,Io,dz)
+     ! Compute photosynthesis and respiration
+     mpb_prod = data%R_mpbg*fI*(1.05**(temp-20.))*(1.-(mpb/data%mpb_max))
+     mpb_resp = (data%R_mpbr*(1.05**(temp-20.)) !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
+     mpb_flux = (mpb_prod-mpb_resp)*mpb
+     ! Update the MPB biomass, and water O2/CO2
+     _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux
+     IF (data%do_DOuptake) THEN
+        _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + mpb_flux
+     ENDIF
+     IF (data%do_Cuptake) THEN
+        _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
+     ENDIF
+     ! Update the diagnostic variables
+     _DIAG_VAR_S_(data%id_d_mpb) = mpb
+     _DIAG_VAR_S_(data%id_d_bpp) = mpb_flux
+   ENDIF
 
-     ! Set bottom fluxes for the pelagic (change per surface area per second)
-     ! Transfer sediment flux value to AED2.
-     _FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + (phy_flux)
-   ENDDO
 END SUBROUTINE aed2_calculate_benthic_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

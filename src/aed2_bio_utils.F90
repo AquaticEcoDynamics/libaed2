@@ -542,6 +542,7 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
 !-------------------------------------------------------------------------------
 !BEGIN
    fI    = 0.0
+   IF (Io == zero_) RETURN
 
    ! MH fix this
    par_t = par
@@ -553,8 +554,6 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
          ! Light limitation without photoinhibition.
          ! This is the Webb et al (1974) model solved using the numerical
          ! integration approach as in CAEDYM (Hipsey and Hamilton, 2008)
-
-         IF (Io == zero_) RETURN
 
          z1 = -par_t / I_K
          z2 = -par_b / I_K

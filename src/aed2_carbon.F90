@@ -432,15 +432,15 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
    ENDIF
 
 
-   ! Allow photosynthetic production of CO2 in the benthos due to MPB if light and suitable pH
-   par = par * (exp(-extc*dz))
-   IF( par > 50. .AND. pH > 5.5 .AND. pH < 9.6 ) THEN
-     mpb = (data%maxMPBProdn/secs_per_day)*(1.0-exp(-par/data%IkMPB)) * (data%theta_sed_dic**(temp-20.0))
-     dic_flux = Fsed_dic - mpb
-     IF (data%use_oxy) THEN
-       _FLUX_VAR_(data%id_oxy) =  _FLUX_VAR_(data%id_oxy) + mpb
-     ENDIF
-   ENDIF
+  !! Allow photosynthetic production of CO2 in the benthos due to MPB if light and suitable pH
+  !par = par * (exp(-extc*dz))
+  ! IF( par > 50. .AND. pH > 5.5 .AND. pH < 9.6 ) THEN
+  !   mpb = (data%maxMPBProdn/secs_per_day)*(1.0-exp(-par/data%IkMPB)) * (data%theta_sed_dic**(temp-20.0))
+  !   dic_flux = Fsed_dic - mpb
+  !   IF (data%use_oxy) THEN
+  !     _FLUX_VAR_(data%id_oxy) =  _FLUX_VAR_(data%id_oxy) + mpb
+  !   ENDIF
+  ! ENDIF
 
    ! TODO:
    ! (1) Get benthic sink and source terms (sccb?) for current environment
