@@ -135,7 +135,7 @@ SUBROUTINE aed2_macrophyte_load_params(data, dbase, count, list)
     DO i=1,count
        ! Assign parameters from database to simulated groups
        data%mphydata(i)%growthForm   = 1
-         IF(list(i)>5) data%mphydata(i)%growthForm   = 2   ! HACK FOR GELERAH
+         IF(list(i)>6) data%mphydata(i)%growthForm   = 2   ! HACK FOR GELERAH
        data%mphydata(i)%m_name       = md(list(i))%m_name
        data%mphydata(i)%m0           = md(list(i))%m0
        data%mphydata(i)%R_growth     = md(list(i))%R_growth/secs_per_day
@@ -255,6 +255,7 @@ SUBROUTINE aed2_define_macrophyte(data, namlst)
    data%id_dz = aed2_locate_global('layer_ht')
    data%id_extc = aed2_locate_global('extc_coef')
    data%id_sed_zone = aed2_locate_global_sheet('sed_zone')
+   data%id_atem = aed2_locate_global_sheet('air_temp')
 
 END SUBROUTINE aed2_define_macrophyte
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -448,8 +449,8 @@ SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx,pc_wet)
 
    ! Retrieve current environmental conditions
    temp = _STATE_VAR_(data%id_atem)      ! local air temperature
-   theta = _STATE_VAR_(data%id_theta)       ! local soil moisture
-   Io = _STATE_VAR_S_(data%id_I_0)      ! surface short wave radiation
+   theta = _STATE_VAR_(data%id_theta)    ! local soil moisture
+   Io = _STATE_VAR_S_(data%id_I_0)       ! surface short wave radiation
 
    ! Initialise cumulative biomass diagnostics
    _DIAG_VAR_S_(data%id_mac) = zero_
@@ -466,9 +467,15 @@ SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx,pc_wet)
         mphy = _STATE_VAR_S_(data%id_mphy(mphy_i))! macrophyte group i
 
         ! LIGHT
+        IF( pc_wet >0.8 ) THEN
+          par   = _STATE_VAR_(data%id_par)
+          emergent_portion = 1.0 ! will depend on pc_wet and depth of water
+        ELSE
+          par   = 0.45*Io
+          emergent_portion = 1.0
+        ENDIF
         fI   = photosynthesis_irradiance(data%mphydata(mphy_i)%lightModel, &
                        data%mphydata(mphy_i)%I_K, data%mphydata(mphy_i)%I_S, par, extc, Io, dz)
-        emergent_portion = 1.0 ! will depend on pc_wet and depth of water
         fI   = fI * emergent_portion
 
         ! TEMPERATURE
