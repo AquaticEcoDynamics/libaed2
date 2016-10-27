@@ -378,7 +378,7 @@ SUBROUTINE aed2_mobility(column, layer_idx, mobility)
 !-------------------------------------------------------------------------------
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
-   AED_REAL,INTENT(inout) :: mobility
+   AED_REAL,INTENT(inout) :: mobility(:)
 !
 !LOCALS
    CLASS (aed2_model_data_t),POINTER :: model
@@ -389,7 +389,7 @@ SUBROUTINE aed2_mobility(column, layer_idx, mobility)
       CALL model%mobility(column, layer_idx, mobility)
       model => model%next
    ENDDO
-END SUBROUTINE aed2_light_extinction
+END SUBROUTINE aed2_mobility
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
