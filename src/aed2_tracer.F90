@@ -272,14 +272,14 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
             dummy_tau = data%tau_0(i) + data%kTau_0 * _STATE_VAR_S_(data%id_lnk_id)
             dummy_eps = data%epsilon(i) * _DIAG_VAR_S_(data%id_sfss(i))
          ELSE
-            dummy_tau =  data%tau_0(i)
+            dummy_tau = data%tau_0(i)
             dummy_eps = data%epsilon(i) * data%fs(i)
          ENDIF
 
          IF ( bottom_stress > dummy_tau ) THEN
             resus_flux = dummy_eps * (bottom_stress - dummy_tau) / data%tau_r(i)
          ELSE
-            resus_flux = 0.
+            resus_flux = zero_
          ENDIF
          _DIAG_VAR_S_(data%id_resus) = _DIAG_VAR_S_(data%id_resus) + resus_flux
       ENDIF
@@ -317,7 +317,7 @@ SUBROUTINE aed2_light_extinction_tracer(data,column,layer_idx,extinction)
       ! Retrieve current (local) state variable values.
       ss = _STATE_VAR_(data%id_ss(ss_i))
 
-      ! Self-shading with explicit contribution from background tracer concentration.
+      ! Self-shading with contribution from background tracer concentration.
       extinction = extinction + (data%Ke_ss(ss_i)*ss)
    ENDDO
 END SUBROUTINE aed2_light_extinction_tracer

@@ -77,6 +77,7 @@ MODULE aed2_common
    PUBLIC aed2_light_extinction, aed2_delete, aed2_equilibrate
    PUBLIC aed2_initialize, aed2_calculate_riparian, aed2_calculate_dry
    PUBLIC aed2_rain_loss, aed2_light_shading, aed2_bio_drag, aed2_particle_bgc
+   PUBLIC aed2_mobility
 
    !# Re-export these from aed2_core.
    PUBLIC aed2_model_data_t, aed2_variable_t, aed2_column_t
@@ -366,6 +367,26 @@ SUBROUTINE aed2_light_extinction(column, layer_idx, extinction)
    model => model_list
    DO WHILE (ASSOCIATED(model))
       CALL model%light_extinction(column, layer_idx, extinction)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed2_light_extinction
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_mobility(column, layer_idx, mobility)
+!-------------------------------------------------------------------------------
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: mobility
+!
+!LOCALS
+   CLASS (aed2_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   mobility = zero_
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%mobility(column, layer_idx, mobility)
       model => model%next
    ENDDO
 END SUBROUTINE aed2_light_extinction

@@ -538,7 +538,7 @@ SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx,pc_wet)
 
    ! Export diagnostic variables
    IF( pc_wet <1.0 ) _DIAG_VAR_S_(data%id_diag_par)= Io
-   _DIAG_VAR_S_(data%id_gpp) = _DIAG_VAR_S_(data%id_gpp) + SUM(primprod)*secs_per_day
+   _DIAG_VAR_S_(data%id_gpp) = zero_ !_DIAG_VAR_S_(data%id_gpp) + SUM(primprod)*secs_per_day
 
 
 END SUBROUTINE aed2_calculate_riparian_macrophyte
