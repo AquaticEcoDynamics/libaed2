@@ -49,9 +49,8 @@ MODULE aed2_tracer
       !# Model parameters
       AED_REAL,ALLOCATABLE :: decay(:), Fsed(:), Ke_ss(:)
       AED_REAL,ALLOCATABLE :: w_ss(:), rho_ss(:), d_ss(:)
-      AED_REAL,ALLOCATABLE :: fs(:)
-      AED_REAL,ALLOCATABLE :: epsilon, tau_0(:)
-      AED_REAL             :: tau_0_min, kTau_0, tau_r
+      AED_REAL,ALLOCATABLE :: fs(:), tau_0(:)
+      AED_REAL             :: epsilon, tau_0_min, kTau_0, tau_r
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_tracer
@@ -135,16 +134,16 @@ SUBROUTINE aed2_define_tracer(data, namlst)
    ! Setup tracers
    IF ( num_tracers > 0 ) THEN
       ALLOCATE(data%id_ss(num_tracers))
-      ALLOCATE(data%decay(num_tracers))    ; data%decay(1:num_tracers)    = decay(1:num_tracers)
-      ALLOCATE(data%Fsed(num_tracers))     ; data%Fsed(1:num_tracers)     = Fsed(1:num_tracers)
-      ALLOCATE(data%Ke_ss(num_tracers))    ; data%Ke_ss(1:num_tracers)    = Ke_ss(1:num_tracers)
+      ALLOCATE(data%decay(num_tracers)) ; data%decay(1:num_tracers) = decay(1:num_tracers)
+      ALLOCATE(data%Fsed(num_tracers))  ; data%Fsed(1:num_tracers)  = Fsed(1:num_tracers)
+      ALLOCATE(data%Ke_ss(num_tracers)) ; data%Ke_ss(1:num_tracers) = Ke_ss(1:num_tracers)
 
-      ALLOCATE(data%w_ss(num_tracers)) ; data%w_ss(1:num_tracers) = w_ss(1:num_tracers)
-      ALLOCATE(data%d_ss(num_tracers)) ; data%d_ss(1:num_tracers) = d_ss(1:num_tracers)
-      ALLOCATE(data%rho_ss(num_tracers)) ; data%rho_ss(1:num_tracers) = rho_ss(1:num_tracers)
+      ALLOCATE(data%w_ss(num_tracers))  ; data%w_ss(1:num_tracers)  = w_ss(1:num_tracers)
+      ALLOCATE(data%d_ss(num_tracers))  ; data%d_ss(1:num_tracers)  = d_ss(1:num_tracers)
+      ALLOCATE(data%rho_ss(num_tracers)); data%rho_ss(1:num_tracers)= rho_ss(1:num_tracers)
 
-      ALLOCATE(data%tau_0(num_tracers))    ; data%tau_0(1:num_tracers)    = tau_0(1:num_tracers)
-      ALLOCATE(data%fs(num_tracers))       ; data%fs(1:num_tracers)       = fs(1:num_tracers)
+      ALLOCATE(data%tau_0(num_tracers)) ; data%tau_0(1:num_tracers) = tau_0(1:num_tracers)
+      ALLOCATE(data%fs(num_tracers))    ; data%fs(1:num_tracers)    = fs(1:num_tracers)
 
       trac_name = 'ss0'
       ! Register state variables
@@ -162,6 +161,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
       data%id_epsilon =  aed2_define_sheet_diag_variable('epsilon','g/m**2/s', 'max resuspension rate')
 
       ALLOCATE(data%id_sfss(num_tracers))
+
       trac_name = 'fs0'
       DO i=1,num_tracers
          trac_name(3:3) = CHAR(ICHAR('0') + i)
@@ -189,7 +189,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
    data%id_temp = aed2_locate_global('temperature')
    data%id_salt = aed2_locate_global('salinity')
    IF ( settling > 1 ) THEN
-      data%id_rho = aed2_locate_global('rho')
+      data%id_rho = aed2_locate_global('density')
    ENDIF
    IF ( resuspension > 0 ) THEN
       data%id_taub = aed2_locate_global_sheet('taub')
