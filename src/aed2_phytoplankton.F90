@@ -17,12 +17,6 @@
 
 #include "aed2.h"
 
-#define _MOB_CONST_ 0
-#define _MOB_TEMP_  1
-#define _MOB_STOKES_  2
-#define _MOB_MOTILE_  3
-
-
 MODULE aed2_phytoplankton
 !-------------------------------------------------------------------------------
 !  aed2_phytoplankton --- phytoplankton biogeochemical model

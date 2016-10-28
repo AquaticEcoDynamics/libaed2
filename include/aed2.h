@@ -13,7 +13,7 @@
 #ifndef _AED2_H_
 #define _AED2_H_
 
-#define AED2_VERSION  "1.2.0-dev01"
+#define AED2_VERSION  "1.2.0-dev10"
 
 #define MAX_MODELS 40
 
@@ -49,6 +49,11 @@
 #define EQUALS             '='
 #define L_PAREN            '('
 #define R_PAREN            ')'
+
+#define _MOB_CONST_ 0
+#define _MOB_TEMP_  1
+#define _MOB_STOKES_  2
+#define _MOB_MOTILE_  3
 
 #ifdef SINGLE
 #  define AED_REAL real(4)

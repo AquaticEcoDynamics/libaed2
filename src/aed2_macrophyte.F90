@@ -448,8 +448,8 @@ SUBROUTINE aed2_calculate_riparian_macrophyte(data,column,layer_idx,pc_wet)
    if ( .NOT. in_zone_set(matz, data%active_zones) ) return
 
    ! Retrieve current environmental conditions
-   temp = _STATE_VAR_(data%id_atem)      ! local air temperature
-   theta = _STATE_VAR_(data%id_theta)    ! local soil moisture
+   temp = _STATE_VAR_S_(data%id_atem)      ! local air temperature
+   theta = 1.0 !_STATE_VAR_(data%id_theta)    ! local soil moisture
    Io = _STATE_VAR_S_(data%id_I_0)       ! surface short wave radiation
 
    ! Initialise cumulative biomass diagnostics
