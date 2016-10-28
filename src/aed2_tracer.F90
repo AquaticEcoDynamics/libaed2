@@ -128,6 +128,10 @@ SUBROUTINE aed2_define_tracer(data, namlst)
    data%resuspension = resuspension
    data%settling = settling
 
+   data%epsilon = epsilon
+   data%tau_r = tau_r
+   data%kTau_0 = kTau_0
+
    ! Setup tracers
    IF ( num_tracers > 0 ) THEN
       ALLOCATE(data%id_ss(num_tracers))
@@ -139,9 +143,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
       ALLOCATE(data%d_ss(num_tracers)) ; data%d_ss(1:num_tracers) = d_ss(1:num_tracers)
       ALLOCATE(data%rho_ss(num_tracers)) ; data%rho_ss(1:num_tracers) = rho_ss(1:num_tracers)
 
-      ALLOCATE(data%epsilon(num_tracers))  ; data%epsilon(1:num_tracers)  = epsilon(1:num_tracers)
       ALLOCATE(data%tau_0(num_tracers))    ; data%tau_0(1:num_tracers)    = tau_0(1:num_tracers)
-      ALLOCATE(data%tau_r(num_tracers))    ; data%tau_r(1:num_tracers)    = tau_r(1:num_tracers)
       ALLOCATE(data%fs(num_tracers))       ; data%fs(1:num_tracers)       = fs(1:num_tracers)
 
       trac_name = 'ss0'
@@ -154,8 +156,6 @@ SUBROUTINE aed2_define_tracer(data, namlst)
       ENDDO
    ENDIF
 
-   ! Resuspension stuff
-   data%kTau_0    = kTau_0
    ! Setup bottom arrays if spatially variable resuspension
    IF ( resuspension == 2 ) THEN
       data%id_tau_0 =  aed2_define_sheet_diag_variable('tau_0','N/m**2', 'dynamic bottom drag')
@@ -282,14 +282,14 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
 
          IF ( data%resuspension == 2 ) THEN
             dummy_tau = data%tau_0(i) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
-            dummy_eps = data%epsilon(i) * _DIAG_VAR_S_(data%id_sfss(i))
+            dummy_eps = data%epsilon * _DIAG_VAR_S_(data%id_sfss(i))
          ELSE
             dummy_tau = data%tau_0(i)
-            dummy_eps = data%epsilon(i) * data%fs(i)
+            dummy_eps = data%epsilon * data%fs(i)
          ENDIF
 
          IF ( bottom_stress > dummy_tau ) THEN
-            resus_flux = dummy_eps * (bottom_stress - dummy_tau) / data%tau_r(i)
+            resus_flux = dummy_eps * (bottom_stress - dummy_tau) / data%tau_r
          ELSE
             resus_flux = zero_
          ENDIF
