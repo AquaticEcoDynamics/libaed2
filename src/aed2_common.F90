@@ -383,7 +383,7 @@ SUBROUTINE aed2_mobility(column, layer_idx, mobility)
 !LOCALS
    CLASS (aed2_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
-   mobility = zero_
+   !mobility = zero_ !MH leave this as is in case default settling vals provided
    model => model_list
    DO WHILE (ASSOCIATED(model))
       CALL model%mobility(column, layer_idx, mobility)
