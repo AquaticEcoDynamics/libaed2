@@ -33,6 +33,7 @@ MODULE aed2_util
    PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, exp_integral
    PUBLIC aed2_bio_temp_function,fTemp_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
+   PUBLIC water_viscosity
 !
 
 

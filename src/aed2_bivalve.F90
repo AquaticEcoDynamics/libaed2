@@ -108,7 +108,7 @@ MODULE aed2_bivalve
       TYPE(type_bivalve_data),DIMENSION(:),ALLOCATABLE :: bivalves
       LOGICAL  :: simDNexcr, simDPexcr, simDCexcr
       LOGICAL  :: simPNexcr, simPPexcr, simPCexcr
-      LOGICAL  :: simSSlim, simBivFeedback, simFixedEnv
+      LOGICAL  :: simSSlim, simBivFeedback, simFixedEnv, simStaticBiomass
       INTEGER  :: n_zones
       AED_REAL,ALLOCATABLE :: active_zones(:)
       AED_REAL :: fixed_temp, fixed_sal, fixed_oxy, fixed_food
@@ -253,11 +253,12 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
    INTEGER  :: status
 
    INTEGER  :: num_biv
-   LOGICAL  :: biv_tracer   = .false.          !include filtration rate tracer
-   LOGICAL  :: biv_feedback = .false.          !allow module to change prey/nutrient concs
-   LOGICAL  :: biv_fixedenv = .false.          !special case to overwrite env and food factors with constants
    INTEGER  :: the_biv(MAX_ZOOP_TYPES)
    INTEGER  :: n_zones = 0, active_zones(MAX_ZONES), i
+   LOGICAL  :: simBivTracer = .false.     !include filtration rate tracer
+   LOGICAL  :: simBivFeedback = .false.   !allow module to change prey/nutrient concs
+   LOGICAL  :: simStaticBiomass = .false. !keep biomass fixed over time
+   LOGICAL  :: simFixedEnv = .false.      !special case to overwrite env and food factors with constants
    AED_REAL :: fixed_temp, fixed_sal, fixed_oxy, fixed_food
 
    CHARACTER(len=64)  :: dn_target_variable='' !dissolved nitrogen target variable
@@ -272,12 +273,12 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
 
    INTEGER  :: biv_i, prey_i, phy_i
 
-   NAMELIST /aed2_bivalve/ num_biv, the_biv, biv_tracer, biv_feedback,          &
-                    dn_target_variable, pn_target_variable, dp_target_variable, &
-                    pp_target_variable, dc_target_variable, pc_target_variable, &
-                    do_uptake_variable, ss_uptake_variable, dbase,              &
-                    n_zones, active_zones, extra_diag,                          &
-                    biv_fixedenv, fixed_temp, fixed_sal, fixed_oxy, fixed_food
+   NAMELIST /aed2_bivalve/ num_biv, the_biv, n_zones, active_zones, extra_diag,&
+                    simBivTracer, simBivFeedback, simStaticBiomass,            &
+                    dn_target_variable, pn_target_variable, dp_target_variable,&
+                    pp_target_variable, dc_target_variable, pc_target_variable,&
+                    do_uptake_variable, ss_uptake_variable, dbase,             &
+                    simFixedEnv, fixed_temp, fixed_sal, fixed_oxy, fixed_food
 !-----------------------------------------------------------------------
 !BEGIN
    ! Read the namelist
@@ -285,7 +286,7 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
    IF (status /= 0) STOP 'Error reading namelist aed2_bivalve'
 
    ! Assign module level variables
-   data%simFixedEnv = biv_fixedenv
+   data%simFixedEnv = simFixedEnv
    IF (biv_fixedenv) THEN
      PRINT *,'Note - bivalves driven by fixed T,DO,A values'
      PRINT *,'     - biv feedback disabled'
@@ -293,12 +294,12 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
      data%fixed_sal = fixed_sal
      data%fixed_oxy = fixed_oxy
      data%fixed_food = fixed_food
-     biv_feedback = .false.
+     simBivFeedback = .false.
    END IF
 
-   data%simBivFeedback = biv_feedback
-   PRINT *,'Note - bivalve feedbacks on water column properties: ',biv_feedback
-   PRINT *,'Note - bivalve filtration tracer variable: ',biv_tracer
+   data%simBivFeedback = simBivFeedback
+   PRINT *,'Note - bivalve feedbacks on water column properties: ',simBivFeedback
+   PRINT *,'Note - bivalve filtration tracer variable: ',simBivTracer
 
    ! Configure which sediment zones to run within
    data%n_zones = n_zones
@@ -373,7 +374,7 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
      data%id_SSupttarget = aed2_locate_variable(ss_uptake_variable)
    ENDIF
 
-   IF (biv_tracer) THEN
+   IF (simBivTracer) THEN
        ! Register group as a state variable
        data%id_bivtr = aed2_define_variable(                                   &
                               'filtfrac',                                      &
@@ -695,8 +696,11 @@ SUBROUTINE aed2_calculate_benthic_bivalve(data,column,layer_idx)
       ! SET TEMPORAL DERIVATIVES FOR ODE SOLVER
 
       ! Biv production & losses (mmolC/m2/s)
-      _FLUX_VAR_B_(data%id_biv(biv_i)) = _FLUX_VAR_B_(data%id_biv(biv_i)) + &
+      IF ( .NOT.data%simStaticBiomass ) THEN
+        _FLUX_VAR_B_(data%id_biv(biv_i)) = _FLUX_VAR_B_(data%id_biv(biv_i)) + &
                      ( (ingestion - respiration - excretion - egestion - mortality)*biv )
+      ENDIF
+
       ! Effects on prey and nutrients
       _DIAG_VAR_(data%id_3d_grz) = zero_
       IF (data%simBivFeedback) THEN

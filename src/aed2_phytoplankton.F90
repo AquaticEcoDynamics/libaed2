@@ -51,7 +51,7 @@ MODULE aed2_phytoplankton
       INTEGER :: id_Siexctarget,id_Simorttarget,id_Siupttarget
       INTEGER :: id_DOupttarget
       INTEGER :: id_par, id_I_0, id_extc
-      INTEGER :: id_tem, id_sal, id_dz
+      INTEGER :: id_tem, id_sal, id_dz, id_dens
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP, id_MPB, id_d_MPB, id_d_BPP
       INTEGER :: id_NUP, id_PUP, id_CUP
@@ -445,6 +445,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_I_0 = aed2_locate_global_sheet('par_sf')
    data%id_dz = aed2_locate_global('layer_ht')
    data%id_extc = aed2_locate_global('extc_coef')
+   data%id_dens = aed2_locate_global('density')
 
 END SUBROUTINE aed2_define_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -964,21 +965,21 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
    DO phy_i=1,data%num_phytos
       SELECT CASE (data%phytos(phy_i)%settling)
 
-         CASE (_MOB_CONST_)
+         CASE ( _MOB_CONST_ )
             ! constant settling velocity using user provided value
             vvel = data%phytos(phy_i)%w_p
 
-         CASE (_MOB_TEMP_)
+         CASE ( _MOB_TEMP_ )
             ! constant settling velocity @20C corrected for density changes
-            pw = _STATE_VAR_(data%id_rho(phy_i))
+            pw = _STATE_VAR_(data%id_dens)
             mu = water_viscosity(temp)
             mu20 = 0.001002  ! N s/m2
             pw20 = 998.2000  ! kg/m3 (assuming freshwater)
             vvel = data%phytos(phy_i)%w_p*mu20*pw / ( mu*pw20 )
 
-         CASE (_MOB_STOKES_)
+         CASE ( _MOB_STOKES_ )
             ! settling velocity based on Stokes Law calculation and cell density
-            pw = _STATE_VAR_(data%id_rho )             ! water density
+            pw = _STATE_VAR_(data%id_dens)       ! water density
             mu = water_viscosity(temp)                 ! water dynamic viscosity
             IF( data%id_rho(phy_i)>0 ) THEN
               rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density
@@ -987,7 +988,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
             ENDIF
             vvel = -9.807*(data%phytos(phy_i)%d_phy**2.)*( rho_p-pw ) / ( 18.*mu )
 
-          CASE (_MOB_MOTILE_)
+          CASE ( _MOB_MOTILE_ )
              ! vertical velocity based on motility and behaviour of phyto group
              ! modelled as in Ross and Sharples (2007)
              vvel = zero_
@@ -1011,8 +1012,11 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
             ELSE
                vvel = zero_
             ENDIF
+
          CASE DEFAULT
+            ! unknown settling/migration option selection
             vvel =  zero_
+
       END SELECT
       ! set global mobility array
       mobility(data%id_p(phy_i)) = vvel

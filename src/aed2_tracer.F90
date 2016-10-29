@@ -350,37 +350,47 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
 !
 !LOCALS
    INTEGER  :: i
-   AED_REAL :: temp, salinity, water_rho, mu, vel
+   AED_REAL :: vvel
+   AED_REAL :: pw, pw20, mu, mu20
+   AED_REAL :: temp
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   ! constant settling rate chosen
-   IF ( data%settling==_MOB_CONST_ .OR. data%settling==_MOB_TEMP_ ) THEN
-      mobility(data%id_ss(:)) = data%w_ss(:)
-      RETURN
-   ENDIF
 
-   ! stokes settling rate chosen, based on particle properties
-   IF ( data%settling==_MOB_STOKES_ .OR. data%settling==_MOB_MOTILE_ ) THEN
-     temp = _STATE_VAR_(data%id_temp)      ! local temperature
-     salinity = _STATE_VAR_(data%id_salt)  ! local salinity
-     water_rho = _STATE_VAR_(data%id_rho ) ! local denisty
+   DO i=1,data%num_tracers
+      SELECT CASE (data%settling)
 
-     ! update the settling rate and assign to mobility array
-     DO i=1,data%num_tracers
-      !! calculate water density
-      ! water_rho = (0.02003*temp**3.-6.3335*temp**2.+26.8567*temp+1000012.72)&
-      !            *(1.+0.77*salinity)/1000.
+         CASE ( _MOB_CONST_ )
+            ! constant settling velocity using user provided value
+            vvel = data%w_ss
 
-      ! calclulate water viscosity
-      mu = (0.00005*temp**4.-0.01196*temp**3.+1.10961*temp**2.-56.59779*temp+1175.58155)/1000000.
+         CASE ( _MOB_TEMP_ )
+            ! constant settling velocity @20C corrected for density changes
+            pw = _STATE_VAR_(data%id_rho)
+            mu = water_viscosity(temp)
+            mu20 = 0.001002  ! N s/m2
+            pw20 = 998.2000  ! kg/m3 (assuming freshwater)
+            vvel = data%w_ss*mu20*pw / ( mu*pw20 )
 
-      ! calculate settling velocity according to Stokes Law
-      vel = -9.807*(data%d_ss(i)**2.)*( data%rho_ss(i)-water_rho ) / ( 18.*mu )
+         CASE ( _MOB_STOKES_ )
+            ! settling velocity based on Stokes Law calculation and cell density
+            pw = _STATE_VAR_(data%id_rho)              ! water density
+            mu = water_viscosity(temp)                 ! water dynamic viscosity
+            IF( data%id_rho(phy_i)>0 ) THEN
+              rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density
+            ELSE
+              rho_p = data%phytos(phy_i)%rho_phy
+            ENDIF
+            vvel = -9.807*(data%phytos(phy_i)%d_phy**2.)*( rho_p-pw ) / ( 18.*mu )
 
-      mobility(data%id_ss(i)) = vel
-     ENDDO
-   ENDIF
+         CASE DEFAULT
+            ! unknown settling/migration option selection
+            vvel = data%w_ss
+
+      END SELECT
+      ! set global mobility array
+      mobility(data%id_ss(i)) = vvel
+   ENDDO
 
 END SUBROUTINE aed2_mobility_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
