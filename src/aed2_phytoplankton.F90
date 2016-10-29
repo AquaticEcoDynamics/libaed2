@@ -41,18 +41,19 @@ MODULE aed2_phytoplankton
       INTEGER,ALLOCATABLE :: id_in(:)
       INTEGER,ALLOCATABLE :: id_ip(:)
       INTEGER,ALLOCATABLE :: id_rho(:)
+      INTEGER,ALLOCATABLE :: id_NtoP(:)
+      INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), &
+                             id_fPho(:), id_fSil(:), id_fSal(:)
       INTEGER :: id_Pexctarget,id_Pmorttarget,id_Pupttarget(1:2)
       INTEGER :: id_Nexctarget,id_Nmorttarget,id_Nupttarget(1:4)
       INTEGER :: id_Cexctarget,id_Cmorttarget,id_Cupttarget
       INTEGER :: id_Siexctarget,id_Simorttarget,id_Siupttarget
       INTEGER :: id_DOupttarget
-      INTEGER :: id_par, id_tem, id_sal, id_dz, id_extc
-      INTEGER :: id_I_0
+      INTEGER :: id_par, id_I_0, id_extc
+      INTEGER :: id_tem, id_sal, id_dz
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP, id_MPB, id_d_MPB, id_d_BPP
       INTEGER :: id_NUP, id_PUP, id_CUP
-      INTEGER,ALLOCATABLE :: id_NtoP(:)
-      INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), id_fPho(:), id_fSil(:), id_fSal(:)
 
       !# Model parameters
       INTEGER  :: num_phytos
@@ -79,21 +80,21 @@ MODULE aed2_phytoplankton
    END TYPE
 
    AED_REAL :: dtlim = 0.9 * 3600
-   LOGICAL  :: extra_debug = .false.
+   LOGICAL  :: extra_diag = .false.
 
 !===============================================================================
 CONTAINS
 
 
 !###############################################################################
-SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
+SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_phytoplankton_data_t),INTENT(inout) :: data
    CHARACTER(len=*),INTENT(in) :: dbase
    INTEGER,INTENT(in)          :: count
    INTEGER,INTENT(in)          :: list(*)
-   INTEGER,INTENT(in)          :: w_model(*)
+   INTEGER,INTENT(in)          :: settling(*)
 !
 !LOCALS
    INTEGER  :: status
@@ -132,7 +133,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
        data%phytos(i)%p_name       = pd(list(i))%p_name
        data%phytos(i)%p0           = pd(list(i))%p0
        data%phytos(i)%w_p          = pd(list(i))%w_p/secs_per_day
-       data%phytos(i)%w_model      = w_model(i)
+       data%phytos(i)%settling      = settling(i)
        data%phytos(i)%Xcc          = pd(list(i))%Xcc
        data%phytos(i)%R_growth     = pd(list(i))%R_growth/secs_per_day
        data%phytos(i)%fT_Method    = pd(list(i))%fT_Method
@@ -178,6 +179,13 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
        data%phytos(i)%K_Si         = pd(list(i))%K_Si
        data%phytos(i)%X_sicon      = pd(list(i))%X_sicon
 
+       data%phytos(i)%c1           = 1. !pd(list(i))%X_sicon
+       data%phytos(i)%c3           = 1. !pd(list(i))%X_sicon
+       data%phytos(i)%f1           = 1. !pd(list(i))%X_sicon
+       data%phytos(i)%f2           = 1. !pd(list(i))%X_sicon
+       data%phytos(i)%d_phy        = 1. !pd(list(i))%X_sicon
+
+
        ! Register group as a state variable
        data%id_p(i) = aed2_define_variable(                                    &
                               TRIM(data%phytos(i)%p_name),                     &
@@ -187,8 +195,8 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
                               minimum=pd(list(i))%p0,                          &
                               mobility = data%phytos(i)%w_p)
 
-       IF (data%phytos(i)%w_model == _MOB_STOKES_) THEN
-          ! Register rho (density) group as a state variable
+       ! Register rho (density) group as a state variable, if required
+       IF (data%phytos(i)%settling == _MOB_STOKES_) THEN
           data%id_rho(i) = aed2_define_variable(                               &
                               TRIM(data%phytos(i)%p_name)//'_rho',             &
                               'kg/m**3',                                       &
@@ -196,8 +204,9 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
                               (data%min_rho+data%max_rho)/2.,                  &
                               minimum=data%min_rho,                            &
                               mobility = data%phytos(i)%w_p)
-
        ENDIF
+
+       ! Register internal nitrogen group as a state variable, if required
        IF (data%phytos(i)%simINDynamics /= 0) THEN
           IF(data%phytos(i)%simINDynamics == 1)THEN
             minNut = data%phytos(i)%p0*data%phytos(i)%X_ncon
@@ -212,8 +221,9 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
                               pd(list(i))%p_initial*data%phytos(i)%X_ncon,     &
                               minimum=minNut,                                  &
                               mobility = data%phytos(i)%w_p)
-
        ENDIF
+
+       ! Register internal phosphorus group as a state variable, if required
        IF (data%phytos(i)%simIPDynamics /= 0) THEN
           IF(data%phytos(i)%simIPDynamics == 1)THEN
             minNut = data%phytos(i)%p0*data%phytos(i)%X_pcon
@@ -228,12 +238,11 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, w_model)
                               pd(list(i))%p_initial*data%phytos(i)%X_pcon,     &
                               minimum=minNut,                                  &
                               mobility = data%phytos(i)%w_p)
-
        ENDIF
 
+       ! Group specific diagnostic variables
        data%id_NtoP(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_NtoP','-', 'internal n:p ratio')
-
-       IF (extra_debug) THEN
+       IF (extra_diag) THEN
           data%id_fI(i)   = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fI', '-', 'fI (0-1)')
           data%id_fNit(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fNit', '-', 'fNit (0-1)')
           data%id_fPho(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fPho', '-', 'fPho (0-1)')
@@ -263,7 +272,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
 
    INTEGER  :: num_phytos
    INTEGER  :: the_phytos(MAX_PHYTO_TYPES)
-   INTEGER  :: w_model(MAX_PHYTO_TYPES)
+   INTEGER  :: settling(MAX_PHYTO_TYPES)
+   INTEGER  :: resuspension
    CHARACTER(len=64)  :: p_excretion_target_variable=''
    CHARACTER(len=64)  :: p_mortality_target_variable=''
    CHARACTER(len=64)  :: p1_uptake_target_variable=''
@@ -282,12 +292,13 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    CHARACTER(len=64)  :: si_mortality_target_variable=''
    CHARACTER(len=64)  :: si_uptake_target_variable=''
    CHARACTER(len=128) :: dbase='aed2_phyto_pars.nml'
-
    AED_REAL           :: zerolimitfudgefactor = 0.9 * 3600
    AED_REAL           :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
+   AED_REAL           :: min_rho, max_rho
+   LOGICAL            :: extra_debug = .false.
    INTEGER            :: do_mpb
 
-   NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, w_model,              &
+   NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, settling,              &
                     p_excretion_target_variable,p_mortality_target_variable,   &
                      p1_uptake_target_variable, p2_uptake_target_variable,     &
                     n_excretion_target_variable,n_mortality_target_variable,   &
@@ -297,20 +308,27 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                       c_uptake_target_variable, do_uptake_target_variable,     &
                     si_excretion_target_variable,si_mortality_target_variable, &
                       si_uptake_target_variable,                               &
-                    dbase, zerolimitfudgefactor, extra_debug,                  &
-                    do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max
+                    dbase, zerolimitfudgefactor, extra_debug, extra_diag,      &
+                    do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho
 !-----------------------------------------------------------------------
 !BEGIN
-   w_model = _MOB_CONST_
-   ! Read the namelist
+   ! Default settings
+   settling = _MOB_CONST_
+
+   ! Read the namelist, and set module parameters
    read(namlst,nml=aed2_phytoplankton,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_phytoplankton'
    dtlim = zerolimitfudgefactor
+   IF( extra_debug ) extra_diag = .true.       ! legacy use of extra_debug
+   data%min_rho = min_rho ; data%max_rho = max_rho
+   data%R_mpbg = R_mpbg   ; data%R_mpbr = R_mpbr
+   data%I_Kmpb = I_Kmpb   ; data%mpb_max = mpb_max
+
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
-   ! and are converted here to values per second.
-   CALL aed2_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,w_model)
+   !     and are converted in here to values per second.
+   CALL aed2_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,settling)
 
    CALL aed2_bio_temp_function(data%num_phytos,              &
                                data%phytos%theta_growth,     &
@@ -494,14 +512,6 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
 
    DO phy_i=1,data%num_phytos
 
-!     ! Available nutrients - this is set to the concentration of nutrients from
-!     ! other aed2_modules unless they are limiting
-!     no3up = sum(nuptake(phy_i, 1) / dtlim
-!     nh4up = nuptake(phy_i, 2) / dtlim
-!     pup   = puptake(phy_i, 1) / dtlim
-!     cup   = cuptake(phy_i)    / dtlim
-!     rsiup = siuptake(phy_i)   / dtlim
-
       primprod(phy_i)    = zero_
       exudation(phy_i)   = zero_
       a_nfix(phy_i)      = zero_
@@ -612,7 +622,6 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
 
 
       ! Respiration and general metabolic loss
-
       respiration(phy_i) = bio_respiration(data%phytos(phy_i)%R_resp,data%phytos(phy_i)%theta_resp,temp)
 
       ! Salinity stress effect on respiration
@@ -633,25 +642,21 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
 
 
       ! Carbon uptake and excretion
-
       cuptake(phy_i)    = -primprod(phy_i) * phy
       cexcretion(phy_i) = (data%phytos(phy_i)%k_fdom*(1.0-data%phytos(phy_i)%k_fres)*respiration(phy_i)+exudation(phy_i)) * phy
       cmortality(phy_i) = ((1.0-data%phytos(phy_i)%k_fdom)*(1.0-data%phytos(phy_i)%k_fres)*respiration(phy_i)) * phy
 
       ! Nitrogen uptake and excretion
-
       CALL phyto_internal_nitrogen(data%phytos,phy_i,data%do_N2uptake,phy,INi,primprod(phy_i),&
                              fT,no3up,nh4up,a_nfix(phy_i),respiration(phy_i),exudation(phy_i),PNf,&
                                    nuptake(phy_i,:),nexcretion(phy_i),nmortality(phy_i))
 
       ! Phosphorus uptake and excretion
-
       CALL phyto_internal_phosphorus(data%phytos,phy_i,data%npup,phy,IPi,primprod(phy_i),&
                                  fT,pup,respiration(phy_i),exudation(phy_i),&
                                          puptake(phy_i,:),pexcretion(phy_i),pmortality(phy_i))
 
       ! Silica uptake and excretion
-
       IF (data%phytos(phy_i)%simSiUptake > 0) THEN
          siuptake(phy_i)    =-data%phytos(phy_i)%X_sicon * primprod(phy_i) * phy
          siexcretion(phy_i) = data%phytos(phy_i)%X_sicon * (data%phytos(phy_i)%k_fdom*respiration(phy_i)+exudation(phy_i)) * phy
@@ -663,7 +668,6 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       ENDIF
 
       ! Diagnostic info
-
       _DIAG_VAR_(data%id_NtoP(phy_i)) =  INi/IPi
 
       IF (extra_debug) THEN
@@ -730,20 +734,19 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       ENDIF
    ENDIF
 
-   net_cuptake = ZERO_
+   !-----------------------------------------------------------------
+   ! SET TEMPORAL DERIVATIVES FOR ODE SOLVER
+   net_cuptake = zero_
    DO phy_i=1,data%num_phytos
 
-      ! Retrieve this phytoplankton group
-      !-----------------------------------------------------------------
-      ! SET TEMPORAL DERIVATIVES FOR ODE SOLVER
-
-      ! Phytoplankton production / losses
+      !# PHYTOPLANKTON PRODUCTION & RESPIRATION
       phy = _STATE_VAR_(data%id_p(phy_i))
       flux = (primprod(phy_i) - respiration(phy_i) - exudation(phy_i)) * phy
       available = MAX(zero_, phy - data%phytos(phy_i)%p0)
       IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
       _FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + ( flux)
 
+      !# PHYTOPLANKTON INTERNAL NITROGEN
       IF (data%phytos(phy_i)%simINDynamics /= 0) THEN
          ! _FLUX_VAR_(data%id_in(phy_i)) = _FLUX_VAR_(data%id_in(phy_i)) + ( (-sum(nuptake) - nexcretion(phy_i) - nmortality(phy_i) )*INi )
          INi = _STATE_VAR_(data%id_in(phy_i))
@@ -752,6 +755,8 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
          IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
          _FLUX_VAR_(data%id_in(phy_i)) = _FLUX_VAR_(data%id_in(phy_i)) + ( flux)
       ENDIF
+
+      !# PHYTOPLANKTON INTERNAL PHOSPHORUS
       IF (data%phytos(phy_i)%simIPDynamics /= 0) THEN
          ! _FLUX_VAR_(data%id_ip(phy_i)) = _FLUX_VAR_(data%id_ip(phy_i)) + ( (-sum(puptake(phy_i,:)) - pexcretion(phy_i) - pmortality(phy_i) ) )
          IPi = _STATE_VAR_(data%id_ip(phy_i))
@@ -761,6 +766,30 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
          _FLUX_VAR_(data%id_ip(phy_i)) = _FLUX_VAR_(data%id_ip(phy_i)) + ( flux)
       ENDIF
 
+      !# PHYTOPLANKTON CELL DENSITY
+      IF ( data%id_rho(phy_i)>0 ) THEN
+         ! density increases during carbohydrate creation (daytime)
+         flux = zero_
+         IF( par>zero_ ) THEN
+           flux = data%phytos(phy_i)%c1 * &
+              (one_ - EXP(-par/data%phytos(phy_i)%I_K) ) - data%phytos(phy_i)%c3
+         ELSE
+           ! darkness
+           flux = -data%phytos(phy_i)%c3
+         ENDIF
+         _FLUX_VAR_(data%id_rho(phy_i)) = _FLUX_VAR_(data%id_rho(phy_i)) + flux
+         ! check maximum/minimum density are not exceeded
+         IF( _STATE_VAR_(data%id_rho(phy_i))>data%max_rho ) THEN
+            _FLUX_VAR_(data%id_rho(phy_i)) =zero_
+            _STATE_VAR_(data%id_rho(phy_i))=data%max_rho
+         ENDIF
+         IF( _STATE_VAR_(data%id_rho(phy_i))<data%min_rho ) THEN
+             _FLUX_VAR_(data%id_rho(phy_i)) =zero_
+             _STATE_VAR_(data%id_rho(phy_i))=data%min_rho
+         ENDIF
+      ENDIF
+
+      ! BIOGEOCHEMICAL FEEDBACKS
       ! Now manage uptake of nutrients, CO2 and DO - these cumulative fluxes already limited above loop
       IF (data%do_Puptake) THEN
          DO c = 1,data%npup
@@ -810,32 +839,32 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       ENDIF
 
       !-----------------------------------------------------------------
-      ! export diagnostic variables
+      ! UPDATE DIAGNOSTIC VARIABLES
 
-      ! Total phytoplankton carbon
+      ! total phytoplankton carbon
       tphy = tphy + phy
 
-      ! Total chlorophyll-a
+      ! total chlorophyll-a
       IF (data%phytos(phy_i)%Xcc > 0.1) THEN
-        ! Assume Xcc (mol C/ mol chla) is a constant
+        !-- assume Xcc (mol C/ mol chla) is a constant
         tchla = tchla + ( phy / data%phytos(phy_i)%Xcc ) * 12.0
       ELSE
-        ! Use dynamic equation (Eq 13: of Baklouti, Cloern et al. 1995)
-        ! theta = 1/Xcc [mg Chl (mg C)1] = 0.003 + 0.0154  e^0.050T  e^0.059E mu
+        !-- use dynamic equation (Eq 13: of Baklouti, Cloern et al. 1995)
+        !-- theta = 1/Xcc [mg Chl (mg C)1] = 0.003 + 0.0154  e^0.050T  e^0.059E mu
         tchla = tchla + ( phy * (0.003 + 0.0154 * exp(0.050*temp) * exp(0.059*par) &
                         * primprod(phy_i)))
       ENDIF
 
-      ! Total internal nutrients
+      ! total internal nutrients
       tin = tin + INi
       tip = tip + IPi
    ENDDO
 
+   ! Set diagnostic arrays for combined assemblage properties
    _DIAG_VAR_(data%id_GPP) =  sum(cuptake)*secs_per_day
    _DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
    _DIAG_VAR_(data%id_PPR) =  sum(cuptake) / ( sum(cuptake) - net_cuptake)
    _DIAG_VAR_(data%id_NPR) =  net_cuptake / ( sum(cuptake) - net_cuptake)
-
    _DIAG_VAR_(data%id_NUP) =  sum(nuptake)*secs_per_day
    _DIAG_VAR_(data%id_PUP) =  sum(puptake)*secs_per_day
    _DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
@@ -912,7 +941,7 @@ END SUBROUTINE aed2_calculate_benthic_phytoplankton
 !###############################################################################
 SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
 !-------------------------------------------------------------------------------
-! Get the vertical movement values
+! Get the vertical movement values for phytoplankton cells
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_phytoplankton_data_t),INTENT(in) :: data
@@ -921,9 +950,10 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
    AED_REAL,INTENT(inout) :: mobility(:)
 !
 !LOCALS
-   AED_REAL :: temp
-   AED_REAL :: w_rho
-   AED_REAL :: phy
+   AED_REAL :: temp, par, rho_p
+   AED_REAL :: vvel
+   AED_REAL :: pw, pw20, mu, mu20
+   AED_REAL :: IN, IC, Q
    INTEGER  :: phy_i
 !
 !-------------------------------------------------------------------------------
@@ -931,21 +961,60 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
    temp = _STATE_VAR_(data%id_tem)
 
    DO phy_i=1,data%num_phytos
-      SELECT CASE (data%phytos(phy_i)%w_model)
-         CASE (_MOB_CONST_)
-            w_rho = data%phytos(phy_i)%w_p
-         CASE (_MOB_TEMP_)
-            w_rho = data%phytos(phy_i)%w_p * temp !# MH to fix
-         CASE (_MOB_STOKES_)
-            !# MH to complete
-             phy = _STATE_VAR_(data%id_p(phy_i))! phytoplankton
-             w_rho = data%phytos(phy_i)%w_p
-             w_rho = _STATE_VAR_(data%id_rho(phy_i))
-         CASE DEFAULT
-             STOP
-      END SELECT
+      SELECT CASE (data%phytos(phy_i)%settling)
 
-      mobility(data%id_p(phy_i)) =  w_rho
+         CASE (_MOB_CONST_)
+            ! constant settling velocity using user provided value
+            vvel = data%phytos(phy_i)%w_p
+
+         CASE (_MOB_TEMP_)
+            ! constant settling velocity @20C corrected for density changes
+            pw = _STATE_VAR_(data%id_rho )
+            mu = water_viscosity(temp)
+            mu20 = 0.001002  ! N s/m2
+            pw20 = 998.2000  ! kg/m3 (assuming freshwater)
+            vvel = data%phytos(phy_i)%w_p*mu20*pw / ( mu*pw20 )
+
+         CASE (_MOB_STOKES_)
+            ! settling velocity based on Stokes Law calculation and cell density
+            pw = _STATE_VAR_(data%id_rho )             ! water density
+            mu = water_viscosity(temp)                 ! water dynamic viscosity
+            IF( data%id_rho(phy_i)>0 ) THEN
+              rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density
+            ELSE
+              rho_p = data%rho_ss(i)
+            ENDIF
+            vvel = -9.807*(data%d_phy(i)**2.)*( rho_p-pw ) / ( 18.*mu )
+
+          CASE (_MOB_MOTILE_)
+             ! vertical velocity based on motility and behaviour of phyto group
+             ! modelled as in Ross and Sharples (2007)
+             vvel = zero_
+             IC = _STATE_VAR_(data%id_p(phy_i))
+             IN = _STATE_VAR_(data%id_in(phy_i))
+             Q = IN/IC
+             Qmax = data%phytos(phy_i)%X_nmax
+             vvel = zero_
+             IF( Q<(data%phytos(phy_i)%f1*Qmax) ) THEN
+               !-- nutrient starvation, swim down
+               vvel = -data%phytos(phy_i)%w_p
+             ELSEIF(Q>(data%phytos(phy_i)%f2*Qmax)) THEN
+               !-- nutrient replete
+               IF( par > data%phytos(phy_i)%I_K ) THEN
+                 !-- high light, swim up
+                 vvel = data%phytos(phy_i)%w_p
+               ELSE
+                 !-- low light
+                 vvel = zero_
+               ENDIF
+            ELSE
+               vvel = zero_
+            ENDIF
+         CASE DEFAULT
+            vvel =  zero_
+      END SELECT
+      ! set global mobility array
+      mobility(data%id_p(phy_i)) = vvel
    ENDDO
 END SUBROUTINE aed2_mobility_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

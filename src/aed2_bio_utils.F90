@@ -24,9 +24,9 @@ MODULE aed2_bio_utils
    USE aed2_core
 
    USE aed2_util,ONLY : find_free_lun, &
-                       exp_integral,  &
-                       aed2_bio_temp_function, &
-                       fTemp_function
+                        exp_integral, &
+                        aed2_bio_temp_function, &
+                        fTemp_function
 
    IMPLICIT NONE
 
@@ -37,7 +37,7 @@ MODULE aed2_bio_utils
    TYPE phyto_data
       ! General Attributes
       CHARACTER(64) :: p_name
-      AED_REAL :: p0, Xcc, kc,i_min,rmax,gmax,iv,alpha,rpn,rzn,rdn,rpdu,rpdl,rzd
+      AED_REAL :: p0,Xcc !,kc,i_min,rmax,gmax,iv,alpha,rpn,rzn,rdn,rpdu,rpdl,rzd
       ! Growth rate parameters
       INTEGER  :: fT_Method
       AED_REAL :: R_growth, theta_growth, T_std, T_opt, T_max, kTn, aTn, bTn
@@ -61,8 +61,8 @@ MODULE aed2_bio_utils
       ! Carbon parameters
       INTEGER  :: simCUptake, dic_mode
       ! Sedimentation parameters
-      AED_REAL :: w_p
-      INTEGER  :: w_model
+      INTEGER  :: settling
+      AED_REAL :: w_p, d_phy, f1, f2, c1, c3
    END TYPE
 
 

@@ -608,4 +608,70 @@ END FUNCTION in_zone_set
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+!###############################################################################
+FUNCTION water_viscosity(temperature) RESULT(mu)
+!-------------------------------------------------------------------------------
+! Calculates the molecular viscosity of water for a given temperature
+!
+! From Table A.1b, FLUID_MECHANICS With Engineering Applications
+! by Robert L. Daugherty and Joseph B. Franzini,
+! however, note these values are common in most fluid mechanics texts.
+! NOTE: N s / m^2  = kg / m / s
+!
+!  Temp (C)     Viscosity (N s / m^2) x 10^3
+!  --------     ---------
+!      0          1.781
+!      5          1.518
+!     10          1.307
+!     15          1.139
+!     20          1.002
+!     25          0.890
+!     30          0.798
+!     40          0.653
+!     50          0.547
+!     60          0.466
+!     70          0.404
+!     80          0.354
+!     90          0.315
+!    100          0.282
+!
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+  AED_REAL,INTENT(in)  :: temperature
+  AED_REAL,INTENT(out) :: mu
+!
+!LOCALS
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   !-- Check for non-sensical temperatures
+   IF( temperature<zero_ ) temperature = 0.0
+   IF( temperature>100.0 ) temperature = 100.0
+
+   IF( temperature<=20.0 ) THEN
+     ! 0C to 20C
+     ! y = 0.0008 * x^2 - 0.0556 * x + 1.7789
+     ! r^2 = 0.9999
+     mu = 0.0008 * temperature**2. - 0.0556 * temperature + 1.7789
+
+   ELSEIF(temperature <= 60)
+     ! 20C to 60C
+     ! y = 0.0002 * x^2 - 0.0323 * x + 1.5471
+     ! r^2 = 0.9997
+     mu = 0.0002 * temperature**2. - 0.0323 * temperature + 1.5471
+   ELSE
+     ! 60C to 100C
+     ! y = 0.00006 * x^2 - 0.0141 * x + 1.1026
+     ! r^2 = 0.9995
+     mu = 0.00006 * temperature**2. - 0.0141 * temperature + 1.1026
+   ENDIF
+
+   ! Now convert to units of: N s / m^2
+   mu = mu / 1e3
+
+END FUNCTION water_viscosity
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
 END MODULE aed2_util
