@@ -53,6 +53,7 @@ MODULE aed2_bivalve
       CHARACTER(64) :: name
       AED_REAL :: initial_conc, min
       INTEGER  :: Length
+      AED_REAL :: X_ci
 
       ! Nutrient parameters
        AED_REAL :: INC, IPC
@@ -61,6 +62,7 @@ MODULE aed2_bivalve
       AED_REAL :: Rgrz
       AED_REAL :: Ing, WaI, WbI
       AED_REAL :: fassim
+
       ! Minumum prey concentration parameters
       AED_REAL :: Cmin_grz, Kgrz
       AED_REAL :: minT, Tmin, Tmax, maxT, Dmax, maxD, SSmax, maxSS
@@ -102,6 +104,7 @@ MODULE aed2_bivalve
       INTEGER  :: id_grz,id_resp,id_mort,id_excr,id_egst
       INTEGER  :: id_tbiv,id_nmp,id_3d_grz,id_fT,id_fD,id_fG
       INTEGER  :: id_bivtr,id_pf,id_FR
+      INTEGER  :: id_bnum
 
       !# Model parameters
       INTEGER  :: num_biv
@@ -109,6 +112,7 @@ MODULE aed2_bivalve
       LOGICAL  :: simDNexcr, simDPexcr, simDCexcr
       LOGICAL  :: simPNexcr, simPPexcr, simPCexcr
       LOGICAL  :: simSSlim, simBivFeedback, simFixedEnv, simStaticBiomass
+      LOGICAL  :: initFromDensity
       INTEGER  :: n_zones
       AED_REAL,ALLOCATABLE :: active_zones(:)
       AED_REAL :: fixed_temp, fixed_sal, fixed_oxy, fixed_food
@@ -163,6 +167,7 @@ SUBROUTINE aed2_bivalve_load_params(data, dbase, count, list)
        data%bivalves(i)%initial_conc  = bivalve_param(list(i))%initial_conc
        data%bivalves(i)%min           = bivalve_param(list(i))%min
        data%bivalves(i)%Length        = bivalve_param(list(i))%Length
+       data%bivalves(i)%X_ci          = 1. ! ADD DETAIL
        data%bivalves(i)%INC           = bivalve_param(list(i))%INC
        data%bivalves(i)%IPC           = bivalve_param(list(i))%IPC
        ! Filtration & Ingestion
@@ -255,6 +260,7 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
    INTEGER  :: num_biv
    INTEGER  :: the_biv(MAX_ZOOP_TYPES)
    INTEGER  :: n_zones = 0, active_zones(MAX_ZONES), i
+   LOGICAL  :: initFromDensity = .false.  !ability to read in map of mussel #'s
    LOGICAL  :: simBivTracer = .false.     !include filtration rate tracer
    LOGICAL  :: simBivFeedback = .false.   !allow module to change prey/nutrient concs
    LOGICAL  :: simStaticBiomass = .false. !keep biomass fixed over time
@@ -278,18 +284,19 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
                     dn_target_variable, pn_target_variable, dp_target_variable,&
                     pp_target_variable, dc_target_variable, pc_target_variable,&
                     do_uptake_variable, ss_uptake_variable, dbase,             &
-                    simFixedEnv, fixed_temp, fixed_sal, fixed_oxy, fixed_food
+                    simFixedEnv, fixed_temp, fixed_sal, fixed_oxy, fixed_food, &
+                    initFromDensity
 !-----------------------------------------------------------------------
 !BEGIN
    ! Read the namelist
    read(namlst,nml=aed2_bivalve,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed2_bivalve'
+   IF (status /= 0) STOP 'ERROR reading namelist aed2_bivalve'
 
    ! Assign module level variables
    data%simFixedEnv = simFixedEnv
    IF (biv_fixedenv) THEN
-     PRINT *,'Note - bivalves driven by fixed T,DO,A values'
-     PRINT *,'     - biv feedback disabled'
+     PRINT *,'    NOTE - bivalves driven by fixed T,DO,A values'
+     PRINT *,'         - biv feedback disabled'
      data%fixed_temp = fixed_temp
      data%fixed_sal = fixed_sal
      data%fixed_oxy = fixed_oxy
@@ -298,8 +305,11 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
    END IF
 
    data%simBivFeedback = simBivFeedback
-   PRINT *,'Note - bivalve feedbacks on water column properties: ',simBivFeedback
-   PRINT *,'Note - bivalve filtration tracer variable: ',simBivTracer
+   PRINT *,'    NOTE - bivalve feedbacks on water column properties: ',simBivFeedback
+   PRINT *,'    NOTE - bivalve filtration tracer variable: ',simBivTracer
+
+   data%initFromDensity = initFromDensity
+   PRINT *,'    NOTE - bivalve mass to be initialised from initial density map: ',initFromDensity
 
    ! Configure which sediment zones to run within
    data%n_zones = n_zones
@@ -308,9 +318,9 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
       DO i=1,n_zones
          data%active_zones(i) = active_zones(i)
       ENDDO
-      PRINT *,'Note - bivalves growing in these zones: ',data%active_zones
+      PRINT *,'    NOTE - bivalves growing in these zones: ',data%active_zones
    ELSE
-      PRINT *,'Note - bivalves growing in all zones'
+      PRINT *,'    NOTE - bivalves growing in all zones'
    ENDIF
 
    ! Register variables and store parameter values in our own derived type
@@ -384,6 +394,7 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
    ENDIF
 
    ! Register diagnostic variables
+   data%id_bnum = aed2_define_sheet_diag_variable('num' ,'#/m**2','mussel density')
    data%id_nmp  = aed2_define_sheet_diag_variable('nmp' ,'mmolC/m**2/d','net mussel production')
    data%id_tbiv = aed2_define_sheet_diag_variable('tbiv','mmolC/m**2','total bivalve mass')
    IF (extra_diag) THEN
@@ -406,6 +417,41 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
    data%id_sed_zone = aed2_locate_global_sheet('sed_zone')
 !
 END SUBROUTINE aed2_define_bivalve
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_initialize_bivalve(data, column, layer_idx)
+!-------------------------------------------------------------------------------
+! Routine to initialize bivalve mass from spatial density map
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_ass_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   AED_REAL :: matz, biv_density
+!-------------------------------------------------------------------------------
+!BEGIN
+
+   ! Check user wishes to initilaise from spatial map of biv density
+   IF ( .NOT. data%initFromDensity ) RETURN
+
+   ! Check to ensure this zone is colonisable
+   matz = _STATE_VAR_S_(data%id_sed_zone)
+   IF ( .NOT. in_zone_set(matz, data%active_zones) ) RETURN
+
+   ! Get the
+   biv_density = _DIAG_VAR_S_(data%id_bnum)
+
+   DO biv_i=1,data%num_biv
+     ! Distribute the read in biv density over the simulated groups
+     _STATE_VAR_S_(data%id_biv(biv_i)) = &
+                            (biv_density/data%num_biv)*data%bivalves(biv_i)%X_ci
+   ENDDO
+
+END SUBROUTINE aed2_initialize_bivalve
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -440,8 +486,8 @@ SUBROUTINE aed2_calculate_benthic_bivalve(data,column,layer_idx)
    ! Check to ensure this zone is colonisable
    matz = _STATE_VAR_S_(data%id_sed_zone)
    IF ( .NOT. in_zone_set(matz, data%active_zones) ) RETURN
-   ! Retrieve current environmental conditions.
 
+   ! Retrieve current environmental conditions.
    IF(data%simFixedEnv) THEN
      temp = data%fixed_temp + matz             ! user provided temp
      salinity = data%fixed_sal                 ! user provided salinity

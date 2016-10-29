@@ -247,8 +247,7 @@ END SUBROUTINE aed2_define_ass
 !###############################################################################
 SUBROUTINE aed2_initialize_ass(data, column, layer_idx)
 !-------------------------------------------------------------------------------
-! Routine to update the dynamics of "Acid Sulfate Soils" (ASS) and determine   !
-! the flux to the water column from exposed or re-wetted sediment              !
+! Routine to set initial state of ASS variables                                !
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_ass_data_t),INTENT(in) :: data
