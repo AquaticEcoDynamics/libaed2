@@ -119,7 +119,7 @@ MODULE aed2_bivalve
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_bivalve
-         PROCEDURE :: initialize         => aed2_initialize_ass
+         PROCEDURE :: initialize        => aed2_initialize_bivalve
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_bivalve
 !        PROCEDURE :: mobility          => aed2_mobility_bivalve
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_bivalve
@@ -432,6 +432,7 @@ SUBROUTINE aed2_initialize_bivalve(data, column, layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
+   INTEGER  :: biv_i
    AED_REAL :: matz, biv_density
 !-------------------------------------------------------------------------------
 !BEGIN
