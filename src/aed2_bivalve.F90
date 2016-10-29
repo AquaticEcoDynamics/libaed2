@@ -119,6 +119,7 @@ MODULE aed2_bivalve
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_bivalve
+         PROCEDURE :: initialize         => aed2_initialize_ass
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_bivalve
 !        PROCEDURE :: mobility          => aed2_mobility_bivalve
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_bivalve
@@ -294,7 +295,7 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
 
    ! Assign module level variables
    data%simFixedEnv = simFixedEnv
-   IF (biv_fixedenv) THEN
+   IF (simFixedEnv) THEN
      PRINT *,'    NOTE - bivalves driven by fixed T,DO,A values'
      PRINT *,'         - biv feedback disabled'
      data%fixed_temp = fixed_temp
@@ -426,7 +427,7 @@ SUBROUTINE aed2_initialize_bivalve(data, column, layer_idx)
 ! Routine to initialize bivalve mass from spatial density map
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed2_ass_data_t),INTENT(in) :: data
+   CLASS (aed2_bivalve_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !
