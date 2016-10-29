@@ -637,8 +637,8 @@ FUNCTION water_viscosity(temperature) RESULT(mu)
 !
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-  AED_REAL,INTENT(in)  :: temperature
-  AED_REAL,INTENT(out) :: mu
+  AED_REAL,INTENT(inout)  :: temperature
+  AED_REAL :: mu
 !
 !LOCALS
 !
@@ -654,7 +654,7 @@ FUNCTION water_viscosity(temperature) RESULT(mu)
      ! r^2 = 0.9999
      mu = 0.0008 * temperature**2. - 0.0556 * temperature + 1.7789
 
-   ELSEIF(temperature <= 60)
+   ELSEIF(temperature <= 60) THEN
      ! 20C to 60C
      ! y = 0.0002 * x^2 - 0.0323 * x + 1.5471
      ! r^2 = 0.9997

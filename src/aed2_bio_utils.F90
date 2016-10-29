@@ -62,7 +62,7 @@ MODULE aed2_bio_utils
       INTEGER  :: simCUptake, dic_mode
       ! Sedimentation parameters
       INTEGER  :: settling
-      AED_REAL :: w_p, d_phy, f1, f2, c1, c3
+      AED_REAL :: w_p, d_phy, rho_phy, f1, f2, c1, c3
    END TYPE
 
 

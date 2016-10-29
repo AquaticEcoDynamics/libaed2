@@ -25,7 +25,8 @@ MODULE aed2_phytoplankton
    USE aed2_util,ONLY : find_free_lun, &
                         exp_integral, &
                         aed2_bio_temp_function, &
-                        fTemp_function
+                        fTemp_function, &
+                        water_viscosity
    USE aed2_bio_utils
 
    IMPLICIT NONE
@@ -119,7 +120,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
     ALLOCATE(data%id_ip(count))
     ALLOCATE(data%id_rho(count))
     ALLOCATE(data%id_NtoP(count))
-    IF (extra_debug) THEN
+    IF (extra_diag) THEN
        ALLOCATE(data%id_fT(count))
        ALLOCATE(data%id_fI(count))
        ALLOCATE(data%id_fNit(count))
@@ -670,7 +671,7 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       ! Diagnostic info
       _DIAG_VAR_(data%id_NtoP(phy_i)) =  INi/IPi
 
-      IF (extra_debug) THEN
+      IF (extra_diag) THEN
          _DIAG_VAR_(data%id_fT(phy_i)) =  fT
          _DIAG_VAR_(data%id_fI(phy_i)) =  fI
          _DIAG_VAR_(data%id_fNit(phy_i)) =  fNit
@@ -953,7 +954,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
    AED_REAL :: temp, par, rho_p
    AED_REAL :: vvel
    AED_REAL :: pw, pw20, mu, mu20
-   AED_REAL :: IN, IC, Q
+   AED_REAL :: IN, IC, Q, Qmax
    INTEGER  :: phy_i
 !
 !-------------------------------------------------------------------------------
@@ -969,7 +970,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
 
          CASE (_MOB_TEMP_)
             ! constant settling velocity @20C corrected for density changes
-            pw = _STATE_VAR_(data%id_rho )
+            pw = _STATE_VAR_(data%id_rho(phy_i))
             mu = water_viscosity(temp)
             mu20 = 0.001002  ! N s/m2
             pw20 = 998.2000  ! kg/m3 (assuming freshwater)
@@ -982,9 +983,9 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
             IF( data%id_rho(phy_i)>0 ) THEN
               rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density
             ELSE
-              rho_p = data%rho_ss(i)
+              rho_p = data%phytos(phy_i)%rho_phy
             ENDIF
-            vvel = -9.807*(data%d_phy(i)**2.)*( rho_p-pw ) / ( 18.*mu )
+            vvel = -9.807*(data%phytos(phy_i)%d_phy**2.)*( rho_p-pw ) / ( 18.*mu )
 
           CASE (_MOB_MOTILE_)
              ! vertical velocity based on motility and behaviour of phyto group
