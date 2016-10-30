@@ -65,25 +65,17 @@ MODULE aed2_organic_matter
       INTEGER  :: id_l_resus
 
       !# Model parameters
-      AED_REAL :: w_poc,Rpoc_miner,Rdoc_miner,Fsed_poc,Fsed_doc,           &
-                          Kpoc_miner, Kdoc_miner, Ksed_doc,                &
-                          theta_poc_miner, theta_doc_miner, theta_sed_doc, &
-                          KeDOM, KePOM
-      AED_REAL :: w_pon,Rpon_miner,Rdon_miner,Fsed_pon,Fsed_don,           &
-                          Kpon_miner, Kdon_miner, Ksed_don,                &
-                          theta_pon_miner, theta_don_miner, theta_sed_don
-      AED_REAL :: w_pop,Rpop_miner,Rdop_miner,Fsed_pop,Fsed_dop,           &
-                          Kpop_miner, Kdop_miner, Ksed_dop,                &
-                          theta_pop_miner, theta_dop_miner, theta_sed_dop
-      AED_REAL :: docr_initial,donr_initial,dopr_initial,cpom_initial,  &
-                          Rdocr_miner,Rdonr_miner,Rdopr_miner,Rcpom_bdown, &
-                          X_cpom_n,X_cpom_p,KeDOMR,KeCPOM
-      AED_REAL :: photo_fmin
+      AED_REAL :: Rpoc_hydrol, Rdoc_minerl, Rdoc_minerl, Rpon_hydrol, &
+                          Rdon_minerl, Rpop_hydrol, Rdop_minerl, &
+                          theta_hydrol, theta_minerl, Kpom_hydrol, Kdom_minerl
+      AED_REAL :: Rdocr_miner, Rdonr_miner, Rdopr_miner, Rcpom_bdown, &
+                          X_cpom_n, X_cpom_p
+      AED_REAL :: KeDOM, KePOM, KeDOMR, KeCPOM, photo_fmin
+      AED_REAL :: w_pom, d_pom, rho_pom, w_cpom, d_cpom, rho_cpom
       AED_REAL :: sedimentOMfrac, Xsc, Xsn, Xsp
-      AED_REAL :: w_cpom, d_cpom, rho_cpom
-      AED_REAL :: w_pom, d_pom, rho_pom
-      AED_REAL :: Ksed_dom, theta_sed_dom
+      AED_REAL :: Ksed_dom, theta_sed_dom, Fsed_doc, Fsed_don, Fsed_dop
 
+      !# Model options
       INTEGER  :: resuspension, settling
       LOGICAL  :: simRPools,extra_diag,simphotolysis
       LOGICAL  :: simSedimentOM
@@ -509,11 +501,11 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
 !
 !LOCALS
    AED_REAL :: pon,don,amm,oxy,temp !State variables
-   AED_REAL :: pon_mineralisation, don_mineralisation
+   AED_REAL :: pon_hydrolysis, don_mineralisation
    AED_REAL :: pop,dop,frp !State variables
-   AED_REAL :: pop_mineralisation, dop_mineralisation
+   AED_REAL :: pop_hydrolysis, dop_mineralisation
    AED_REAL :: poc,doc,dic !State variables
-   AED_REAL :: poc_mineralisation, doc_mineralisation
+   AED_REAL :: poc_hydrolysis, doc_mineralisation
    AED_REAL :: docr,donr,dopr,cpom,cdom
    AED_REAL :: docr_mineralisation, donr_mineralisation
    AED_REAL :: dopr_mineralisation, cpom_breakdown
