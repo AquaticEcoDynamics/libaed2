@@ -354,7 +354,7 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
    INTEGER  :: i
    AED_REAL :: vvel
    AED_REAL :: pw, pw20, mu, mu20
-   AED_REAL :: temp
+   AED_REAL :: temp, rho_s
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -380,14 +380,14 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
             mu = water_viscosity(temp)
             mu20 = 0.001002  ! N s/m2
             pw20 = 998.2000  ! kg/m3 (assuming freshwater)
-            vvel = data%w_ss*mu20*pw / ( mu*pw20 )
+            vvel = data%w_ss(i)*mu20*pw / ( mu*pw20 )
 
          CASE ( _MOB_STOKES_ )
             ! settling velocity based on Stokes Law calculation and cell density
             pw = _STATE_VAR_(data%id_rho)              ! water density
             mu = water_viscosity(temp)                 ! water dynamic viscosity
             rho_s = data%rho_ss(i)
-            vvel = -9.807*(data%phytos(phy_i)%d_ss**2.)*( rho_p-pw ) / ( 18.*mu )
+            vvel = -9.807*(data%d_ss(i)**2.)*( rho_s-pw ) / ( 18.*mu )
 
          CASE DEFAULT
             ! unknown settling/migration option selection
