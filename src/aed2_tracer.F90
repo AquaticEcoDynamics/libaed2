@@ -28,6 +28,8 @@ MODULE aed2_tracer
 !-------------------------------------------------------------------------------
    USE aed2_core
 
+   USE aed2_util,ONLY : water_viscosity
+
    IMPLICIT NONE
 
    PRIVATE
@@ -356,13 +358,21 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ! settling = 0 : no settling
+   ! settling = 1 : constant settling @ w_pom
+   ! settling = 2 : constant settling @ w_pom, corrected for variable density
+   ! settling = 3 : settling based on Stoke's Law (calculated below)
 
    DO i=1,data%num_tracers
       SELECT CASE (data%settling)
 
+         CASE ( _MOB_OFF_ )
+            ! disable settling by setting vertical velocity to 0
+            vvel = zero_
+
          CASE ( _MOB_CONST_ )
             ! constant settling velocity using user provided value
-            vvel = data%w_ss
+            vvel = data%w_ss(i)
 
          CASE ( _MOB_TEMP_ )
             ! constant settling velocity @20C corrected for density changes
@@ -376,16 +386,12 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
             ! settling velocity based on Stokes Law calculation and cell density
             pw = _STATE_VAR_(data%id_rho)              ! water density
             mu = water_viscosity(temp)                 ! water dynamic viscosity
-            IF( data%id_rho(phy_i)>0 ) THEN
-              rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density
-            ELSE
-              rho_p = data%phytos(phy_i)%rho_phy
-            ENDIF
-            vvel = -9.807*(data%phytos(phy_i)%d_phy**2.)*( rho_p-pw ) / ( 18.*mu )
+            rho_s = data%rho_ss(i)
+            vvel = -9.807*(data%phytos(phy_i)%d_ss**2.)*( rho_p-pw ) / ( 18.*mu )
 
          CASE DEFAULT
             ! unknown settling/migration option selection
-            vvel = data%w_ss
+            vvel = data%w_ss(i)
 
       END SELECT
       ! set global mobility array

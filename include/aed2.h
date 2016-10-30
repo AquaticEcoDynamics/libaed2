@@ -50,10 +50,12 @@
 #define L_PAREN            '('
 #define R_PAREN            ')'
 
-#define _MOB_CONST_ 0
-#define _MOB_TEMP_  1
-#define _MOB_STOKES_  2
-#define _MOB_MOTILE_  3
+!# for generic vertical settling/mobility approaches
+#define _MOB_OFF_ 0
+#define _MOB_CONST_ 1
+#define _MOB_TEMP_  2
+#define _MOB_STOKES_  3
+#define _MOB_MOTILE_  4
 
 #ifdef SINGLE
 #  define AED_REAL real(4)

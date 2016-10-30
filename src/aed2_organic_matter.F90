@@ -24,11 +24,14 @@ MODULE aed2_organic_matter
 ! aed2_organic_matter --- organic matter biogeochemical model
 !
 ! The Organic Matter (OM) module contains equations for mineralisation
-! of particulate and dissolved organic matter pools.
+! and breakdown of particulate and dissolved organic matter pools, as well as
+! settling, resuspension and other processes
 !
 ! Users can optionally configure refractory pools
 !-------------------------------------------------------------------------------
    USE aed2_core
+
+   USE aed2_util,ONLY : water_viscosity
 
    IMPLICIT NONE
 
@@ -821,41 +824,57 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
    AED_REAL,INTENT(inout) :: mobility(:)
 !
 !LOCALS
-   AED_REAL :: temp, salinity, water_rho, mu, vel
-   INTEGER  :: i
+   AED_REAL :: vvel, vvel_cpom
+   AED_REAL :: pw, pw20, mu, mu20
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   ! settling = 0 : no settling
-   ! settling = 1 : constant settling @ w_pom
-   ! settling = 2 : stokes settling (calculated below)
+     ! settling = 0 : no settling
+     ! settling = 1 : constant settling @ w_pom
+     ! settling = 2 : constant settling @ w_pom, corrected for variable density
+     ! settling = 3 : settling based on Stoke's Law (calculated below)
 
-   IF( data%settling<2 ) RETURN
+     SELECT CASE (data%settling)
 
-   temp = _STATE_VAR_(data%id_temp)     ! local temperature
-   salinity = _STATE_VAR_(data%id_salt) ! local salinity
+        CASE ( _MOB_OFF_ )
+          ! disable settling by settign vertical velocity to 0
+          vvel = zero_
+          vvel_cpom = zero_
 
-   ! Calculate water density
-   water_rho = (0.02003*temp**3.-6.3335*temp**2.+26.8567*temp+1000012.72)*(1.+0.77*salinity)/1000.
+        CASE ( _MOB_CONST_ )
+          ! constant settling velocity using user provided value
+          vvel = data%w_pom
+          vvel_cpom = data%w_pom
 
-   ! calclulate water viscosity
-   mu = (0.00005*temp**4.-0.01196*temp**3.+1.10961*temp**2.-56.59779*temp+1175.58155)/1000000.
+        CASE ( _MOB_TEMP_ )
+          ! constant settling velocity @20C corrected for density changes
+          pw = _STATE_VAR_(data%id_rho)
+          mu = water_viscosity(temp)
+          mu20 = 0.001002  ! N s/m2
+          pw20 = 998.2000  ! kg/m3 (assuming freshwater)
+          vvel = data%w_pom*mu20*pw / ( mu*pw20 )
+          vvel_cpom = data%w_cpom*mu20*pw / ( mu*pw20 )
 
-   ! Calculate settling velocity according to Stokes law
-   !  vel = 9.807*data%d_pom(i)**2.*(data%rho_pom(i) - water_rho)/(18.*mu)   !CHECK THIS CALCULATION
+        CASE ( _MOB_STOKES_ )
+          ! settling velocity based on Stokes Law calculation and cell density
+          pw = _STATE_VAR_(data%id_rho)              ! water density
+          mu = water_viscosity(temp)                 ! water dynamic viscosity
+          rho_pom = data%rho_pom
+          vvel = -9.807*(data%d_pom**2.)*( rho_pom-pw ) / ( 18.*mu )
+          IF(data%simRPools) &
+          vvel_cpom = -9.807*(data%d_cpom**2.)*( data%rho_cpom-pw ) / ( 18.*mu )
 
-   ! Update the settling rate and assign to mobility array
-   mobility(data%id_poc) = data%w_pom !vel
-   mobility(data%id_pon) = data%w_pom !vel
-   mobility(data%id_pon) = data%w_pom !vel
-   IF(data%simRPools) THEN
-     !  vel = 9.807*data%d_cpom(i)**2.*(data%rho_cpom(i) - water_rho)/(18.*mu)   !CHECK THIS CALCULATION
-     mobility(data%id_pon) = data%w_cpom !vel
-   ENDIF
+        CASE DEFAULT
+          ! unknown settling/migration option selection
+          vvel = data%w_pom
+          vvel_cpom = data%w_cpom
 
-   print*,'Settling velocity = ', mobility(data%id_poc)
-
-
+      END SELECT
+      ! set global mobility array
+      mobility(data%id_poc) = vvel
+      mobility(data%id_pon) = vvel
+      mobility(data%id_pop) = vvel
+      IF(data%simRPools) mobility(data%id_cpom) = vvel_cpom
 
 END SUBROUTINE aed2_mobility_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
