@@ -54,7 +54,7 @@ MODULE aed2_organic_matter
       INTEGER  :: id_Fsed_pop, id_Fsed_dop ! sed. rate organic phosphorus
       INTEGER  :: id_Fsed_poc, id_Fsed_doc ! sed. rate organic carbon
       INTEGER  :: id_Psed_poc, id_Psed_pon, id_Psed_pop ! sedimentation rates
-      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb
+      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_rho
       INTEGER  :: id_pon_miner, id_don_miner
       INTEGER  :: id_pop_miner, id_dop_miner
       INTEGER  :: id_poc_miner, id_doc_miner
@@ -446,6 +446,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
    data%id_salt = aed2_locate_global('salinity')
+   data%id_rho = aed2_locate_global('density')
 
 END SUBROUTINE aed2_define_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -826,6 +827,7 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
 !LOCALS
    AED_REAL :: vvel, vvel_cpom
    AED_REAL :: pw, pw20, mu, mu20
+   AED_REAL :: rho_pom, temp
 !
 !-------------------------------------------------------------------------------
 !BEGIN
