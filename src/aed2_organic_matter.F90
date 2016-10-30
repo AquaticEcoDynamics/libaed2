@@ -53,7 +53,7 @@ MODULE aed2_organic_matter
       INTEGER  :: id_Fsed_pon, id_Fsed_don ! sed. rate organic nitrogen
       INTEGER  :: id_Fsed_pop, id_Fsed_dop ! sed. rate organic phosphorus
       INTEGER  :: id_Fsed_poc, id_Fsed_doc ! sed. rate organic carbon
-      INTEGER  :: id_Psed_poc, id_Psed_pon, id_Psed_pop ! sedimentation rates
+      INTEGER  :: id_Psed_poc, id_Psed_pon, id_Psed_pop, id_Psed_cpom ! sedimentation rates
       INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_rho
       INTEGER  :: id_pon_miner, id_don_miner
       INTEGER  :: id_pop_miner, id_dop_miner
@@ -404,6 +404,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
      data%id_Psed_poc = aed2_define_sheet_diag_variable('Psed_poc','mmol/m**2/s',  'POC sedimentation')
      data%id_Psed_pon = aed2_define_sheet_diag_variable('Psed_pon','mmol/m**2/s',  'POC sedimentation')
      data%id_Psed_pop = aed2_define_sheet_diag_variable('Psed_pop','mmol/m**2/s',  'POC sedimentation')
+     IF (simRPools) &
+       data%id_Psed_cpom = aed2_define_sheet_diag_variable('Psed_cpom','mmol/m**2/s',  'CPOM sedimentation')
    ENDIF
 
    !-- resuspension link variable
@@ -568,7 +570,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
 
    ! Define some intermediate quantities (units mmol N/m3/day)
    pon_hydrolysis = fpon_miner(data%use_oxy,data%Rpon_hydrol,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
-   don_mineralisation = fdon_miner(data%use_oxy,data%Rdon_minerl,data%Kdom_miner,data%theta_minerl,oxy,temp)
+   don_mineralisation = fdon_miner(data%use_oxy,data%Rdon_minerl,data%Kdom_minerl,data%theta_minerl,oxy,temp)
    pop_hydrolysis = fpop_miner(data%use_oxy,data%Rpop_hydrol,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
    dop_mineralisation = fdop_miner(data%use_oxy,data%Rdop_minerl,data%Kdom_minerl,data%theta_minerl,oxy,temp)
    poc_hydrolysis = fpoc_miner(data%use_oxy,data%Rpoc_hydrol,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
