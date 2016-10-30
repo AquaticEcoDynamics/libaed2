@@ -65,7 +65,7 @@ MODULE aed2_organic_matter
       INTEGER  :: id_l_resus
 
       !# Model parameters
-      AED_REAL :: Rpoc_hydrol, Rdoc_minerl, Rdoc_minerl, Rpon_hydrol, &
+      AED_REAL :: Rpoc_hydrol, Rdoc_minerl, Rpon_hydrol, &
                           Rdon_minerl, Rpop_hydrol, Rdop_minerl, &
                           theta_hydrol, theta_minerl, Kpom_hydrol, Kdom_minerl
       AED_REAL :: Rdocr_miner, Rdonr_miner, Rdopr_miner, Rcpom_bdown, &
@@ -566,18 +566,18 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_temp) ! temperature
 
-   ! Define some intermediate quantities units mmol N/m3/day
-   pon_hydrolysis = fpon_miner(data%use_oxy,data%Rpon_miner,data%Kpon_miner,data%theta_pon_miner,oxy,temp)
-   don_mineralisation = fdon_miner(data%use_oxy,data%Rdon_miner,data%Kdon_miner,data%theta_don_miner,oxy,temp)
-   pop_hydrolysis = fpop_miner(data%use_oxy,data%Rpop_miner,data%Kpop_miner,data%theta_pop_miner,oxy,temp)
-   dop_mineralisation = fdop_miner(data%use_oxy,data%Rdop_miner,data%Kdop_miner,data%theta_dop_miner,oxy,temp)
-   poc_hydrolysis = fpoc_miner(data%use_oxy,data%Rpoc_miner,data%Kpoc_miner,data%theta_poc_miner,oxy,temp)
-   doc_mineralisation = fdoc_miner(data%use_oxy,data%Rdoc_miner,data%Kdoc_miner,data%theta_doc_miner,oxy,temp)
+   ! Define some intermediate quantities (units mmol N/m3/day)
+   pon_hydrolysis = fpon_miner(data%use_oxy,data%Rpon_hydrol,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
+   don_mineralisation = fdon_miner(data%use_oxy,data%Rdon_minerl,data%Kdom_miner,data%theta_minerl,oxy,temp)
+   pop_hydrolysis = fpop_miner(data%use_oxy,data%Rpop_hydrol,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
+   dop_mineralisation = fdop_miner(data%use_oxy,data%Rdop_minerl,data%Kdom_minerl,data%theta_minerl,oxy,temp)
+   poc_hydrolysis = fpoc_miner(data%use_oxy,data%Rpoc_hydrol,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
+   doc_mineralisation = fdoc_miner(data%use_oxy,data%Rdoc_minerl,data%Kdom_minerl,data%theta_minerl,oxy,temp)
    IF(data%simRPools) THEN
-      docr_mineralisation = fdoc_miner(data%use_oxy,data%Rdocr_miner,data%Kdoc_miner,data%theta_doc_miner,oxy,temp)
-      donr_mineralisation = fdoc_miner(data%use_oxy,data%Rdonr_miner,data%Kdoc_miner,data%theta_doc_miner,oxy,temp)
-      dopr_mineralisation = fdoc_miner(data%use_oxy,data%Rdopr_miner,data%Kdoc_miner,data%theta_doc_miner,oxy,temp)
-      cpom_breakdown = fpoc_miner(data%use_oxy,data%Rcpom_bdown,data%Kpoc_miner,data%theta_poc_miner,oxy,temp)
+      docr_mineralisation = fdoc_miner(data%use_oxy,data%Rdocr_miner,data%Kdom_minerl,data%theta_minerl,oxy,temp)
+      donr_mineralisation = fdoc_miner(data%use_oxy,data%Rdonr_miner,data%Kdom_minerl,data%theta_minerl,oxy,temp)
+      dopr_mineralisation = fdoc_miner(data%use_oxy,data%Rdopr_miner,data%Kdom_minerl,data%theta_minerl,oxy,temp)
+      cpom_breakdown = fpoc_miner(data%use_oxy,data%Rcpom_bdown,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
       IF ( data%simphotolysis ) THEN
          photolysis = photo(vis,cdom,1) + photo(uva,cdom,2) + photo(uvb,cdom,3)
          !# Limit photolysis to 90% of doc pool within 1 hour
