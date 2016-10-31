@@ -154,13 +154,13 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
      ELSE
        IF (po4sorption_target_variable .NE. '' ) THEN
           data%id_frpads_vvel = -1
-          print *,'        PO4 is adsorbing to ',TRIM(po4sorption_target_variable)
-          print *,'        ... found'
+          print *,'          PO4 is adsorbing to ',TRIM(po4sorption_target_variable)
+          print *,'          ... found'
           data%id_tss = aed2_locate_variable(po4sorption_target_variable)
           IF(w_po4ads<-999.) THEN
-            print *,'        Checking for associated _vvel diagnostic',TRIM(po4sorption_target_variable)//'_vvel'
+            print *,'          Checking for associated _vvel link array ',TRIM(po4sorption_target_variable)//'_vvel'
             data%id_frpads_vvel = aed2_locate_variable(TRIM(po4sorption_target_variable)//'_vvel')
-            print *,'        ... found'
+            print *,'          ... found'
           ELSE
             PRINT *,'  ERROR PO4 adsorption vvel link variable not found even though w_po4ads specifies link'
           ENDIF
@@ -329,6 +329,9 @@ SUBROUTINE aed2_mobility_phosphorus(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+
+print *,'frpmob1',data%id_frpads_vvel
+print *,'frpmob2',data%w_po4ads, _DIAG_VAR_(data%id_frpads_vvel)
 
    ! default to zero_
    mobility(data%id_frpads) = zero_

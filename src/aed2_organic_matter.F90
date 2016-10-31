@@ -692,7 +692,7 @@ SUBROUTINE aed2_calculate_benthic_organic_matter(data,column,layer_idx)
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp)                   ! local temperature
-   oxy = 300. ; IF (data%use_oxy) oxy = _STATE_VAR_(data%id_oxy)  
+   oxy = 300. ; IF (data%use_oxy) oxy = _STATE_VAR_(data%id_oxy)
 
    ! Retrieve current (local) state variable values.
    poc = _STATE_VAR_(data%id_poc) ! particulate organic carbon
@@ -767,8 +767,8 @@ SUBROUTINE aed2_calculate_benthic_organic_matter(data,column,layer_idx)
 
    ! Also store net sediment fluxes as diagnostic variable.
    IF (data%extra_diag) THEN
-      _DIAG_VAR_S_(data%id_sed_poc) = Fsed_poc + Psed_poc
-      _DIAG_VAR_S_(data%id_sed_doc) = Fsed_doc
+      _DIAG_VAR_S_(data%id_sed_poc) = Fsed_poc + Psed_poc ! resus & settling
+      _DIAG_VAR_S_(data%id_sed_doc) = Fsed_doc            ! dissolved flux
       _DIAG_VAR_S_(data%id_sed_pon) = Fsed_poc + Psed_poc
       _DIAG_VAR_S_(data%id_sed_don) = Fsed_don
       _DIAG_VAR_S_(data%id_sed_pop) = Fsed_poc + Psed_poc
