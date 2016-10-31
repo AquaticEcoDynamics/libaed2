@@ -399,7 +399,7 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
       END SELECT
       ! set global mobility array
       mobility(data%id_ss(i)) = vvel
-      IF( settling>1 .AND. i==1 ) _DIAG_VAR_(data%id_d_vvel) = vvel
+      _DIAG_VAR_(data%id_ss_vvel(i)) = vvel
    ENDDO
 
 END SUBROUTINE aed2_mobility_tracer
