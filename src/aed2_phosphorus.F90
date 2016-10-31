@@ -39,7 +39,7 @@ MODULE aed2_phosphorus
       INTEGER  :: id_frp, id_frpads, id_oxy,  id_tss, id_pH
       INTEGER  :: id_Fsed_frp
       INTEGER  :: id_temp, id_tssext
-      INTEGER  :: id_sed_frp
+      INTEGER  :: id_sed_frp, id_frpads_vvel
 
       !# Model parameters
       AED_REAL :: Fsed_frp,Ksed_frp,theta_sed_frp      ! Benthic
@@ -52,7 +52,7 @@ MODULE aed2_phosphorus
          PROCEDURE :: define            => aed2_define_phosphorus
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_phosphorus
          PROCEDURE :: equilibrate       => aed2_equilibrate_phosphorus
-!        PROCEDURE :: mobility          => aed2_mobility_phosphorus
+         PROCEDURE :: mobility          => aed2_mobility_phosphorus
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_phosphorus
 !        PROCEDURE :: delete            => aed2_delete_phosphorus
 
@@ -149,13 +149,23 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
    ! Check if particles and PO4 adsorption are simulated
    IF (data%simPO4Adsorption) THEN
      IF (data%ads_use_external_tss) THEN
-         PRINT *,'PO4 adsorption is configured to use external TSS'
+         PRINT *,'        PO4 adsorption is configured to use external TSS var'
          data%id_tssext = aed2_locate_global('tss')
      ELSE
        IF (po4sorption_target_variable .NE. '' ) THEN
+          data%id_frpads_vvel = -1
+          print *,'        PO4 is adsorbing to ',TRIM(po4sorption_target_variable)
+          print *,'        ... found'
           data%id_tss = aed2_locate_variable(po4sorption_target_variable)
+          IF(w_po4ads<-999.) THEN
+            print *,'        Checking for associated _vvel diagnostic',TRIM(po4sorption_target_variable)//'_vvel'
+            data%id_frpads_vvel = aed2_locate_variable(TRIM(po4sorption_target_variable)//'_vvel')
+            print *,'        ... found'
+          ELSE
+            PRINT *,'  ERROR PO4 adsorption vvel link variable not found even though w_po4ads specifies link'
+          ENDIF
        ELSE
-          PRINT *,'PO4 adsorption is configured but no internal or external target variable is set'
+          PRINT *,'  ERROR PO4 adsorption is configured but no internal or external target variable is set'
           STOP
        ENDIF
      ENDIF
@@ -301,6 +311,36 @@ SUBROUTINE aed2_calculate_benthic_phosphorus(data,column,layer_idx)
 
 
 END SUBROUTINE aed2_calculate_benthic_phosphorus
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_mobility_phosphorus(data,column,layer_idx,mobility)
+!-------------------------------------------------------------------------------
+! Get the vertical movement velocities of frp_ads (+ve up; -ve down)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_phosphorus_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: mobility(:)
+!
+!LOCALS
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+
+   ! default to zero_
+   mobility(data%id_frpads) = zero_
+   IF( data%id_frpads_vvel>0 ) THEN
+     ! adopt vertical velocity of host particle
+     mobility(data%id_frpads) = _DIAG_VAR_(data%id_frpads_vvel)
+   ELSE
+     ! adopt constant value read in from nml
+     mobility(data%id_frpads) = data%w_po4ads
+   ENDIF
+
+END SUBROUTINE aed2_mobility_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

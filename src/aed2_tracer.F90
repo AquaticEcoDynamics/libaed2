@@ -38,11 +38,11 @@ MODULE aed2_tracer
 
    TYPE,extends(aed2_model_data_t) :: aed2_tracer_data_t
       !# Variable identifiers
-      INTEGER,ALLOCATABLE :: id_ss(:), id_sfss(:)
+      INTEGER,ALLOCATABLE :: id_ss(:), id_sfss(:), id_ss_vvel(:)
       INTEGER :: id_retain
-      INTEGER :: id_l_bot, id_tau_0, id_epsilon
+      INTEGER :: id_l_bot, id_tau_0, id_epsilon, id_resus
       INTEGER :: id_temp, id_taub, id_salt, id_rho
-      INTEGER :: id_d_taub, id_resus
+      INTEGER :: id_d_taub
 
       !# Module configuration
       INTEGER :: num_tracers
@@ -137,7 +137,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
 
    ! Setup tracers
    IF ( num_tracers > 0 ) THEN
-      ALLOCATE(data%id_ss(num_tracers))
+      ALLOCATE(data%id_ss(num_tracers)) ; ALLOCATE(data%id_ss_vvel(num_tracers))
       ALLOCATE(data%decay(num_tracers)) ; data%decay(1:num_tracers) = decay(1:num_tracers)
       ALLOCATE(data%Fsed(num_tracers))  ; data%Fsed(1:num_tracers)  = Fsed(1:num_tracers)
       ALLOCATE(data%Ke_ss(num_tracers)) ; data%Ke_ss(1:num_tracers) = Ke_ss(1:num_tracers)
@@ -155,7 +155,8 @@ SUBROUTINE aed2_define_tracer(data, namlst)
          trac_name(3:3) = CHAR(ICHAR('0') + i)
                                              ! divide settling by secs_per_day to convert m/d to m/s
          data%id_ss(i) = aed2_define_variable(TRIM(trac_name),'mmol/m**3','tracer', &
-                                                  trace_initial,minimum=zero_,mobility=(w_ss(i)/secs_per_day))
+                                              trace_initial,minimum=zero_,mobility=(w_ss(i)/secs_per_day))
+         data%id_ss_vvel(i) = aed2_define_diag_variable(TRIM(trac_name)//'_vvel','m/s','vertical velocity')
       ENDDO
    ENDIF
 
@@ -398,6 +399,7 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
       END SELECT
       ! set global mobility array
       mobility(data%id_ss(i)) = vvel
+      IF( settling>1 .AND. i==1 ) _DIAG_VAR_(data%id_d_vvel) = vvel
    ENDDO
 
 END SUBROUTINE aed2_mobility_tracer
