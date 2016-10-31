@@ -211,6 +211,9 @@ SUBROUTINE aed2_define_isotope_c(data, namlst)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_isotope_c initialization"
+   print *,"  WARNING! aed2_isotope_c model is currently under development"
+
    ! Read the namelist
    read(namlst,nml=aed2_isotope_c,iostat=status)
    IF (status /= 0) THEN

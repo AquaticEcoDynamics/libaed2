@@ -138,6 +138,7 @@ SUBROUTINE aed2_define_ass(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_ass initialization"
 
    simProfiles = .FALSE.
 

@@ -202,6 +202,7 @@ SUBROUTINE aed2_define_macrophyte(data, namlst)
 
 !-----------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_macrophyte initialization"
 
    simMacFeedback = .FALSE.
    simStaticBiomass = .FALSE.

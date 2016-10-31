@@ -87,6 +87,9 @@ SUBROUTINE aed2_define_habitat(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_habitat initialization"
+   print *,"  WARNING! aed2_habitat model is currently under development"
+
    ! Default
    simBirdForaging = .false.
    simBenthicProd = .false.

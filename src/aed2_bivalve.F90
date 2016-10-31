@@ -289,6 +289,8 @@ SUBROUTINE aed2_define_bivalve(data, namlst)
                     initFromDensity
 !-----------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_bivalve initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_bivalve,iostat=status)
    IF (status /= 0) STOP 'ERROR reading namelist aed2_bivalve'

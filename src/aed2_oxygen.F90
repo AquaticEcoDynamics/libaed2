@@ -93,6 +93,8 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_oxygen initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_oxygen,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_oxygen'

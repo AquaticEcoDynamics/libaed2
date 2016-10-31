@@ -253,7 +253,9 @@ SUBROUTINE aed2_define_vegetation(data, namlst)
                     do_uptake_variable, ss_uptake_variable, dbase
 !-----------------------------------------------------------------------
 !BEGIN
-!print *,'**** Reading /aed2_vegetation/ namelist'
+   print *,"        aed2_vegetation initialization"
+   print *,"  WARNING! aed2_vegetation model is currently under development"
+
    ! Read the namelist
    read(namlst,nml=aed2_vegetation,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_vegetation'

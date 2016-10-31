@@ -117,6 +117,8 @@ SUBROUTINE aed2_define_carbon(data, namlst)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_carbon initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_carbon,iostat=status)
    IF (status /= 0) THEN

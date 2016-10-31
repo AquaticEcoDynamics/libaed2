@@ -183,7 +183,8 @@ SUBROUTINE aed2_define_zooplankton(data, namlst)
                     dbase
 !-----------------------------------------------------------------------
 !BEGIN
-!print *,'**** Reading /aed2_zooplankton/ namelist'
+   print *,"        aed2_zooplankton initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_zooplankton,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_zooplankton'

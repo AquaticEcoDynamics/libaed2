@@ -83,6 +83,9 @@ SUBROUTINE aed2_define_radon(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_radon initialization"
+   print *,"  WARNING! aed2_radon model is currently under development"
+
    ! Read the namelist
    read(namlst,nml=aed2_radon,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_radon'

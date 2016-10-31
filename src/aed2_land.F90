@@ -117,6 +117,8 @@ SUBROUTINE aed2_define_land(data, namlst)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_land initialization"
+   print *,"  WARNING! aed2_land model is currently under development"
 
    ! Set defaults
    boundaryWThgt = zero_

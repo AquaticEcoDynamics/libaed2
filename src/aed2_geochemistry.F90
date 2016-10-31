@@ -144,8 +144,9 @@ SUBROUTINE aed2_define_geochemistry(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_geochemistry initialization"
 
-   print *,"WARNING! aed2_geochemistry model is currently under development"
+   print *,"  WARNING! aed2_geochemistry model is currently under development"
    ! MH:JOBS
    ! remove pe
    ! species outputs

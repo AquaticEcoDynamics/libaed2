@@ -107,6 +107,8 @@ SUBROUTINE aed2_define_tracer(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_tracer initialization"
+
    ! set default parameter values
    decay = zero_
    Fsed = zero_

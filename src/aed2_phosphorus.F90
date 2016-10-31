@@ -109,6 +109,8 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_phosphorus initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_phosphorus,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_phosphorus'

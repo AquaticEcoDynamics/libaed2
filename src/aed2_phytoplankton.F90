@@ -313,6 +313,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho
 !-----------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_phytoplankton initialization"
+
    ! Default settings
    settling = _MOB_CONST_
 

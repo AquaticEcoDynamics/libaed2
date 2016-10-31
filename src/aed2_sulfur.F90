@@ -83,6 +83,9 @@ SUBROUTINE aed2_define_sulfur(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_sulfur initialization"
+   print *,"  WARNING! aed2_sulfur model is currently under development"
+
    ! Read the namelist
    read(namlst,nml=aed2_sulfur,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_sulfur'
@@ -91,7 +94,7 @@ SUBROUTINE aed2_define_sulfur(data, namlst)
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
 
-   PRINT *,'AED_SULFUR : Note this module has not been completed. Stopping.'
+   PRINT *,'  AED_SULFUR : Note this module has not been completed. Stopping.'
 
 
 !  ! Register environmental dependencies

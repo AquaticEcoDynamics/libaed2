@@ -110,6 +110,8 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_nitrogen initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_nitrogen,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_nitrogen'

@@ -94,7 +94,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
 !BEGIN
    ! Read the namelist
    read(namlst,nml=aed2_sed_const2d,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed2_sed_const2d'
+   IF (status /= 0) STOP 'ERROR reading namelist aed2_sed_const2d'
 
    data%n_zones = n_zones
    IF (Fsed_oxy(1) .NE. MISVAL ) THEN
@@ -158,11 +158,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
-
-!  AED_REAL          :: FsedA_initial=0.01
-!  AED_REAL          :: FsedN_initial=0.01
    CHARACTER(len=64) :: sedflux_model=''
-
    INTEGER  :: nzones = 1
    AED_REAL :: Fsed_oxy = MISVAL, Fsed_rsi = MISVAL, Fsed_amm = MISVAL, Fsed_nit = MISVAL, &
                Fsed_pon = MISVAL, Fsed_don = MISVAL, Fsed_pop = MISVAL, Fsed_dop = MISVAL, &
@@ -178,16 +174,16 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"aed2_sedflux initialization"
+   print *,"        aed2_sedflux initialization"
 
    ! Read the namelist
    read(namlst,nml=aed2_sedflux,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed2_sedflux'
+   IF (status /= 0) STOP 'ERROR reading namelist aed2_sedflux'
 
    data%sed_modl = -1
    IF ( sedflux_model .EQ. "Constant" ) THEN
       read(namlst,nml=aed2_sed_constant,iostat=status)
-      IF (status /= 0) STOP 'Error reading namelist aed2_sed_constant'
+      IF (status /= 0) STOP 'ERROR reading namelist aed2_sed_constant'
 
       ! Store parameter values in our own derived type
       ! NB: all rates must be provided in values per day,

@@ -266,6 +266,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_organic_matter initialization"
+
    ! Set default parameters here
 
 

@@ -138,6 +138,9 @@ SUBROUTINE aed2_define_seddiagenesis(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_seddiagenesis initialization"
+   print *,"  WARNING! aed2_seddiagenesis model is currently under development"
+
    ! Read the namelist
    read(namlst,nml=aed2_sediment,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_seddiagenesis'

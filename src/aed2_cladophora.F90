@@ -210,6 +210,7 @@ SUBROUTINE aed2_define_cladophora(data, namlst)
 
 !-----------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_cladophora initialization"
 
    ! Read the namelist
    read(namlst,nml=aed2_cladophora,iostat=status)

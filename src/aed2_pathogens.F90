@@ -55,8 +55,8 @@ MODULE aed2_pathogens
       AED_REAL      :: coef_pred_kp20, coef_pred_theta_P   !-- Loss rate due to predation and temp multiplier
       AED_REAL      :: coef_sett_fa                        !-- Attached fraction in water column
       AED_REAL      :: coef_sett_w_path      !-- Sedimentation velocity (m/d) at 20C (-ve means down) for NON-ATTACHED orgs
-      AED_REAL      :: coef_resus_epsilonP   !âPathogen resuspension rate
-      AED_REAL      :: coef_resus_tauP_0     !âCritical shear stress for organism resuspension
+      AED_REAL      :: coef_resus_epsilonP   !ï¿½Pathogen resuspension rate
+      AED_REAL      :: coef_resus_tauP_0     !ï¿½Critical shear stress for organism resuspension
    END TYPE
 
 !  TYPE pathogen_data
@@ -144,6 +144,8 @@ SUBROUTINE aed2_define_pathogens(data, namlst)
             epsilon, tau_0, tau_0_min, Ktau_0, dbase, extra_diag, att_ts
 !-----------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_pathogens initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_pathogens,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_pathogens'

@@ -91,15 +91,18 @@ SUBROUTINE aed2_define_iron(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_iron initialization"
+   print *,"  WARNING! aed2_iron model is currently under development"
+
    ! Read the namelist
    read(namlst,nml=aed2_iron,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed2_iron'
+   IF (status /= 0) STOP 'ERROR reading namelist aed2_iron'
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
 
-   PRINT *,'AED_IRON : Note this module has not been completed. Stopping.'
+   PRINT *,'  AED_IRON : Note this module has not been completed. Stopping.'
    STOP
 
 !  ! Register environmental dependencies
