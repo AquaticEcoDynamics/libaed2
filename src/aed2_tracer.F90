@@ -52,7 +52,7 @@ MODULE aed2_tracer
       AED_REAL,ALLOCATABLE :: decay(:), Fsed(:), Ke_ss(:)
       AED_REAL,ALLOCATABLE :: w_ss(:), rho_ss(:), d_ss(:)
       AED_REAL,ALLOCATABLE :: fs(:), tau_0(:)
-      AED_REAL             :: epsilon, tau_0_min, kTau_0, tau_r
+      AED_REAL             :: epsilon, kTau_0, tau_r
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_tracer
@@ -142,7 +142,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
       ALLOCATE(data%Fsed(num_tracers))  ; data%Fsed(1:num_tracers)  = Fsed(1:num_tracers)
       ALLOCATE(data%Ke_ss(num_tracers)) ; data%Ke_ss(1:num_tracers) = Ke_ss(1:num_tracers)
 
-      ALLOCATE(data%w_ss(num_tracers))  ; data%w_ss(1:num_tracers)  = w_ss(1:num_tracers)
+      ALLOCATE(data%w_ss(num_tracers))  ; data%w_ss(1:num_tracers)  = w_ss(1:num_tracers)/secs_per_day
       ALLOCATE(data%d_ss(num_tracers))  ; data%d_ss(1:num_tracers)  = d_ss(1:num_tracers)
       ALLOCATE(data%rho_ss(num_tracers)); data%rho_ss(1:num_tracers)= rho_ss(1:num_tracers)
 
@@ -268,7 +268,7 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
    ENDIF
 
    IF ( data%resuspension == 2 .AND. data%id_l_bot > 0 ) &
-      _DIAG_VAR_S_(data%id_tau_0) = data%tau_0(1) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
+      _DIAG_VAR_S_(data%id_tau_0) = MIN(data%tau_0(:)) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
 
 
    DO i=1,ubound(data%id_ss,1)
@@ -380,6 +380,7 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
          CASE ( _MOB_TEMP_ )
             ! constant settling velocity @20C corrected for density changes
             pw = _STATE_VAR_(data%id_rho)
+            temp = _STATE_VAR_(data%id_temp)
             mu = water_viscosity(temp)
             mu20 = 0.001002  ! N s/m2
             pw20 = 998.2000  ! kg/m3 (assuming freshwater)
@@ -388,6 +389,7 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
          CASE ( _MOB_STOKES_ )
             ! settling velocity based on Stokes Law calculation and cell density
             pw = _STATE_VAR_(data%id_rho)              ! water density
+            temp = _STATE_VAR_(data%id_temp)
             mu = water_viscosity(temp)                 ! water dynamic viscosity
             rho_s = data%rho_ss(i)
             vvel = -9.807*(data%d_ss(i)**2.)*( rho_s-pw ) / ( 18.*mu )

@@ -962,7 +962,6 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   temp = _STATE_VAR_(data%id_tem)
 
    DO phy_i=1,data%num_phytos
       SELECT CASE (data%phytos(phy_i)%settling)
@@ -974,6 +973,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
          CASE ( _MOB_TEMP_ )
             ! constant settling velocity @20C corrected for density changes
             pw = _STATE_VAR_(data%id_dens)
+            temp = _STATE_VAR_(data%id_temp)
             mu = water_viscosity(temp)
             mu20 = 0.001002  ! N s/m2
             pw20 = 998.2000  ! kg/m3 (assuming freshwater)
@@ -982,6 +982,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
          CASE ( _MOB_STOKES_ )
             ! settling velocity based on Stokes Law calculation and cell density
             pw = _STATE_VAR_(data%id_dens)       ! water density
+            temp = _STATE_VAR_(data%id_temp)
             mu = water_viscosity(temp)                 ! water dynamic viscosity
             IF( data%id_rho(phy_i)>0 ) THEN
               rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density

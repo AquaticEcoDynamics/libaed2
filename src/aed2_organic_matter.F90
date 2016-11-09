@@ -846,11 +846,12 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
         CASE ( _MOB_CONST_ )
           ! constant settling velocity using user provided value
           vvel = data%w_pom
-          vvel_cpom = data%w_pom
+          vvel_cpom = data%w_cpom
 
         CASE ( _MOB_TEMP_ )
           ! constant settling velocity @20C corrected for density changes
           pw = _STATE_VAR_(data%id_rho)
+          temp = _STATE_VAR_(data%id_temp)
           mu = water_viscosity(temp)
           mu20 = 0.001002  ! N s/m2
           pw20 = 998.2000  ! kg/m3 (assuming freshwater)
@@ -860,6 +861,7 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
         CASE ( _MOB_STOKES_ )
           ! settling velocity based on Stokes Law calculation and cell density
           pw = _STATE_VAR_(data%id_rho)              ! water density
+          temp = _STATE_VAR_(data%id_temp)
           mu = water_viscosity(temp)                 ! water dynamic viscosity
           rho_pom = data%rho_pom
           vvel = -9.807*(data%d_pom**2.)*( rho_pom-pw ) / ( 18.*mu )
