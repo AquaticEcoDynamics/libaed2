@@ -43,6 +43,7 @@ MODULE aed2_phytoplankton
       INTEGER,ALLOCATABLE :: id_ip(:)
       INTEGER,ALLOCATABLE :: id_rho(:)
       INTEGER,ALLOCATABLE :: id_NtoP(:)
+      INTEGER,ALLOCATABLE :: id_vvel(:)
       INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), &
                              id_fPho(:), id_fSil(:), id_fSal(:)
       INTEGER :: id_Pexctarget,id_Pmorttarget,id_Pupttarget(1:2)
@@ -69,6 +70,7 @@ MODULE aed2_phytoplankton
       INTEGER  :: nnup, npup
       AED_REAL :: dic_per_n
       AED_REAL :: min_rho,max_rho
+      AED_REAL,ALLOCATABLE :: resuspension(:)
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_phytoplankton
@@ -88,7 +90,7 @@ CONTAINS
 
 
 !###############################################################################
-SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
+SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, resuspension)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_phytoplankton_data_t),INTENT(inout) :: data
@@ -96,6 +98,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
    INTEGER,INTENT(in)          :: count
    INTEGER,INTENT(in)          :: list(*)
    INTEGER,INTENT(in)          :: settling(*)
+   AED_REAL,INTENT(in)         :: resuspension(*)
 !
 !LOCALS
    INTEGER  :: status
@@ -115,18 +118,19 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
 
     data%num_phytos = count
     ALLOCATE(data%phytos(count))
-    ALLOCATE(data%id_p(count))
-    ALLOCATE(data%id_in(count))
-    ALLOCATE(data%id_ip(count))
-    ALLOCATE(data%id_rho(count))
-    ALLOCATE(data%id_NtoP(count))
+    ALLOCATE(data%id_p(count)) ; data%id_p(:) = 0
+    ALLOCATE(data%id_in(count)) ; data%id_in(:) = 0
+    ALLOCATE(data%id_ip(count)) ; data%id_ip(:) = 0
+    ALLOCATE(data%id_rho(count)) ; data%id_rho(:) = 0
+    ALLOCATE(data%id_NtoP(count)) ; data%id_NtoP(:) = 0
     IF (extra_diag) THEN
-       ALLOCATE(data%id_fT(count))
-       ALLOCATE(data%id_fI(count))
-       ALLOCATE(data%id_fNit(count))
-       ALLOCATE(data%id_fPho(count))
-       ALLOCATE(data%id_fSil(count))
-       ALLOCATE(data%id_fSal(count))
+       ALLOCATE(data%id_fT(count)) ; data%id_fT(:) = 0
+       ALLOCATE(data%id_fI(count)) ; data%id_fI(:) = 0
+       ALLOCATE(data%id_fNit(count)) ; data%id_fNit(:) = 0
+       ALLOCATE(data%id_fPho(count)) ; data%id_fPho(:) = 0
+       ALLOCATE(data%id_fSil(count)) ; data%id_fSil(:) = 0
+       ALLOCATE(data%id_fSal(count)) ; data%id_fSal(:) = 0
+       ALLOCATE(data%id_vvel(count)) ; data%id_vvel(:) = 0
     ENDIF
 
     DO i=1,count
@@ -134,7 +138,8 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
        data%phytos(i)%p_name       = pd(list(i))%p_name
        data%phytos(i)%p0           = pd(list(i))%p0
        data%phytos(i)%w_p          = pd(list(i))%w_p/secs_per_day
-       data%phytos(i)%settling      = settling(i)
+       data%phytos(i)%settling     = settling(i)
+       data%phytos(i)%resuspension = resuspension(i)
        data%phytos(i)%Xcc          = pd(list(i))%Xcc
        data%phytos(i)%R_growth     = pd(list(i))%R_growth/secs_per_day
        data%phytos(i)%fT_Method    = pd(list(i))%fT_Method
@@ -207,6 +212,10 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
                               mobility = data%phytos(i)%w_p)
        ENDIF
 
+
+       data%id_ss_vvel(i) = aed2_define_diag_variable(TRIM(trac_name)//'_vvel','m/s','vertical velocity')
+
+
        ! Register internal nitrogen group as a state variable, if required
        IF (data%phytos(i)%simINDynamics /= 0) THEN
           IF(data%phytos(i)%simINDynamics == 1)THEN
@@ -250,6 +259,12 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling)
           data%id_fSil(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSil', '-', 'fSil (0-1)')
           data%id_fT(i)   = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fT', '-', 'fT (>0)')
           data%id_fSal(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSal', '-', 'fSal (>1)')
+          ! Register vertical velocity diagnostic, where relevant
+          IF (data%phytos(i)%settling == _MOB_STOKES_ .OR. &
+                                   data%phytos(i)%settling == _MOB_MOTILE_) THEN
+            data%id_vvel(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_vvel', 'm/s', 'vertical velocity')
+
+          ENDIF
        ENDIF
     ENDDO
 END SUBROUTINE aed2_phytoplankton_load_params
@@ -274,7 +289,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    INTEGER  :: num_phytos
    INTEGER  :: the_phytos(MAX_PHYTO_TYPES)
    INTEGER  :: settling(MAX_PHYTO_TYPES)
-   INTEGER  :: resuspension
+   AED_REAL :: resuspension(MAX_PHYTO_TYPES)
    CHARACTER(len=64)  :: p_excretion_target_variable=''
    CHARACTER(len=64)  :: p_mortality_target_variable=''
    CHARACTER(len=64)  :: p1_uptake_target_variable=''
@@ -299,7 +314,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    LOGICAL            :: extra_debug = .false.
    INTEGER            :: do_mpb
 
-   NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, settling,              &
+   NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, settling, resuspension,&
                     p_excretion_target_variable,p_mortality_target_variable,   &
                      p1_uptake_target_variable, p2_uptake_target_variable,     &
                     n_excretion_target_variable,n_mortality_target_variable,   &
@@ -317,6 +332,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
 
    ! Default settings
    settling = _MOB_CONST_
+   resuspension = zero_
 
    ! Read the namelist, and set module parameters
    read(namlst,nml=aed2_phytoplankton,iostat=status)
@@ -331,7 +347,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    !     and are converted in here to values per second.
-   CALL aed2_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,settling)
+   CALL aed2_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,settling,resuspension)
 
    CALL aed2_bio_temp_function(data%num_phytos,              &
                                data%phytos%theta_growth,     &
@@ -954,7 +970,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
    AED_REAL,INTENT(inout) :: mobility(:)
 !
 !LOCALS
-   AED_REAL :: temp, par, rho_p
+   AED_REAL :: temp, par, rho_p, Io
    AED_REAL :: vvel
    AED_REAL :: pw, pw20, mu, mu20
    AED_REAL :: IN, IC, Q, Qmax
@@ -965,6 +981,10 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
 
    DO phy_i=1,data%num_phytos
       SELECT CASE (data%phytos(phy_i)%settling)
+
+         CASE ( _MOB_OFF_ )
+           ! disable settling by setting vertical velocity to 0
+           vvel = zero_
 
          CASE ( _MOB_CONST_ )
             ! constant settling velocity using user provided value
@@ -994,6 +1014,9 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
           CASE ( _MOB_MOTILE_ )
              ! vertical velocity based on motility and behaviour of phyto group
              ! modelled as in Ross and Sharples (2007)
+             par = _STATE_VAR_(data%id_par)     ! local photosynthetically active radiation
+             Io = _STATE_VAR_S_(data%id_I_0)    ! surface short wave radiation
+
              vvel = zero_
              IC = _STATE_VAR_(data%id_p(phy_i))
              IN = _STATE_VAR_(data%id_in(phy_i))
@@ -1015,6 +1038,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
             ELSE
                vvel = zero_
             ENDIF
+            IF (par>0.95*Io) vvel = zero_   ! already at the surface
 
          CASE DEFAULT
             ! unknown settling/migration option selection
@@ -1023,6 +1047,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
       END SELECT
       ! set global mobility array
       mobility(data%id_p(phy_i)) = vvel
+      IF(extra_diag .AND. data%id_vvel(phy_i)>0) _DIAG_VAR_(data%id_vvel(phy_i)) = vvel
    ENDDO
 END SUBROUTINE aed2_mobility_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

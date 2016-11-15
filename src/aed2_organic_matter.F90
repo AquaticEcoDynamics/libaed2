@@ -411,7 +411,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    ENDIF
 
    !-- resuspension link variable
-   IF ( .NOT. resus_link .EQ. '' ) THEN
+   IF ( data%resuspension>0 .AND. .NOT.resus_link .EQ. '' ) THEN
       data%id_l_resus  = aed2_locate_global(TRIM(resus_link)) ! ('TRC_resus')
    ELSE
       data%resuspension = 0
@@ -514,7 +514,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: docr_mineralisation, donr_mineralisation
    AED_REAL :: dopr_mineralisation, cpom_breakdown
    AED_REAL :: photolysis
-   AED_REAL :: vis, uva, uvb, photo_fmin
+   AED_REAL :: vis, uva, uvb, photo_fmin, cdoc
 
    AED_REAL, PARAMETER :: Yoxy_doc_miner = 32./12. !ratio of oxygen to carbon utilised during doc mineralisation
 
@@ -634,10 +634,11 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    !-- CDOM computed as a function of DOC amount, as empirically defined by
    !   Kostoglidis et al 2005 for Swan-Canning
    IF ( data%simRPools ) THEN
-      _DIAG_VAR_(data%id_cdom) = 0.35*exp(0.1922*(doc+docr)*(12./1e3))
+     cdoc = MIN(doc+docr,1.e4)
    ELSE
-      _DIAG_VAR_(data%id_cdom) = 0.35*exp(0.1922*(doc)*(12./1e3))
+     cdoc = MIN(doc,1.e4)
    ENDIF
+  _DIAG_VAR_(data%id_cdom) = 0.35*exp(0.1922*(cdoc)*(12./1e3))
    !-- Extra diagnostics
    IF (data%extra_diag) THEN
      _DIAG_VAR_(data%id_poc_miner) = poc_hydrolysis*poc*secs_per_day

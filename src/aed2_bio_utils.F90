@@ -63,6 +63,8 @@ MODULE aed2_bio_utils
       ! Sedimentation parameters
       INTEGER  :: settling
       AED_REAL :: w_p, d_phy, rho_phy, f1, f2, c1, c3
+      ! Resuspension parameters
+      AED_REAL  :: resuspension
    END TYPE
 
 
