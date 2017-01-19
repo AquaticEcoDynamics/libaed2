@@ -242,7 +242,6 @@ SUBROUTINE aed2_define_totals(data, namlst)
                      'W/m2', 'Light extinction coefficient')
    ENDIF
 
-
 END SUBROUTINE aed2_define_totals
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

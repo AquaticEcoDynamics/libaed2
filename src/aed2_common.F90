@@ -33,9 +33,6 @@ MODULE aed2_common
    USE aed2_core
 
    USE aed2_sedflux
-   USE aed2_land
-   USE aed2_ass
-!  USE aed2_cladophora
    USE aed2_chlorophylla
    USE aed2_oxygen
    USE ufz_oxygen
@@ -43,25 +40,14 @@ MODULE aed2_common
    USE aed2_carbon
    USE aed2_nitrogen
    USE aed2_phosphorus
-   USE aed2_macrophyte
    USE aed2_organic_matter
    USE aed2_phytoplankton
    USE aed2_pathogens
-   USE aed2_iron
-   USE aed2_isotope
-   USE aed2_isotope_c
-   USE aed2_radon
-   USE aed2_sulfur
    USE aed2_zooplankton
    USE aed2_bivalve
    USE aed2_tracer
-   USE aed2_geochemistry
-   USE aed2_seddiagenesis
-   USE aed2_vegetation
    USE aed2_totals
-   USE csiro_optical
    USE aed2_test
-   USE aed2_habitat
 
    IMPLICIT NONE
 
@@ -109,9 +95,6 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
 
    SELECT CASE (modelname)
       CASE ('aed2_sedflux');        prefix = 'SDF'; ALLOCATE(aed2_sedflux_data_t::model)
-      CASE ('aed2_land');           prefix = 'LND'; ALLOCATE(aed2_land_data_t::model)
-      CASE ('aed2_ass');            prefix = 'ASS'; ALLOCATE(aed2_ass_data_t::model)
-!     CASE ('aed2_cladophora');     prefix = 'CLD'; ALLOCATE(aed2_cladophora_data_t::model)
       CASE ('aed2_chlorophylla');   prefix = 'CHL'; ALLOCATE(aed2_chla_data_t::model)
       CASE ('aed2_oxygen');         prefix = 'OXY'; ALLOCATE(aed2_oxygen_data_t::model)
       CASE ('ufz_oxygen');          prefix = 'UOX'; ALLOCATE(ufz_oxygen_data_t::model)
@@ -123,21 +106,10 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_phytoplankton');  prefix = 'PHY'; ALLOCATE(aed2_phytoplankton_data_t::model)
       CASE ('aed2_zooplankton');    prefix = 'ZOO'; ALLOCATE(aed2_zooplankton_data_t::model)
       CASE ('aed2_bivalve');        prefix = 'BIV'; ALLOCATE(aed2_bivalve_data_t::model)
-      CASE ('aed2_macrophyte');     prefix = 'MAC'; ALLOCATE(aed2_macrophyte_data_t::model)
       CASE ('aed2_pathogens');      prefix = 'PAT'; ALLOCATE(aed2_pathogens_data_t::model)
-      CASE ('aed2_iron');           prefix = 'IRN'; ALLOCATE(aed2_iron_data_t::model)
-      CASE ('aed2_isotope');        prefix = 'ISO'; ALLOCATE(aed2_isotope_data_t::model)
-      CASE ('aed2_isotope_c');      prefix = 'ISC'; ALLOCATE(aed2_isotope_c_data_t::model)
-      CASE ('aed2_radon');          prefix = 'RAD'; ALLOCATE(aed2_radon_data_t::model)
-      CASE ('aed2_sulfur');         prefix = 'SLF'; ALLOCATE(aed2_sulfur_data_t::model)
       CASE ('aed2_tracer');         prefix = 'TRC'; ALLOCATE(aed2_tracer_data_t::model)
-      CASE ('aed2_geochemistry');   prefix = 'GEO'; ALLOCATE(aed2_geochemistry_data_t::model)
-      CASE ('aed2_seddiagenesis');  prefix = 'SDD'; ALLOCATE(aed2_seddiagenesis_data_t::model)
-      CASE ('aed2_vegetation');     prefix = 'VEG'; ALLOCATE(aed2_vegetation_data_t::model)
       CASE ('aed2_totals');         prefix = 'TOT'; ALLOCATE(aed2_totals_data_t::model)
       CASE ('aed2_test');           prefix = 'TST'; ALLOCATE(aed2_test_data_t::model)
-      CASE ('csiro_optical');       prefix = 'OPT'; ALLOCATE(csiro_optical_data_t::model)
-      CASE ('aed2_habitat');        prefix = 'HAB'; ALLOCATE(aed2_habitat_data_t::model)
       CASE DEFAULT;                 print *,'*** Unknown module ', modelname
    END SELECT
 

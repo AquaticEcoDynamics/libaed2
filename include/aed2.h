@@ -13,7 +13,7 @@
 #ifndef _AED2_H_
 #define _AED2_H_
 
-#define AED2_VERSION  "1.2.0-dev01"
+#define AED2_VERSION  "1.2.0"
 
 #define MAX_MODELS 40
 
@@ -66,6 +66,5 @@
 #define _FLUX_VAR_(id)    column(id)%flux_pel(layer_idx)
 #define _FLUX_VAR_T_(id)  column(id)%flux_atm
 #define _FLUX_VAR_B_(id)  column(id)%flux_ben
-#define _FLUX_VAR_R_(id)  column(id)%flux_rip
 
 #endif
