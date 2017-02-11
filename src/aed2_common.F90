@@ -35,6 +35,7 @@ MODULE aed2_common
    USE aed2_sedflux
    USE aed2_land
    USE aed2_ass
+   USE aed2_soilbgc
 !  USE aed2_cladophora
    USE aed2_chlorophylla
    USE aed2_oxygen
@@ -112,10 +113,10 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_sedflux');        prefix = 'SDF'; ALLOCATE(aed2_sedflux_data_t::model)
       CASE ('aed2_land');           prefix = 'LND'; ALLOCATE(aed2_land_data_t::model)
       CASE ('aed2_ass');            prefix = 'ASS'; ALLOCATE(aed2_ass_data_t::model)
+      CASE ('aed2_soilbgc');        prefix = 'SBG'; ALLOCATE(aed2_soilbgc_data_t::model)
 !     CASE ('aed2_cladophora');     prefix = 'CLD'; ALLOCATE(aed2_cladophora_data_t::model)
       CASE ('aed2_chlorophylla');   prefix = 'CHL'; ALLOCATE(aed2_chla_data_t::model)
       CASE ('aed2_oxygen');         prefix = 'OXY'; ALLOCATE(aed2_oxygen_data_t::model)
-      CASE ('ufz_oxygen');          prefix = 'UOX'; ALLOCATE(ufz_oxygen_data_t::model)
       CASE ('aed2_silica');         prefix = 'SIL'; ALLOCATE(aed2_silica_data_t::model)
       CASE ('aed2_carbon');         prefix = 'CAR'; ALLOCATE(aed2_carbon_data_t::model)
       CASE ('aed2_nitrogen');       prefix = 'NIT'; ALLOCATE(aed2_nitrogen_data_t::model)
@@ -137,8 +138,9 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_vegetation');     prefix = 'VEG'; ALLOCATE(aed2_vegetation_data_t::model)
       CASE ('aed2_totals');         prefix = 'TOT'; ALLOCATE(aed2_totals_data_t::model)
       CASE ('aed2_test');           prefix = 'TST'; ALLOCATE(aed2_test_data_t::model)
-      CASE ('csiro_optical');       prefix = 'OPT'; ALLOCATE(csiro_optical_data_t::model)
       CASE ('aed2_habitat');        prefix = 'HAB'; ALLOCATE(aed2_habitat_data_t::model)
+      CASE ('csiro_optical');       prefix = 'OPT'; ALLOCATE(csiro_optical_data_t::model)
+      CASE ('ufz_oxygen');          prefix = 'UOX'; ALLOCATE(ufz_oxygen_data_t::model)
       CASE DEFAULT;                 print *,'*** Unknown module ', modelname
    END SELECT
 

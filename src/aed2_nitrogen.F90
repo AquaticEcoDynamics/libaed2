@@ -34,9 +34,9 @@ MODULE aed2_nitrogen
 !
    TYPE,extends(aed2_model_data_t) :: aed2_nitrogen_data_t
       !# Variable identifiers
-      INTEGER  :: id_nit, id_amm !nitrate & ammonium
+      INTEGER  :: id_nit, id_amm, id_n2o
       INTEGER  :: id_oxy,id_denit_product
-      INTEGER  :: id_temp
+      INTEGER  :: id_temp, id_salt
       INTEGER  :: id_Fsed_amm,id_Fsed_nit
       INTEGER  :: id_nitrif,id_denit
       INTEGER  :: id_sed_amm,id_sed_nit
@@ -45,6 +45,7 @@ MODULE aed2_nitrogen
       AED_REAL :: Rnitrif,Rdenit,Fsed_amm,Fsed_nit,Knitrif,Kdenit,Ksed_amm,Ksed_nit, &
                           theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit
       LOGICAL  :: use_oxy,use_no2,use_sed_model_amm, use_sed_model_nit
+      LOGICAL  :: simN2O
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_nitrogen
@@ -74,14 +75,17 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    CLASS (aed2_nitrogen_data_t),INTENT(inout) :: data
 !
 !LOCALS
-   INTEGER  :: status
-
+   INTEGER           :: status
+   LOGICAL           :: simN2O = .false.
    AED_REAL          :: nit_initial=4.5
    AED_REAL          :: nit_min=zero_
-   AED_REAL          :: nit_max=nan_
+   AED_REAL          :: nit_max=1e6
    AED_REAL          :: amm_initial=4.5
    AED_REAL          :: amm_min=zero_
-   AED_REAL          :: amm_max=nan_
+   AED_REAL          :: amm_max=1e6
+   AED_REAL          :: n2o_initial=0.5
+   AED_REAL          :: n2o_min=zero_
+   AED_REAL          :: n2o_max=1e6
    AED_REAL          :: Rnitrif = 0.01
    AED_REAL          :: Rdenit = 0.01
    AED_REAL          :: Fsed_amm = 3.5
@@ -102,11 +106,13 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
 
    NAMELIST /aed2_nitrogen/ nit_initial,nit_min, nit_max,                 &
                     amm_initial, amm_min, amm_max,                        &
+                    n2o_initial, n2o_min, n2o_max,                        &
                     Rnitrif,Rdenit,Fsed_amm,Fsed_nit,                     &
                     Knitrif,Kdenit,Ksed_amm,Ksed_nit,                     &
                     theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit, &
                     nitrif_reactant_variable,denit_product_variable,      &
-                    Fsed_amm_variable, Fsed_nit_variable
+                    Fsed_amm_variable, Fsed_nit_variable,                 &
+                    simN2O
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -119,6 +125,9 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
+
+   data%simN2O = simN2O
+
    data%Rnitrif  = Rnitrif/secs_per_day
    data%Rdenit   = Rdenit/secs_per_day
    data%Fsed_amm = Fsed_amm/secs_per_day
@@ -132,18 +141,28 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    data%theta_sed_amm = theta_sed_amm
    data%theta_sed_nit = theta_sed_nit
 
+
    ! Register state variables
    data%id_amm = aed2_define_variable('amm','mmol/m**3','ammonium',            &
                                     amm_initial,minimum=amm_min, maximum=amm_max)
    data%id_nit = aed2_define_variable('nit','mmol/m**3','nitrate',             &
                                     nit_initial,minimum=nit_min, maximum=nit_max)
+
+
+   IF( simN2O ) THEN
+     data%id_n2o = aed2_define_variable('n2o','mmol/m**3','nitrous oxide',     &
+                                    n2o_initial,minimum=n2o_min, maximum=n2o_max)
+   ENDIF
+
+
    ! Register external state variable dependencies
    data%use_oxy = nitrif_reactant_variable .NE. '' !This means oxygen module switched on
    IF (data%use_oxy) THEN
      data%id_oxy = aed2_locate_variable(nitrif_reactant_variable)
    ENDIF
-   data%use_no2 = denit_product_variable .NE. '' !This means n2 module switched on
-   IF (data%use_no2) data%id_denit_product = aed2_locate_variable(denit_product_variable)
+
+   !data%use_no2 = denit_product_variable .NE. '' !This means n2 module switched on
+   !IF (data%use_no2) data%id_denit_product = aed2_locate_variable(denit_product_variable)
 
    data%use_sed_model_amm = Fsed_amm_variable .NE. ''
    IF (data%use_sed_model_amm) &
@@ -151,6 +170,7 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    data%use_sed_model_nit = Fsed_amm_variable .NE. ''
    IF (data%use_sed_model_nit) &
      data%id_Fsed_nit = aed2_locate_global_sheet(Fsed_nit_variable)
+
 
    ! Register diagnostic variables
    data%id_nitrif = aed2_define_diag_variable('nitrif','mmol/m**3/d',       &
@@ -164,6 +184,9 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
 
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
+   data%id_salt = aed2_locate_global('salinity')
+
+
 END SUBROUTINE aed2_define_nitrogen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -185,19 +208,20 @@ SUBROUTINE aed2_calculate_nitrogen(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+
    ! Retrieve current (local) state variable values.
    amm = _STATE_VAR_(data%id_amm)! ammonium
    nit = _STATE_VAR_(data%id_nit)! nitrate
    IF (data%use_oxy) THEN ! & use_oxy
       oxy = _STATE_VAR_(data%id_oxy)! oxygen
    ELSE
-      oxy = 0.0
+      oxy = zero_
    ENDIF
 
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_temp) ! temperature
 
-   ! Define some intermediate quantities units mmol N/m3/day
+   ! Define some intermediate quantities units mmol N/m3/s
    nitrification = fnitrif(data%use_oxy,data%Rnitrif,data%Knitrif,data%theta_nitrif,oxy,temp)
    denitrification = fdenit(data%use_oxy,data%Rdenit,data%Kdenit,data%theta_denit,oxy,temp)
 
@@ -250,12 +274,13 @@ SUBROUTINE aed2_calculate_benthic_nitrogen(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   ! Retrieve current environmental conditions for the bottom pelagic layer.
+
+  ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
     ! Retrieve current (local) state variable values.
-   amm = _STATE_VAR_(data%id_amm)! ammonium
-   nit = _STATE_VAR_(data%id_nit)! nitrate
+   amm = _STATE_VAR_(data%id_amm) ! ammonium
+   nit = _STATE_VAR_(data%id_nit) ! nitrate
 
    IF (data%use_sed_model_amm) THEN
       Fsed_amm = _STATE_VAR_S_(data%id_Fsed_amm)
@@ -306,8 +331,6 @@ PURE AED_REAL FUNCTION fnitrif(use_oxy,Rnitrif,Knitrif,theta_nitrif,oxy,temp)
 !-------------------------------------------------------------------------------
 ! Michaelis-Menten formulation for nitrification
 !
-! Here, the classical Michaelis-Menten formulation for nitrification
-! is formulated.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    LOGICAL,INTENT(in)  :: use_oxy
@@ -320,7 +343,6 @@ PURE AED_REAL FUNCTION fnitrif(use_oxy,Rnitrif,Knitrif,theta_nitrif,oxy,temp)
    ELSE
       fnitrif = Rnitrif * (theta_nitrif**(temp-20.0))
    ENDIF
-
 END FUNCTION fnitrif
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -330,8 +352,6 @@ PURE AED_REAL FUNCTION fdenit(use_oxy,Rdenit,Kdenit,theta_denit,oxy,temp)
 !-------------------------------------------------------------------------------
 ! Michaelis-Menten formulation for denitrification
 !
-! Here, the classical Michaelis-Menten formulation for denitrification
-! is formulated.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    LOGICAL,INTENT(in)  :: use_oxy
@@ -344,7 +364,6 @@ PURE AED_REAL FUNCTION fdenit(use_oxy,Rdenit,Kdenit,theta_denit,oxy,temp)
    ELSE
       fdenit = Rdenit * (theta_denit**(temp-20.0))
    ENDIF
-
 END FUNCTION fdenit
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

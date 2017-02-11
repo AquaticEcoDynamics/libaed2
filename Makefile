@@ -76,6 +76,7 @@ ${objdir}/aed2_sedflux.o \
 ${objdir}/aed2_riptypes.o \
 ${objdir}/aed2_land.o \
 ${objdir}/aed2_ass.o \
+${objdir}/aed2_soilbgc.o \
 ${objdir}/aed2_chlorophylla.o \
 ${objdir}/aed2_oxygen.o \
 ${objdir}/ufz_oxygen.o \

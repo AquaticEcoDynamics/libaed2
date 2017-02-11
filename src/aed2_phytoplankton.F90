@@ -973,7 +973,7 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
    AED_REAL,INTENT(inout) :: mobility(:)
 !
 !LOCALS
-   AED_REAL :: temp, par, rho_p
+   AED_REAL :: temp, par, rho_p, Io
    AED_REAL :: vvel
    AED_REAL :: pw, pw20, mu, mu20
    AED_REAL :: IN, IC, Q, Qmax

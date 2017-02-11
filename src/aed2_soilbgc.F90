@@ -1,6 +1,6 @@
 !###############################################################################
 !#                                                                             #
-!# aed2_ass.F90                                                                #
+!# aed2_soilbgc.F90                                                                #
 !#                                                                             #
 !# Developed by :                                                              #
 !#     AquaticEcoDynamics (AED) Group                                          #
@@ -11,16 +11,16 @@
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
-!# Created Oct 2015                                                            #
+!# Created Feb 2017                                                            #
 !#                                                                             #
 !###############################################################################
 
 #include "aed2.h"
 
 !
-MODULE aed2_ass
+MODULE aed2_soilbgc
 !------------------------------------------------------------------------------+
-! AED2 module for Acid Sulfate Soils                                           |
+! AED2 module for Riparian Soil Biogeochemistry                                |
 !------------------------------------------------------------------------------+
    USE aed2_core
    USE aed2_util
@@ -30,24 +30,24 @@ MODULE aed2_ass
 
    PRIVATE
 !
-   PUBLIC aed2_ass_data_t
+   PUBLIC aed2_soilbgc_data_t
 !
-   TYPE,extends(aed2_model_data_t) :: aed2_ass_data_t
-      !# Variable identifiers888
-      INTEGER :: id_uzaass, id_szaass, id_taa, id_passt
-      INTEGER,ALLOCATABLE :: id_anc0(:), id_pass0(:)
-      INTEGER,ALLOCATABLE :: id_anc(:), id_pass(:)
+   TYPE,extends(aed2_model_data_t) :: aed2_soilbgc_data_t
+      !# Variable identifiers
+      INTEGER,ALLOCATABLE :: id_pom0(:), id_pom(:)
+      INTEGER,ALLOCATABLE :: id_anc0(:), id_anc(:)
+      INTEGER :: id_uzdom, id_szdom, id_toc, id_pomt, id_litter
       INTEGER :: id_wettime, id_drytime
-      INTEGER :: id_asstracer
+      INTEGER :: id_soilbgctracer
 
       !# Environmental variables
       INTEGER :: id_E_rain, id_E_area, id_E_matz, id_E_bath, id_E_salt, id_E_nearlevel
 
       !# Diagnostic variables
-      INTEGER :: id_rwet, id_rchg, id_bflw, id_pyrox, id_so4r, id_pml, id_sflw
+      INTEGER :: id_rwet, id_rchg, id_bflw, id_omox, id_so4r, id_pml, id_sflw
 
       !# Dependant variable IDs
-      INTEGER :: id_g_ubalchg, id_g_so4
+      INTEGER :: id_o_doc, id_c_dic
       INTEGER :: id_l_depth, id_l_Sb, id_l_St, id_l_Ssat, id_l_theta, id_l_Stop, id_l_capz
       INTEGER :: id_l_phreatic, id_l_qss, id_l_qse, id_l_qcap, id_l_qper, id_l_wt
       INTEGER :: id_l_soiltemp
@@ -57,29 +57,29 @@ MODULE aed2_ass
       !# ASS params
       INTEGER  :: n_zones, nlay
       AED_REAL,ALLOCATABLE :: active_zones(:)
-      AED_REAL :: pass_0(MAX_ASS_PARAMS)
-      AED_REAL :: Racid(MAX_ASS_PARAMS)
+      AED_REAL :: pom_0(MAX_ASS_PARAMS)
+      AED_REAL :: Rom(MAX_ASS_PARAMS)
       AED_REAL :: flux_bf(MAX_ASS_PARAMS)
       AED_REAL :: flux_rn(MAX_ASS_PARAMS)
       AED_REAL :: flux_rn_max(MAX_ASS_PARAMS)
       AED_REAL :: flux_rw_a(MAX_ASS_PARAMS)
       AED_REAL :: flux_rw_d(MAX_ASS_PARAMS)
-      AED_REAL :: zASS(MAX_ASS_PARAMS)
+      AED_REAL :: zOM(MAX_ASS_PARAMS)
       AED_REAL :: Porosity(MAX_ASS_PARAMS),Density(MAX_ASS_PARAMS)
       AED_REAL :: X_hso4
 
      CONTAINS
-         PROCEDURE :: define             => aed2_define_ass
-         PROCEDURE :: initialize         => aed2_initialize_ass
-!        PROCEDURE :: calculate_surface  => aed2_calculate_surface_ass
-!        PROCEDURE :: calculate          => aed2_calculate_ass
-!        PROCEDURE :: calculate_benthic  => aed2_calculate_benthic_ass
-         PROCEDURE :: calculate_riparian => aed2_calculate_riparian_ass
-!        PROCEDURE :: calculate_dry      => aed2_calculate_dry_ass
-!        PROCEDURE :: equilibrate        => aed2_equilibrate_ass
-!        PROCEDURE :: mobility           => aed2_mobility_ass
-!        PROCEDURE :: light_extinction   => aed2_light_extinction_ass
-!        PROCEDURE :: delete             => aed2_delete_ass
+         PROCEDURE :: define             => aed2_define_soilbgc
+         PROCEDURE :: initialize         => aed2_initialize_soilbgc
+!        PROCEDURE :: calculate_surface  => aed2_calculate_surface_soilbgc
+!        PROCEDURE :: calculate          => aed2_calculate_soilbgc
+!        PROCEDURE :: calculate_benthic  => aed2_calculate_benthic_soilbgc
+         PROCEDURE :: calculate_riparian => aed2_calculate_riparian_soilbgc
+!        PROCEDURE :: calculate_dry      => aed2_calculate_dry_soilbgc
+!        PROCEDURE :: equilibrate        => aed2_equilibrate_soilbgc
+!        PROCEDURE :: mobility           => aed2_mobility_soilbgc
+!        PROCEDURE :: light_extinction   => aed2_light_extinction_soilbgc
+!        PROCEDURE :: delete             => aed2_delete_soilbgc
    END TYPE
 
 
@@ -87,10 +87,10 @@ MODULE aed2_ass
 !MODULE VARIABLES
 
    TYPE(SoilUnit) :: SoilCol
-   INTEGER, PARAMETER :: ASSCLAYL = 4
-   INTEGER, PARAMETER :: ASSCLAYH = 5
-   INTEGER, PARAMETER :: ASSSANDL = 6
-   INTEGER, PARAMETER :: ASSSANDH = 7
+   INTEGER, PARAMETER :: OMCLAYL = 4
+   INTEGER, PARAMETER :: OMCLAYH = 5
+   INTEGER, PARAMETER :: OMSANDL = 6
+   INTEGER, PARAMETER :: OMSANDH = 7
    AED_REAL, PARAMETER :: DDT = 0.25/24.    ! Currently assuming 15 min timestep
 
 !===============================================================================
@@ -98,7 +98,7 @@ CONTAINS
 
 
 !###############################################################################
-SUBROUTINE aed2_define_ass(data, namlst)
+SUBROUTINE aed2_define_soilbgc(data, namlst)
 !-------------------------------------------------------------------------------
 ! Initialise the AED model
 !
@@ -106,7 +106,7 @@ SUBROUTINE aed2_define_ass(data, namlst)
 !  by the model are registered with AED2.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed2_ass_data_t),INTENT(inout) :: data
+   CLASS (aed2_soilbgc_data_t),INTENT(inout) :: data
    INTEGER,INTENT(in) :: namlst
 !
 !LOCALS
@@ -115,36 +115,36 @@ SUBROUTINE aed2_define_ass(data, namlst)
    !# ASS params
    INTEGER  :: n_zones, nlay
    INTEGER  :: active_zones(MAX_ZONES)
-   AED_REAL :: pass_0(MAX_ASS_PARAMS)
-   AED_REAL :: Racid(MAX_ASS_PARAMS)
+   AED_REAL :: pom_0(MAX_ASS_PARAMS)
+   AED_REAL :: Rom(MAX_ASS_PARAMS)
    AED_REAL :: flux_bf(MAX_ASS_PARAMS)
    AED_REAL :: flux_rn(MAX_ASS_PARAMS)
    AED_REAL :: flux_rn_max(MAX_ASS_PARAMS)
    AED_REAL :: flux_rw_a(MAX_ASS_PARAMS)
    AED_REAL :: flux_rw_d(MAX_ASS_PARAMS)
-   AED_REAL :: zASS(MAX_ASS_PARAMS)
+   AED_REAL :: zOM(MAX_ASS_PARAMS)
    AED_REAL :: Porosity(MAX_ASS_PARAMS),Density(MAX_ASS_PARAMS)
    AED_REAL :: X_hso4
 
    LOGICAL  :: simProfiles
 
-   CHARACTER(len=64) :: acid_link = ''
-   CHARACTER(len=64) :: so4_link = ''
+   CHARACTER(len=64) :: dom_link = ''
+   CHARACTER(len=64) :: dic_link = ''
    CHARACTER(4) :: trac_name
 
-   NAMELIST /aed2_ass/ n_zones, active_zones, nlay, acid_link, simProfiles, &
-                       pass_0, Racid, flux_bf, flux_rn, flux_rn_max, flux_rw_a, flux_rw_d, zASS, &
-                       Porosity, Density, so4_link, X_hso4
+   NAMELIST /aed2_soilbgc/ n_zones, active_zones, nlay, dom_link, simProfiles, &
+                       pom_0, Rom, flux_bf, flux_rn, flux_rn_max, flux_rw_a, flux_rw_d, zOM, &
+                       Porosity, Density, dic_link, X_hso4
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed2_ass initialization"
+   print *,"        aed2_soilbgc initialization"
 
    simProfiles = .FALSE.
 
    ! Read the namelist
-   read(namlst,nml=aed2_ass,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed2_ass'
+   read(namlst,nml=aed2_soilbgc,iostat=status)
+   IF (status /= 0) STOP 'Error reading namelist aed2_soilbgc'
 
    data%simProfiles = simProfiles
    data%n_zones = n_zones         ! THIS NEEDS TO BE 4 AT THE MOMENT!
@@ -157,41 +157,46 @@ SUBROUTINE aed2_define_ass(data, namlst)
 
    data%X_hso4 = X_hso4
    DO i=1,n_zones
-      data%pass_0(i)  = pass_0(i)
-      data%Racid(i)  = Racid(i)
+      data%pom_0(i)  = pom_0(i)
+      data%Rom(i)  = Rom(i)
       data%flux_bf(i)  = flux_bf(i)
       data%flux_rn(i) = flux_rn(i)
       data%flux_rn_max(i) = flux_rn_max(i)
       data%flux_rw_a(i) = flux_rw_a(i)
       data%flux_rw_d(i)  = flux_rw_d(i)
-      data%zASS(i)  = zASS(i)
+      data%zOM(i)  = zOM(i)
       data%nlay  = nlay
       data%Porosity(i) = Porosity(i)
       data%Density(i) = Density(i)
    ENDDO
 
-   ALLOCATE(data%id_pass0(nlay));  ALLOCATE(data%id_anc0(nlay))
-   ALLOCATE(data%id_pass(nlay));  ALLOCATE(data%id_anc(nlay))
+   ALLOCATE(data%id_pom0(nlay));  ALLOCATE(data%id_anc0(nlay))
+   ALLOCATE(data%id_pom(nlay));  ALLOCATE(data%id_anc(nlay))
 
    !# Register state variables
-   data%id_asstracer = aed2_define_variable('tracer', 'mmol/m**3', 'ass tracer', &
+   data%id_litter = aed2_define_sheet_variable('litter','mmolC/m**2',          &
+                                               'litter carbon density',        &
+                                               zero_,                          &
+                                               minimum=zero_)
+
+   data%id_soilbgctracer = aed2_define_variable('tracer', 'mmol/m**3', 'dom tracer', &
                                                                 zero_,minimum=zero_)
-   IF ( acid_link .EQ. '' ) &
-   data%id_g_ubalchg = aed2_define_variable('acidity', 'mmol/m**3', 'acidity', &
+   IF ( dom_link .EQ. '' ) &
+   data%id_o_doc = aed2_define_variable('dom_leachate', 'mmol/m**3', 'dom_leachate', &
                                                                 zero_,minimum=zero_)
      ! Register diagnostic variables
-   data%id_passt = aed2_define_sheet_diag_variable('pass_total','molH+/kg','soil total potential acidity (depth averaged)')
-   data%id_uzaass = aed2_define_sheet_diag_variable('uzaass','molH+/m2','unsat zone available acidity')
-   data%id_szaass = aed2_define_sheet_diag_variable('szaass','molH+/m2','sat zone available acidity')
-   data%id_taa    = aed2_define_sheet_diag_variable('taa','molH+/L','total actual acidity (porewater)')
+   data%id_pomt  = aed2_define_sheet_diag_variable('pom_total','mol C/kg','soil total potential reactive carbon (depth averaged)')
+   data%id_uzdom = aed2_define_sheet_diag_variable('uzdom','mol C/kg','unsat zone DOM')
+   data%id_szdom = aed2_define_sheet_diag_variable('szdom','mol C/kg','sat zone DOM')
+   data%id_toc   = aed2_define_sheet_diag_variable('toc','molH+/L','total actual acidity (porewater)')
    trac_name = 'lay0'
    DO i=1,nlay
      trac_name(4:4) = CHAR(ICHAR('0') + i)
-     data%id_pass0(i) = aed2_define_sheet_diag_variable('pass0_'//TRIM(trac_name),'molH+/kg','starting potential acidity (sulfides)')
+     data%id_pom0(i) = aed2_define_sheet_diag_variable('pom0_'//TRIM(trac_name),'molH+/kg','starting particualte organic matter')
    ENDDO
    DO i=1,nlay
      trac_name(4:4) = CHAR(ICHAR('0') + i)
-     data%id_pass(i)  = aed2_define_sheet_diag_variable('pass_'//TRIM(trac_name),'molH+/m2','potential acidity (sulfides)')
+     data%id_pom(i)  = aed2_define_sheet_diag_variable('pom_'//TRIM(trac_name),'molH+/m2','particulate organic matter')
    ENDDO
    DO i=1,nlay
      trac_name(4:4) = CHAR(ICHAR('0') + i)
@@ -201,24 +206,24 @@ SUBROUTINE aed2_define_ass(data, namlst)
      trac_name(4:4) = CHAR(ICHAR('0') + i)
      data%id_anc(i)  = aed2_define_sheet_diag_variable('anc_'//TRIM(trac_name),'molH+/m2','acid neutralising capacity')
    ENDDO
-   data%id_rwet  = aed2_define_sheet_diag_variable('rwet','molH+/m2/day','acid neutralising capacity')
-   data%id_rchg  = aed2_define_sheet_diag_variable('rchg','molH+/m2/day','acid neutralising capacity')
-   data%id_bflw  = aed2_define_sheet_diag_variable('bflw','molH+/m2/day','acid neutralising capacity')
-   data%id_sflw  = aed2_define_sheet_diag_variable('sflw','molH+/m2/day','acid neutralising capacity')
-   data%id_pyrox = aed2_define_sheet_diag_variable('pyrox','/day','acid neutralising capacity')
+   data%id_rwet  = aed2_define_sheet_diag_variable('rwet','molH+/m2/day','rewetting flux of dom')
+   data%id_rchg  = aed2_define_sheet_diag_variable('rchg','molH+/m2/day','percolation of dom')
+   data%id_bflw  = aed2_define_sheet_diag_variable('bflw','molH+/m2/day','baseflow of dom')
+   data%id_sflw  = aed2_define_sheet_diag_variable('sflw','molH+/m2/day','surface flow of dom')
+   data%id_omox = aed2_define_sheet_diag_variable('omox','/day','OM oxidation rate')
    data%id_so4r  = aed2_define_sheet_diag_variable('so4r','molH+/m2/day','acid neutralising capacity')
    data%id_pml   = aed2_define_sheet_diag_variable('pml','m','past maximum groundwater level')
    data%id_wettime = aed2_define_sheet_diag_variable('wettime','day','time cell has been innundated')
    data%id_drytime = aed2_define_sheet_diag_variable('drytime','day','time cell has been exposed')
 
    ! Register module dependencies
-   IF ( .NOT. acid_link .EQ. '' ) &
-   data%id_g_ubalchg  = aed2_locate_global(TRIM(acid_link))     ! ('GEO_ubalchg')       !,'meq/L','chg balance variable')
-   IF ( .NOT. so4_link .EQ. '' ) &
-   data%id_g_so4      = aed2_locate_global(TRIM(so4_link))      ! ('GEO_SO4')       !,'meq/L','chg balance variable')
+   IF ( .NOT. dom_link .EQ. '' ) &
+   data%id_o_doc  = aed2_locate_global(TRIM(dom_link))
+   IF ( .NOT. dic_link .EQ. '' ) &
+   data%id_c_dic      = aed2_locate_global(TRIM(dic_link))
    data%id_l_depth    = aed2_locate_global_sheet('LND_depth')   !,'m','soil depth (to datum)')
    data%id_l_phreatic = aed2_locate_global_sheet('LND_phreatic')!,'m','depth of phreatic surface below surface')
-   data%id_l_wt       = aed2_locate_global_sheet('LND_wt')!,'m','depth of phreatic surface below surface')
+   data%id_l_wt       = aed2_locate_global_sheet('LND_wt')      !,'m','depth of phreatic surface below surface')
    data%id_l_Sb       = aed2_locate_global_sheet('LND_Sb')      !,'mm','total capacity for water storage')
    data%id_l_St       = aed2_locate_global_sheet('LND_St')      ! 'mm', 'total soil water storage at time t')
    data%id_l_Ssat     = aed2_locate_global_sheet('LND_Ssat')    !,'mm','saturated zone soil water storage')
@@ -239,24 +244,24 @@ SUBROUTINE aed2_define_ass(data, namlst)
    data%id_E_salt = aed2_locate_global('salinity')          ! salinity of overlying water
    data%id_E_nearlevel= aed2_locate_global_sheet('nearest_depth')
 
-   !# NOTE: Initialisation occurs in first call of calculate_riparian
+   ! Initialisation occurs in first call of calculate_riparian
 
-END SUBROUTINE aed2_define_ass
+END SUBROUTINE aed2_define_soilbgc
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed2_initialize_ass(data, column, layer_idx)
+SUBROUTINE aed2_initialize_soilbgc(data, column, layer_idx)
 !-------------------------------------------------------------------------------
-! Routine to set initial state of ASS variables                                !
+! Routine to set initial state of soil BGC variables
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed2_ass_data_t),INTENT(in) :: data
+   CLASS (aed2_soilbgc_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   AED_REAL :: PASSt, ANCt
+   AED_REAL :: POMt, ANCt
 !-------------------------------------------------------------------------------
 !BEGIN
    !---------------------------------------------------------------------------
@@ -264,42 +269,43 @@ SUBROUTINE aed2_initialize_ass(data, column, layer_idx)
    CALL SetSoilHydrology(data, column, SoilCol)
 
    !---------------------------------------------------------------------------
-   ! Initialise vertical profiles of ANC and PASS
+   ! Initialise vertical profiles of ANC and POM
    _DIAG_VAR_S_(data%id_pml) = SoilCol%PhreaticHgt  !Reset
    ANCt = _DIAG_VAR_S_(data%id_anc0(1))
-   PASSt = _DIAG_VAR_S_(data%id_pass0(1))
-   CALL SetSoilASSProfile(data, column, SoilCol, PASSt, ANCt)
-   _DIAG_VAR_S_(data%id_uzaass)= zero_
+   POMt = _DIAG_VAR_S_(data%id_pom0(1))
+   CALL SetSoilPOMProfile(data, column, SoilCol, POMt, ANCt)
+   _DIAG_VAR_S_(data%id_uzdom)= zero_
 
 
-END SUBROUTINE aed2_initialize_ass
+END SUBROUTINE aed2_initialize_soilbgc
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
+SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
 !-------------------------------------------------------------------------------
-! Routine to update the dynamics of "Acid Sulfate Soils" (ASS) and determine   !
-! the flux to the water column from exposed or re-wetted sediment              !
+! Routine to update the dynamics of soil biogeochemsitry and determine
+! the flux to the water column from exposed or re-wetted soils
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed2_ass_data_t),INTENT(in) :: data
+   CLASS (aed2_soilbgc_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    AED_REAL,INTENT(in) :: pc_wet
 !
 !LOCALS
    AED_REAL :: rain, salt, bathy, area, matz, soiltemp
-   INTEGER  :: var, i, sub, assz
+   INTEGER  :: var, i, sub, omz
 
-   AED_REAL :: newAcidity, acidityFlux, acid_anc, newANC, avgpyrox, pass_vol
-   AED_REAL :: avgLevel, acid_gen, acid_potl, OxdnRate, SZDepth, UZDepth, NeutRate
-   AED_REAL :: acid_flux0, acid_flux1, acid_flux2, acid_flux3, acid_flux4, acid_flux5, acid_flux6, acid_flux7
-   AED_REAL :: Kass, sedDensity, pass_depth, moist, maxqse, acid_neut
-   AED_REAL :: oldlevel, newlevel
+   AED_REAL :: newDOM, domFlux, DOMmnlzn, avgomox, pom_vol
+   AED_REAL :: Kass, sedDensity, pom_depth, moist, maxqse, OxdnRate,  NeutRate
+   AED_REAL :: avgLevel, oldlevel, newlevel, SZDepth, UZDepth
 
-   AED_REAL :: ASSRWET, ASSRCHG, ASSBFLW, ASSSFLW, PYROX, SO4REDN
-   AED_REAL :: PASSt, TAA, ANCt, SZAASS, UZAASS, UZpH, SZpH, SO4, PH
+   AED_REAL :: dom_flux0, dom_flux1, dom_flux2, dom_flux3, dom_flux4, dom_flux5, dom_flux6, dom_flux7
+   AED_REAL :: dom_gen, acid_potl, dom_minl, dom_anc
+
+   AED_REAL :: DOMRWET, DOMRCHG, DOMBFLW, DOMSFLW, OMOX, SO4REDN
+   AED_REAL :: POMt, TOC, ANCt, SZDOM, UZDOM, SO4, DIC
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -308,10 +314,10 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
    ! Set local cell properties
    matz = _STATE_VAR_S_(data%id_E_matz)
    IF(.NOT.in_zone_set(matz,data%active_zones)) RETURN
-   assz = 1
+   omz = 1
    DO i =1,data%n_zones
      IF( INT(matz) == data%active_zones(i) )THEN
-       assz = i
+       omz = i
      ENDIF
    ENDDO
    avgLevel = _STATE_VAR_S_(data%id_E_nearlevel)
@@ -325,41 +331,38 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
 
    !---------------------------------------------------------------------------
    ! Zero dummy (working) variables
-   acid_anc   = zero_
-   acid_gen   = zero_
+   dom_anc   = zero_
+   dom_gen   = zero_
    acid_potl  = zero_
-   acid_flux0 = zero_
-   acid_flux1 = zero_
-   acid_flux2 = zero_
-   acid_flux3 = zero_
-   acid_flux4 = zero_
-   acid_flux5 = zero_
-   acid_flux6 = zero_
-   acid_flux7 = zero_
-   acid_neut  = zero_
-   pass_vol   = zero_
-   avgpyrox   = zero_
-   acidityFlux = zero_
-   newAcidity  = zero_
-   avgpyrox    = zero_
-   maxqse = zero_
+   dom_flux0 = zero_
+   dom_flux1 = zero_
+   dom_flux2 = zero_
+   dom_flux3 = zero_
+   dom_flux4 = zero_
+   dom_flux5 = zero_
+   dom_flux6 = zero_
+   dom_flux7 = zero_
+   dom_minl  = zero_
+   pom_vol   = zero_
+   avgomox   = zero_
+   domFlux   = zero_
+   newDOM    = zero_
+   maxqse    = zero_
 
    ! Zero diagnostic variables
-   ASSRWET = zero_
-   ASSRCHG = zero_
-   ASSBFLW = zero_
-   PYROX   = zero_
+   DOMRWET = zero_
+   DOMRCHG = zero_
+   DOMBFLW = zero_
+   OMOX   = zero_
    SO4REDN = zero_
-   UZpH = zero_
-   SZpH = zero_
 
    !---------------------------------------------------------------------------
    ! Get local ASS properties for this cell
-   TAA = _DIAG_VAR_S_(data%id_taa)
-   ANCt = _DIAG_VAR_S_(data%id_anc0(1))
-   PASSt = _DIAG_VAR_S_(data%id_pass0(1))
-   UZAASS = _DIAG_VAR_S_(data%id_uzaass)
-   SZAASS = _DIAG_VAR_S_(data%id_szaass)
+   TOC   = _DIAG_VAR_S_(data%id_toc)
+   ANCt  = _DIAG_VAR_S_(data%id_anc0(1))
+   POMt  = _DIAG_VAR_S_(data%id_pom0(1))
+   UZDOM = _DIAG_VAR_S_(data%id_uzdom)
+   SZDOM = _DIAG_VAR_S_(data%id_szdom)
 
    !---------------------------------------------------------------------------
    ! Prime local cell hydrology object with data from global arrays
@@ -371,8 +374,8 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
 
    !---------------------------------------------------------------------------
    ! Get PASS depth & volume
-   pass_depth = MAX(SoilCol%Bathy - SoilCol%pastMaxLevel, zero_)
-   pass_vol   = pass_depth * SoilCol%Area
+   pom_depth = MAX(SoilCol%Bathy - SoilCol%pastMaxLevel, zero_)
+   pom_vol   = pom_depth * SoilCol%Area
 
    SZDepth    = SoilCol%Depth - SoilCol%PhreaticDepth
    UZDepth    = SoilCol%PhreaticDepth
@@ -386,41 +389,48 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
        newLevel = SoilCol%PhreaticHgt
 
        !-----------------------------------------------------------------------!
-       !-- Increase in potential ASS due to increase in depth & then oxidise
+       !-- Update surface litter
+       litter = _STATE_VAR_S_(data%id_litter)
+       decomposition = litter * 0.01/86400
+       _FLUX_VAR_B_(data%id_litter) = _FLUX_VAR_B_(data%id_litter) - decomposition
 
-       CALL UpdatePASSProfile( SoilCol,          &
+
+       !-----------------------------------------------------------------------!
+       !-- Change in POM due to change Water Table & then oxidise
+
+       CALL UpdatePOMProfile( SoilCol,           &
                                column,           &
-                               newAcidity,       &
-                               avgpyrox,         &
-                               data%RAcid(assz), &
+                               newDOM,           &
+                               avgomox,          &
+                               data%Rom(omz),    &
                                temp=soiltemp     )
 
-       PASSt = zero_
+       POMt = zero_
        DO i=1,data%nlay
-         PASSt = PASSt + _DIAG_VAR_S_(data%id_pass(i))
+         POMt = POMt + _DIAG_VAR_S_(data%id_pom(i))
        ENDDO
-       IF( pass_depth > 0.05 ) THEN
-         _DIAG_VAR_S_(data%id_passt) = PASSt / (pass_depth * SoilCol%Density * 1e-3)
+       IF( pom_depth > 0.05 ) THEN
+         _DIAG_VAR_S_(data%id_pomt) = POMt / (pom_depth * SoilCol%Density * 1e-3)
        ENDIF
 
        ! Increase available acidity
-       UZAASS =  UZAASS + newAcidity
-       acid_gen = acid_gen + newAcidity
-       PYROX = avgpyrox
+       UZDOM =  UZDOM + newDOM
+       dom_gen = dom_gen + newDOM
+       OMOX = avgomox
 
-       newAcidity = TAA
-       CALL UpdateANCProfile( SoilCol, &
-                               column, &
-                              newAcidity )
-
-       ANCt = zero_
-       DO i=1,data%nlay
-         ANCt = ANCt + _DIAG_VAR_S_(data%id_anc(i))
-       ENDDO
+       newDOM = zero_ !consumption/mineralisation here
+       !CALL UpdateANCProfile( SoilCol, &
+       !                         column, &
+       !                      newAcidity )
+       !
+       !ANCt = zero_
+       !DO i=1,data%nlay
+       !   ANCt = ANCt + _DIAG_VAR_S_(data%id_anc(i))
+       !ENDDO
 
        ! Consume available acidity
-       UZAASS = UZAASS - newAcidity
-       acid_anc = acid_anc - newAcidity
+       UZDOM = UZDOM - newDOM
+       dom_anc = dom_anc - newDOM
 
        ! Reset pastMaxLevel if necessary
        oldLevel = newLevel
@@ -430,177 +440,137 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
        END IF
 
        !-----------------------------------------------------------------------
-       !-- Decrease in available acidity in SZ due to ANC/SO4 reduction
+       !-- Decrease in available DOM in SZ due to (anaerobic) mineralisation
 
        !newANC = data%flux_rn_max(assz) * MIN(SZDepth,0.5) * area * DDT * 1e-3
-       newANC = data%flux_rn_max(assz) * MIN(SZDepth,0.5) * DDT * 1e-3
-       IF(newANC > SZAASS) newANC=SZAASS
+       DOMmnlzn = data%flux_rn_max(omz) * MIN(SZDepth,0.5) * DDT * 1e-3
+       IF(DOMmnlzn > SZDOM) DOMmnlzn=SZDOM
 
        ! Consume available acidty
-       SZAASS = SZAASS - newANC
+       SZDOM = SZDOM - DOMmnlzn
 
-       acid_neut = acid_neut - newANC
-
-       !print *,'newAcidity',newAcidity,newANC,PYROX
-
+       dom_minl = dom_minl - DOMmnlzn
 
        !-----------------------------------------------------------------------
-       !-- Decrease in available acidity in due to acidity recharge/discharge/etc
+       !-- Decrease in available DOM in UZ due to recharge/discharge/etc
 
        ! R-RCG : recharge/percolation   [UNITS=> mol/L/timestep = mol/L * ((m/ts)/m) ]
        IF( SoilCol%recharge>zero_ .AND. UZDepth>0.1 ) THEN
 
-         acidityFlux = UZAASS * 0.5 * ( MIN(SoilCol%recharge/UZDepth,1.0) **data%flux_rn(assz) )
+         domFlux = UZDOM * 0.5 * ( MIN(SoilCol%recharge/UZDepth,1.0) **data%flux_rn(omz) )
 
-         UZAASS = UZAASS - acidityFlux
-         SZAASS = SZAASS + acidityFlux
+         UZDOM = UZDOM - domFlux
+         SZDOM = SZDOM + domFlux
 
-         acid_flux0 = acid_flux0 + acidityFlux
-         ASSRCHG = acidityFlux/DDT  ! molH+/L/day
+         dom_flux0 = dom_flux0 + domFlux
+         DOMRCHG = domFlux/DDT  ! molH+/L/day
        END IF
-
 
        ! R-BFLW : baseflow  [ UNITS>= mol/timestep = mol/L * m/day /m *day/ts ]
        IF( SoilCol%qss>zero_ .AND. SZDepth>0.01 ) THEN
 
-        IF(SZAASS>zero_)THEN
-           acidityFlux = data%flux_bf(assz) * SZAASS * ( SoilCol%qss / MIN(SZDepth,0.5) )
+        IF(SZDOM>zero_)THEN
+           domFlux = data%flux_bf(omz) * SZDOM * ( SoilCol%qss / MIN(SZDepth,0.5) )
         ELSE
-           acidityFlux = zero_
+           domFlux = zero_
         ENDIF
 
-         IF ( acidityFlux > SZAASS ) THEN
-           acidityFlux = SZAASS
+         IF ( domFlux > SZDOM ) THEN
+           domFlux = SZDOM
          END IF
 
-         SZAASS = SZAASS - acidityFlux
-         acid_flux1 = acid_flux1 + acidityFlux
-
-        ! ! Store acidity flux in DissFluxRates  [ UNITS = mol /m2 /day ]
+         SZDOM = SZDOM - domFlux
+         dom_flux1 = dom_flux1 + domFlux
 
         ! set diagnostic flux and update seepage tracer into the water: mol/m2/day
-         ASSBFLW = acidityFlux/DDT
-        _FLUX_VAR_R_(data%id_asstracer) = _FLUX_VAR_R_(data%id_asstracer) + ASSBFLW/secs_per_day
+         DOMBFLW = domFlux/DDT
+        _FLUX_VAR_R_(data%id_soilbgctracer) = _FLUX_VAR_R_(data%id_soilbgctracer) + DOMBFLW/secs_per_day
 
-        ! ! Store acidity flux in DissFluxRates  [ UNITS = mol /m2 /day ]
 
         ! _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + 1e-3*ASSBFLW/secs_per_day
-        _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + ASSBFLW/secs_per_day
-        IF ( data%id_g_so4>0 ) THEN
-         _FLUX_VAR_R_(data%id_g_so4) = _FLUX_VAR_R_(data%id_g_so4) + (ASSBFLW/secs_per_day) * data%X_hso4
+        _FLUX_VAR_R_(data%id_o_doc) = _FLUX_VAR_R_(data%id_o_doc) + DOMBFLW/secs_per_day
+        IF ( data%id_c_dic>0 ) THEN
+         _FLUX_VAR_R_(data%id_c_dic) = _FLUX_VAR_R_(data%id_c_dic) + (DOMBFLW/secs_per_day) !* data%X_hso4
         ENDIF
 
        END IF
 
 
-       ! R-DIS : If water table moves up, move some UZAASS -> SZAASS
+       ! R-DIS : If water table moves up, move some UZDOM -> SZDOM
        IF(newLevel > oldLevel .AND. UZDepth > 0.01 ) THEN
 
-         acidityFlux = MAX((( newLevel - oldLevel ) / UZDepth),1.0) * UZAASS
+         domFlux = MAX((( newLevel - oldLevel ) / UZDepth),1.0) * UZDOM
 
-         UZAASS = UZAASS - acidityFlux
-         SZAASS = SZAASS + acidityFlux
+         UZDOM = UZDOM - domFlux
+         SZDOM = SZDOM + domFlux
 
-         acid_flux6 = acid_flux6 + acidityFlux
+         dom_flux6 = dom_flux6 + domFlux
        END IF
 
 
        ! R-POND : ponding and sat excess  [ UNITS>= mol/timestep = mol/L * m/day /m *day/ts ]
-       IF( SoilCol%qse>zero_ .AND. UZAASS>zero_ .AND. UZDepth>0.1 ) THEN
+       IF( SoilCol%qse>zero_ .AND. UZDOM>zero_ .AND. UZDepth>0.1 ) THEN
 
          !  [UNITS=> mol/L/timestep = mol/L *m/ts *day/tstep *m2 * ??]
-         acidityFlux = UZAASS * ( MIN(SoilCol%qse/UZDepth,1.0) **data%flux_rn(assz) )
+         domFlux = UZDOM * ( MIN(SoilCol%qse/UZDepth,1.0) **data%flux_rn(omz) )
 
-         UZAASS = UZAASS - acidityFlux
-         acid_flux5 = acid_flux5 + acidityFlux
+         UZDOM = UZDOM - domFlux
+         dom_flux5 = dom_flux5 + domFlux
 
         ! set diagnostic flux and update seepage tracer into the water: mol/m2/day
-         ASSSFLW = acidityFlux/DDT
+         DOMSFLW = domFlux/DDT
 
-        _FLUX_VAR_R_(data%id_asstracer) = _FLUX_VAR_R_(data%id_asstracer) + ASSSFLW/secs_per_day
+        _FLUX_VAR_R_(data%id_soilbgctracer) = _FLUX_VAR_R_(data%id_soilbgctracer) + DOMSFLW/secs_per_day
 
         ! ! Store acidity flux in DissFluxRates  [ UNITS = mol /m2 /day ]
-        _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + ASSSFLW/secs_per_day
+        _FLUX_VAR_R_(data%id_o_doc) = _FLUX_VAR_R_(data%id_o_doc) + DOMSFLW/secs_per_day
         ! _FLUX_VAR_R_(data%id_g_ubalchg) = _FLUX_VAR_R_(data%id_g_ubalchg) + 1e-3*ASSSFLW/secs_per_day
-        IF ( data%id_g_so4>0 ) THEN
+        IF ( data%id_c_dic>0 ) THEN
          ! SO4 flux associated with pyrite oxidation (SHOULD THIS BE MULTIPLIED BY 1000 as SO4 in mmol/m3?)
-         _FLUX_VAR_R_(data%id_g_so4) = _FLUX_VAR_R_(data%id_g_so4) + (ASSSFLW/secs_per_day) * data%X_hso4
+         _FLUX_VAR_R_(data%id_c_dic) = _FLUX_VAR_R_(data%id_c_dic) + (DOMSFLW/secs_per_day) !* data%X_hso4
         ENDIF
-
 
        END IF
 
 
 
 
-       ASSRWET = 0.0
+       DOMRWET = 0.0
        _DIAG_VAR_S_(data%id_drytime) = _DIAG_VAR_S_(data%id_drytime) + DDT
        _DIAG_VAR_S_(data%id_wettime) = zero_
 
-       TAA = zero_
-       IF( SoilCol%Sus>0.01 ) TAA = UZAASS  / ( MAX(SoilCol%Sus,0.001) )
-       IF(TAA>1e-12) THEN
-         UZpH  = MAX (-LOG10(TAA), 2.5)
-       ELSE
-         UZpH  = 9.0
-       END IF
-       TAA = UZAASS * 1e3 / ( MAX(UZDepth,0.01)  * SoilCol%Density )
-
-       SZpH = SZAASS / ( MAX(SoilCol%Ssat,0.001) )
-       IF(SZpH>1e-9) THEN
-         SZpH  = -LOG10(SZpH)
-       ELSE
-         SZpH  = 9.0
-       END IF
+       TOC = zero_
+       TOC = UZDOM + SZDOM + POMt !? * 1e3 / ( MAX(UZDepth,0.01)  * SoilCol%Density )
 
      !-------------------------------------------------------------------------
-     ! R-WET : Newly re-wetted sediment (ii is in vdo2D but wasn't last step)
+     ! R-WET : Newly re-wetted sediment
      ! Flux rate is initially high
-     ELSE IF(pc_wet>0.1 .AND. _DIAG_VAR_S_(data%id_wettime)<=0.25) THEN   ! .AND. .NOT. ANY(Prevvdo2D == i)) THEN
+     ELSE IF(pc_wet>0.1 .AND. _DIAG_VAR_S_(data%id_wettime)<=0.25) THEN
 
        salt = _STATE_VAR_(data%id_E_salt)
-       acidityFlux = GetAcidityFluxRate(data%flux_rw_a(assz),salt,assz,1)
+       domFlux = GetDOMFluxRate(data%flux_rw_a(omz),salt,omz,1)
 
-       ! Store acidity flux in DissFluxRates for update within routine
-       ! Update BottomWaterConcs [ UNITS = mol /m2 /day ]
+       DOMRWET = domFlux
 
-       ASSRWET = acidityFlux !* 1e-3
-
-   !    DissFluxRates(i,DICHM(chargeBalCol)) = acidityFlux * 1e-3
-       _FLUX_VAR_B_(data%id_g_ubalchg) = _FLUX_VAR_B_(data%id_g_ubalchg) + ASSRWET/secs_per_day
-       IF ( data%id_g_so4>0 ) THEN
-         _FLUX_VAR_B_(data%id_g_so4) = _FLUX_VAR_B_(data%id_g_so4) + (ASSRWET/secs_per_day) * data%X_hso4
+       _FLUX_VAR_B_(data%id_o_doc) = _FLUX_VAR_B_(data%id_o_doc) + DOMRWET/secs_per_day
+       IF ( data%id_c_dic>0 ) THEN
+         _FLUX_VAR_B_(data%id_c_dic) = _FLUX_VAR_B_(data%id_c_dic) + (DOMRWET/secs_per_day) !* data%X_hso4
        ENDIF
 
-       acid_flux3 = acid_flux3 + acidityFlux*DDT
+       dom_flux3 = dom_flux3 + domFlux*DDT
 
        _DIAG_VAR_S_(data%id_wettime) = _DIAG_VAR_S_(data%id_wettime) + DDT
 
 
-
-     !  ANCt = zero_
-     !  DO i=1,data%nlay
-     !o    ANCt = ANCt + _DIAG_VAR_S_(data%id_anc(i))
-     !  ENDDO
-     !  IF(ANCt>UZAASS) THEN
-     !    SZAASS = zero_
-     !
-     !
-
-     ! ANCt    =  _DIAG_VAR_S_(data%id_anc(i))
-     !  IF(ANCt>SZAASS) THEN
-     !    SZAASS = zero_
-     !  END IF
-     SZAASS = SZAASS + UZAASS
-     UZAASS = zero_
+       SZDOM = SZDOM + UZDOM
+       UZDOM = zero_
 
 
      !-------------------------------------------------------------------------
      ! R-WET : Old re-wetted sediment - keep fluxing remainder (via diffusion)
      ELSE IF(pc_wet>0.1 .AND. _DIAG_VAR_S_(data%id_wettime)>0.25 ) THEN
 
-       SO4 = _STATE_VAR_(data%id_g_so4)
-       PH = 8.
+       DIC = _STATE_VAR_(data%id_c_dic)
        salt = _STATE_VAR_(data%id_E_salt)
        IF(salt < 1.)  salt = 1.0
        IF(salt > 40.) salt = 40.0
@@ -609,39 +579,36 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
          ! Old innundation .or. soil not dry for very long before innundation
 
          ! SO4 reduction of 5mmol H+/day from Koschorreck M, Tittel J.
-         acidityFlux = -0.005
+         domFlux = -0.005
 
          ! Scale SO4 reduction down if SO4 is limiting (>280mg/L SO4 is non-limiting)
-         acidityFlux = acidityFlux * ( SO4 ) / ( SO4+(153.*(1e3/96.)) )
+         domFlux = domFlux * ( SO4 ) / ( SO4+(153.*(1e3/96.)) )
 
-         SO4REDN = acidityFlux
-         acid_flux7 = acid_flux7 + acidityFlux*DDT
+         SO4REDN = domFlux
+         dom_flux7 = dom_flux7 + domFlux*DDT
 
          ! Past dryness and PASS production is reset by now
          _DIAG_VAR_S_(data%id_drytime) = zero_
 
        ELSEIF(_DIAG_VAR_S_(data%id_wettime) < 1.) THEN
          ! Innundated within last 1 days
-         acidityFlux = GetAcidityFluxRate(data%flux_rw_a(assz),salt,assz,1)
+         domFlux = GetDOMFluxRate(data%flux_rw_a(omz),salt,omz,1)
 
-         acid_flux3 = acid_flux3 + acidityFlux*DDT
+         dom_flux3 = dom_flux3 + domFlux*DDT
 
        ELSE
          ! Innundated within last 1-90 days
-         acidityFlux = GetAcidityFluxRate(data%flux_rw_d(assz),salt,assz,2)
+         domFlux = GetDOMFluxRate(data%flux_rw_d(omz),salt,omz,2)
 
-         acid_flux4 = acid_flux4 + acidityFlux*DDT
+         dom_flux4 = dom_flux4 + domFlux*DDT
        END IF
 
-       UZpH = PH
-       SZpH = PH
-
        ! Store acidity flux in ASSRWET for update within routine
-       ASSRWET = acidityFlux * 1e-3
+       DOMRWET = domFlux * 1e-3
 
-       _FLUX_VAR_B_(data%id_g_ubalchg) = _FLUX_VAR_B_(data%id_g_ubalchg) + ASSRWET/secs_per_day
-       IF ( data%id_g_so4>0 ) THEN
-         _FLUX_VAR_B_(data%id_g_so4) = _FLUX_VAR_B_(data%id_g_so4) + (ASSRWET/secs_per_day) * data%X_hso4
+       _FLUX_VAR_B_(data%id_o_doc) = _FLUX_VAR_B_(data%id_o_doc) + DOMRWET/secs_per_day
+       IF ( data%id_c_dic>0 ) THEN
+         _FLUX_VAR_B_(data%id_c_dic) = _FLUX_VAR_B_(data%id_c_dic) + (DOMRWET/secs_per_day) * data%X_hso4
        ENDIF
 
        ! Update the time-counter for inundation
@@ -651,17 +618,15 @@ SUBROUTINE aed2_calculate_riparian_ass(data, column, layer_idx, pc_wet)
      !------------------------------
 
 
-
-
    ! Update the main arrays
-   _DIAG_VAR_S_(data%id_uzaass) = UZAASS
-   _DIAG_VAR_S_(data%id_szaass) = SZAASS
-   _DIAG_VAR_S_(data%id_taa)    = TAA
-   _DIAG_VAR_S_(data%id_rwet)   = ASSRWET
-   _DIAG_VAR_S_(data%id_rchg)   = ASSRCHG
-   _DIAG_VAR_S_(data%id_bflw)   = ASSBFLW
-   _DIAG_VAR_S_(data%id_sflw)   = ASSSFLW
-   _DIAG_VAR_S_(data%id_pyrox)  = PYROX
+   _DIAG_VAR_S_(data%id_uzdom) = UZDOM
+   _DIAG_VAR_S_(data%id_szdom) = SZDOM
+   _DIAG_VAR_S_(data%id_toc)    = TOC
+   _DIAG_VAR_S_(data%id_rwet)   = DOMRWET
+   _DIAG_VAR_S_(data%id_rchg)   = DOMRCHG
+   _DIAG_VAR_S_(data%id_bflw)   = DOMBFLW
+   _DIAG_VAR_S_(data%id_sflw)   = DOMSFLW
+   _DIAG_VAR_S_(data%id_omox)   = OMOX
    _DIAG_VAR_S_(data%id_so4r)   = SO4REDN
    _DIAG_VAR_S_(data%id_pml)    = SoilCol%pastMaxLevel  ! _DIAG_VAR_S_(data%id_l_wt)
 
@@ -673,7 +638,7 @@ CONTAINS
 
 !###############################################################################
 ! SUBROUTINE UpdatePASSProfile(theSoil,thePASS,PASS0,newAASS, avgpyrox, pyrox)
- SUBROUTINE UpdatePASSProfile(theSoil,column,newAASS, avgpyrox, pyrox, temp)
+ SUBROUTINE UpdatePOMProfile(theSoil,column,newAASS, avgpyrox, pyrox, temp)
    !-- Incoming
    TYPE(SoilUnit)       :: theSoil
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
@@ -702,14 +667,14 @@ CONTAINS
 
        !-----------------------------------------------------------------------!
        ! Check for newly exposed layers and update PASScontent based on PASScontent0
-       IF(middep > theSoil%pastMaxLevel .AND. _DIAG_VAR_S_(data%id_pass0(lay)) > zero_ ) THEN
+       IF(middep > theSoil%pastMaxLevel .AND. _DIAG_VAR_S_(data%id_pom0(lay)) > zero_ ) THEN
 
-         _DIAG_VAR_S_(data%id_pass(lay)) = (dep - depm1)  & !* theSoil%Area &
-                      * _DIAG_VAR_S_(data%id_pass0(lay))  * theSoil%Density * 1e-3
+         _DIAG_VAR_S_(data%id_pom(lay)) = (dep - depm1)  & !* theSoil%Area &
+                      * _DIAG_VAR_S_(data%id_pom0(lay))  * theSoil%Density * 1e-3
          ! Once a layer is added to the PASScontent array it cannot be repeated.
-         _DIAG_VAR_S_(data%id_pass0(lay)) = zero_
+         _DIAG_VAR_S_(data%id_pom0(lay)) = zero_
 
-         IF( middep > 0.5 )  _DIAG_VAR_S_(data%id_pass(lay)) = zero_
+         IF( middep > 0.5 )  _DIAG_VAR_S_(data%id_pom(lay)) = zero_
        END IF
 
 
@@ -722,14 +687,14 @@ CONTAINS
 
    !    IF(theTAA*1e3 < 2500) THEN
          ! [ UNITS = mol/L * /day * day/timestep = mol /L /timestep ]
-         newAcidity = _DIAG_VAR_S_(data%id_pass(lay)) * OxdnRate * DDT
+         newAcidity = _DIAG_VAR_S_(data%id_pom(lay)) * OxdnRate * DDT
    !    ELSE
    !      newAcidity = wq_zero
    !    END IF
 
 
        ! Reduce PASS based on used amount
-       _DIAG_VAR_S_(data%id_pass(lay)) = _DIAG_VAR_S_(data%id_pass(lay)) - newAcidity
+       _DIAG_VAR_S_(data%id_pom(lay)) = _DIAG_VAR_S_(data%id_pom(lay)) - newAcidity
 
        ! Increase available acidity
        newAASS = newAASS + newAcidity
@@ -741,7 +706,7 @@ CONTAINS
    ! Average PYROX for plots
    avgpyrox =  avgpyrox/theSoil%nlay
 
- END SUBROUTINE UpdatePASSProfile
+ END SUBROUTINE UpdatePOMProfile
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -811,7 +776,7 @@ CONTAINS
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-END SUBROUTINE aed2_calculate_riparian_ass
+END SUBROUTINE aed2_calculate_riparian_soilbgc
 
 
 !###############################################################################
@@ -821,7 +786,7 @@ SUBROUTINE SetSoilHydrology(data, column, theSoil)
 ! its material zone id number                                                  !
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed2_ass_data_t),INTENT(in) :: data
+   CLASS (aed2_soilbgc_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    TYPE(SoilUnit),INTENT(inout) :: theSoil
    !INTEGER,INTENT(in) :: MatZoneID
@@ -937,14 +902,14 @@ END SUBROUTINE SetSoilHydrology
    OxdnRate = 0.0
 
    ! SANDY ASS
-   IF(SOIL == ASSSANDL .OR. SOIL == ASSSANDH) THEN
+   IF(SOIL == OMSANDL .OR. SOIL == OMSANDH) THEN
 
      OxdnRate = -9.7011*MC**3. + 2.1949*MC**2. + 0.0025*MC + 0.0006
 
      OxdnRate = MaxRate* OxdnRate
 
    ! CLAYEY ASS
-   ELSE IF(SOIL == ASSCLAYL .OR. SOIL == ASSCLAYH) THEN
+   ELSE IF(SOIL == OMCLAYL .OR. SOIL == OMCLAYH) THEN
 
      IF(MC > 0.225 .AND. MC < 0.48) THEN
        OxdnRate = -0.0142*MC + 0.0068
@@ -973,7 +938,7 @@ END SUBROUTINE SetSoilHydrology
 
 
 !###############################################################################
- FUNCTION GetAcidityFluxRate(FWRate,Salinity,SOIL,theTime) RESULT (FluxRate)
+ FUNCTION GetDOMFluxRate(FWRate,Salinity,SOIL,theTime) RESULT (FluxRate)
    !-- Incoming
    AED_REAL   :: FWRate,Salinity    ! Rate of FW release of H for this soil
    AED_REAL   :: FluxRate           ! The actual flux rate calculated
@@ -987,13 +952,13 @@ END SUBROUTINE SetSoilHydrology
 
    !---------------------------------------------------------------------------!
    IF(theTime == 1) THEN
-     IF(SOIL == ASSCLAYL .OR. SOIL == ASSCLAYH) THEN
+     IF(SOIL == OMCLAYL .OR. SOIL == OMCLAYH) THEN
         kk = BC1
      ELSE
         kk = BS1
      END IF
    ELSE
-     IF(SOIL == ASSCLAYL .OR. SOIL == ASSCLAYH) THEN
+     IF(SOIL == OMCLAYL .OR. SOIL == OMCLAYH) THEN
         kk = BCt
      ELSE
         kk = BSt
@@ -1006,19 +971,19 @@ END SUBROUTINE SetSoilHydrology
      FluxRate =  kk * Salinity/35. + FWRate
    END IF
 
- END FUNCTION GetAcidityFluxRate
+ END FUNCTION GetDOMFluxRate
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 
 !###############################################################################
-SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
+SUBROUTINE SetSoilPOMProfile(data, column, theSoil, PASSt, ANCt)
 !-------------------------------------------------------------------------------
 ! Primes the local cell Bucket model "object" with relevant parameters based on!
 ! its material zone id number                                                  !
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed2_ass_data_t),INTENT(in) :: data
+   CLASS (aed2_soilbgc_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    TYPE(SoilUnit),INTENT(inout) :: theSoil ! passing SoilUnit into theSoil
    AED_REAL,INTENT(in) :: PASSt, ANCt
@@ -1051,12 +1016,12 @@ SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
 
    ! Set active arrays pass and anc to 0 (no oxidation as yet) & pass0 and anc0 to top value
    DO lay = 1,theSoil%nlay
-     _DIAG_VAR_S_(data%id_pass(lay)) = zero_
-     _DIAG_VAR_S_(data%id_pass0(lay)) = PASSt
+     _DIAG_VAR_S_(data%id_pom(lay)) = zero_
+     _DIAG_VAR_S_(data%id_pom0(lay)) = PASSt
      _DIAG_VAR_S_(data%id_anc(lay)) = zero_
      _DIAG_VAR_S_(data%id_anc0(lay)) = ANCt
    ENDDO
-   _DIAG_VAR_S_(data%id_passt) = zero_
+   _DIAG_VAR_S_(data%id_pomt) = zero_
 
 
 
@@ -1064,136 +1029,136 @@ SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
 
 
    ! Lake Alex == 1
-   IF( data%zASS(zindex)>0.5 .AND. data%zASS(zindex)<1.5) THEN
+   IF( data%zOM(zindex)>0.5 .AND. data%zOM(zindex)<1.5) THEN
 
-       IF(theSoil%Substrate == ASSCLAYL .OR. theSoil%Substrate == ASSCLAYH) THEN
+       IF(theSoil%Substrate == OMCLAYL .OR. theSoil%Substrate == OMCLAYH) THEN
 
          DO lay = 1,theSoil%nlay
            IF(middep(lay)-dep(1) >0.0 .AND. middep(lay)-dep(1) <=0.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = PASSt       ! Surface concs by CSIRO
+              _DIAG_VAR_S_(data%id_pom0(lay)) = PASSt       ! Surface concs by CSIRO
               _DIAG_VAR_S_(data%id_anc0(lay))  = ANCt        ! Surface concs by CSIRO
            ELSE IF(middep(lay)-dep(1) >0.2 .AND. middep(lay)-dep(1) <=0.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 1.009705089
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 1.009705089
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.187140007
            ELSE IF(middep(lay)-dep(1) >0.3 .AND. middep(lay)-dep(1) <=0.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 1.000955436
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 1.000955436
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.213892035
            ELSE IF(middep(lay)-dep(1) >0.4 .AND. middep(lay)-dep(1) <=0.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 1.000955436
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 1.000955436
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.213892035
            ELSE IF(middep(lay)-dep(1) >0.5 .AND. middep(lay)-dep(1) <=0.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.83412953
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.83412953
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.487488851
            ELSE IF(middep(lay)-dep(1) >0.6 .AND. middep(lay)-dep(1) <=0.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.667303624
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.667303624
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.761085667
            ELSE IF(middep(lay)-dep(1) >0.7 .AND. middep(lay)-dep(1) <=0.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.500477718
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.500477718
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.034682483
            ELSE IF(middep(lay)-dep(1) >0.8 .AND. middep(lay)-dep(1) <=0.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.333651812
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.333651812
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.308279299
            ELSE IF(middep(lay)-dep(1) >0.9 .AND. middep(lay)-dep(1) <=1.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.166825906
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.166825906
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.581876115
            ELSE IF(middep(lay)-dep(1) >1.0 .AND. middep(lay)-dep(1) <=1.1) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.215260078
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.215260078
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.855472932
            ELSE IF(middep(lay)-dep(1) >1.1 .AND. middep(lay)-dep(1) <=1.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.205900944
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.205900944
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.01769224
            ELSE IF(middep(lay)-dep(1) >1.2 .AND. middep(lay)-dep(1) <=1.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.190302388
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.190302388
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.965818518
            ELSE IF(middep(lay)-dep(1) >1.3 .AND. middep(lay)-dep(1) <=1.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.190302388
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.190302388
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.965818518
            ELSE IF(middep(lay)-dep(1) >1.4 .AND. middep(lay)-dep(1) <=1.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.5 .AND. middep(lay)-dep(1) <=1.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.6 .AND. middep(lay)-dep(1) <=1.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.7 .AND. middep(lay)-dep(1) <=1.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.8 .AND. middep(lay)-dep(1) <=1.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.9 .AND. middep(lay)-dep(1) <=2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            END IF
          END DO
 
-       ELSE IF(theSoil%Substrate == ASSSANDL .OR. theSoil%Substrate == ASSSANDH) THEN
+       ELSE IF(theSoil%Substrate == OMSANDL .OR. theSoil%Substrate == OMSANDH) THEN
 
          DO lay = 1,theSoil%nlay
            IF(middep(lay)-dep(1) >0.0 .AND. middep(lay)-dep(1) <=0.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = PASSt       ! Surface concs by CSIRO
+              _DIAG_VAR_S_(data%id_pom0(lay)) = PASSt       ! Surface concs by CSIRO
               _DIAG_VAR_S_(data%id_anc0(lay))  = ANCt        ! Surface concs by CSIRO
            ELSE IF(middep(lay)-dep(1) >0.2 .AND. middep(lay)-dep(1) <=0.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.025127245
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.025127245
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.128028612
            ELSE IF(middep(lay)-dep(1) >0.3 .AND. middep(lay)-dep(1) <=0.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.039191336
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.039191336
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.151751814
            ELSE IF(middep(lay)-dep(1) >0.4 .AND. middep(lay)-dep(1) <=0.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.039191336
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.039191336
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.151751814
            ELSE IF(middep(lay)-dep(1) >0.5 .AND. middep(lay)-dep(1) <=0.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.093591338
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.093591338
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.272543826
            ELSE IF(middep(lay)-dep(1) >0.6 .AND. middep(lay)-dep(1) <=0.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.093591338
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.093591338
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.272543826
            ELSE IF(middep(lay)-dep(1) >0.7 .AND. middep(lay)-dep(1) <=0.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.093591338
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.093591338
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.272543826
            ELSE IF(middep(lay)-dep(1) >0.8 .AND. middep(lay)-dep(1) <=0.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.162224986
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.162224986
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.040779625
            ELSE IF(middep(lay)-dep(1) >0.9 .AND. middep(lay)-dep(1) <=1.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.109189895
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.109189895
               _DIAG_VAR_S_(data%id_anc0(lay))  = 2.741532621
            ELSE IF(middep(lay)-dep(1) >1.0 .AND. middep(lay)-dep(1) <=1.1) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.056154803
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.056154803
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.44407992
            ELSE IF(middep(lay)-dep(1) >1.1 .AND. middep(lay)-dep(1) <=1.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.087351916
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.087351916
               _DIAG_VAR_S_(data%id_anc0(lay))  = 4.750826297
            ELSE IF(middep(lay)-dep(1) >1.2 .AND. middep(lay)-dep(1) <=1.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 4.057572674
            ELSE IF(middep(lay)-dep(1) >1.3 .AND. middep(lay)-dep(1) <=1.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.092343454
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.092343454
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.874113298
            ELSE IF(middep(lay)-dep(1) >1.4 .AND. middep(lay)-dep(1) <=1.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.065513937
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.065513937
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.690556051
            ELSE IF(middep(lay)-dep(1) >1.5 .AND. middep(lay)-dep(1) <=1.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.047835573
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.047835573
               _DIAG_VAR_S_(data%id_anc0(lay))  = 2.724078941
            ELSE IF(middep(lay)-dep(1) >1.6 .AND. middep(lay)-dep(1) <=1.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.047835573
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.047835573
               _DIAG_VAR_S_(data%id_anc0(lay))  = 2.724078941
            ELSE IF(middep(lay)-dep(1) >1.7 .AND. middep(lay)-dep(1) <=1.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.065513937
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.065513937
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.945188106
            ELSE IF(middep(lay)-dep(1) >1.8 .AND. middep(lay)-dep(1) <=1.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.012478845
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.012478845
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.791124722
            ELSE IF(middep(lay)-dep(1) >1.9 .AND. middep(lay)-dep(1) <=2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.012478845
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.012478845
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.791124722
            ELSE IF(middep(lay)-dep(1) >2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.012478845
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.012478845
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.791124722
            END IF
          END DO
@@ -1202,136 +1167,136 @@ SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
 
      ! Currency == 2
 !CAB was KASS
-     ELSEIF( data%zASS(zindex)>1.5 .AND. data%zASS(zindex) <2.5) THEN
+     ELSEIF( data%zOM(zindex)>1.5 .AND. data%zOM(zindex) <2.5) THEN
 
-       IF(theSoil%Substrate == ASSCLAYL .OR. theSoil%Substrate == ASSCLAYH) THEN
+       IF(theSoil%Substrate == OMCLAYL .OR. theSoil%Substrate == OMCLAYH) THEN
 
          DO lay = 1,theSoil%nlay
            IF(middep(lay)-dep(1) >0.0 .AND. middep(lay)-dep(1) <=0.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = PASSt      ! Surface concs by CSIRO
+              _DIAG_VAR_S_(data%id_pom0(lay)) = PASSt      ! Surface concs by CSIRO
               _DIAG_VAR_S_(data%id_anc0(lay))  = ANCt        ! Surface concs by CSIRO
            ELSE IF(middep(lay)-dep(1) >0.2 .AND. middep(lay)-dep(1) <=0.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.582346104
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.582346104
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.094914577
            ELSE IF(middep(lay)-dep(1) >0.3 .AND. middep(lay)-dep(1) <=0.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.808629162
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.808629162
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.092250308
            ELSE IF(middep(lay)-dep(1) >0.4 .AND. middep(lay)-dep(1) <=0.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.579018412
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.579018412
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.108235921
            ELSE IF(middep(lay)-dep(1) >0.5 .AND. middep(lay)-dep(1) <=0.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.290133148
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.290133148
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.275751823
            ELSE IF(middep(lay)-dep(1) >0.6 .AND. middep(lay)-dep(1) <=0.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.288573293
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.288573293
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.274895451
            ELSE IF(middep(lay)-dep(1) >0.7 .AND. middep(lay)-dep(1) <=0.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.106070183
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.106070183
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.517534219
            ELSE IF(middep(lay)-dep(1) >0.8 .AND. middep(lay)-dep(1) <=0.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.172624024
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.172624024
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.716688314
            ELSE IF(middep(lay)-dep(1) >0.9 .AND. middep(lay)-dep(1) <=1.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.205900944
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.205900944
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.927165551
            ELSE IF(middep(lay)-dep(1) >1.0 .AND. middep(lay)-dep(1) <=1.1) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.287013437
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.287013437
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.119892097
            ELSE IF(middep(lay)-dep(1) >1.1 .AND. middep(lay)-dep(1) <=1.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.287013437
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.287013437
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.119892097
            ELSE IF(middep(lay)-dep(1) >1.2 .AND. middep(lay)-dep(1) <=1.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.089919073
            ELSE IF(middep(lay)-dep(1) >1.3 .AND. middep(lay)-dep(1) <=1.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.089919073
            ELSE IF(middep(lay)-dep(1) >1.4 .AND. middep(lay)-dep(1) <=1.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.089919073
            ELSE IF(middep(lay)-dep(1) >1.5 .AND. middep(lay)-dep(1) <=1.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.089919073
            ELSE IF(middep(lay)-dep(1) >1.6 .AND. middep(lay)-dep(1) <=1.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.089919073
            ELSE IF(middep(lay)-dep(1) >1.7 .AND. middep(lay)-dep(1) <=1.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.089919073
            ELSE IF(middep(lay)-dep(1) >1.8 .AND. middep(lay)-dep(1) <=1.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.089919073
            ELSE IF(middep(lay)-dep(1) >1.9 .AND. middep(lay)-dep(1) <=2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) =  0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) =  0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  =  0.089919073
            ELSE IF(middep(lay)-dep(1) >2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) =  0.155985564
+              _DIAG_VAR_S_(data%id_pom0(lay)) =  0.155985564
               _DIAG_VAR_S_(data%id_anc0(lay))  =  0.089919073
            END IF
          END DO
 
-       ELSE IF(theSoil%Substrate == ASSSANDL .OR. theSoil%Substrate == ASSSANDH) THEN
+       ELSE IF(theSoil%Substrate == OMSANDL .OR. theSoil%Substrate == OMSANDH) THEN
 
          DO lay = 1,theSoil%nlay
            IF(middep(lay)-dep(1) >0.0 .AND. middep(lay)-dep(1) <=0.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = PASSt       ! Surface concs by CSIRO
+              _DIAG_VAR_S_(data%id_pom0(lay)) = PASSt       ! Surface concs by CSIRO
               _DIAG_VAR_S_(data%id_anc0(lay))  = ANCt        ! Surface concs by CSIRO
            ELSE IF(middep(lay)-dep(1) >0.2 .AND. middep(lay)-dep(1) <=0.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.026740382
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.026740382
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.188401867
            ELSE IF(middep(lay)-dep(1) >0.3 .AND. middep(lay)-dep(1) <=0.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.03327692
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.03327692
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.254371066
            ELSE IF(middep(lay)-dep(1) >0.4 .AND. middep(lay)-dep(1) <=0.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.043675958
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.043675958
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.365670896
            ELSE IF(middep(lay)-dep(1) >0.5 .AND. middep(lay)-dep(1) <=0.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.047419611
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.047419611
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.463183135
            ELSE IF(middep(lay)-dep(1) >0.6 .AND. middep(lay)-dep(1) <=0.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.054074995
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.054074995
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.744663137
            ELSE IF(middep(lay)-dep(1) >0.7 .AND. middep(lay)-dep(1) <=0.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.147666334
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.147666334
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.731341792
            ELSE IF(middep(lay)-dep(1) >0.8 .AND. middep(lay)-dep(1) <=0.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.2214995
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.2214995
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.006094515
            ELSE IF(middep(lay)-dep(1) >0.9 .AND. middep(lay)-dep(1) <=1.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.2214995
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.2214995
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.006094515
            ELSE IF(middep(lay)-dep(1) >1.0 .AND. middep(lay)-dep(1) <=1.1) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.1 .AND. middep(lay)-dep(1) <=1.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.215260078
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.215260078
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.2 .AND. middep(lay)-dep(1) <=1.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.3 .AND. middep(lay)-dep(1) <=1.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.4 .AND. middep(lay)-dep(1) <=1.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.5 .AND. middep(lay)-dep(1) <=1.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.6 .AND. middep(lay)-dep(1) <=1.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.7 .AND. middep(lay)-dep(1) <=1.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.8 .AND. middep(lay)-dep(1) <=1.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >1.9 .AND. middep(lay)-dep(1) <=2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            ELSE IF(middep(lay)-dep(1) >2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.670729677
            END IF
          END DO
@@ -1341,136 +1306,136 @@ SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
 
      ! Lake Albert == 3
 !CAB was KASS
-     ELSEIF( data%zASS(zindex)>2.5 .AND. data%zASS(zindex) <3.5) THEN
+     ELSEIF( data%zOM(zindex)>2.5 .AND. data%zOM(zindex) <3.5) THEN
 
-       IF(theSoil%Substrate == ASSCLAYL .OR. theSoil%Substrate == ASSCLAYH) THEN
+       IF(theSoil%Substrate == OMCLAYL .OR. theSoil%Substrate == OMCLAYH) THEN
 
          DO lay = 1,theSoil%nlay
            IF(middep(lay)-dep(1) >0.0 .AND. middep(lay)-dep(1) <=0.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = PASSt       ! Surface concs by CSIRO
+              _DIAG_VAR_S_(data%id_pom0(lay)) = PASSt       ! Surface concs by CSIRO
               _DIAG_VAR_S_(data%id_anc0(lay))  = ANCt        ! Surface concs by CSIRO
            ELSE IF(middep(lay)-dep(1) >0.2 .AND. middep(lay)-dep(1) <=0.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 1.009705089
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 1.009705089
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.187140007
            ELSE IF(middep(lay)-dep(1) >0.3 .AND. middep(lay)-dep(1) <=0.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 1.000955436
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 1.000955436
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.213892035
            ELSE IF(middep(lay)-dep(1) >0.4 .AND. middep(lay)-dep(1) <=0.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 1.000955436
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 1.000955436
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.213892035
            ELSE IF(middep(lay)-dep(1) >0.5 .AND. middep(lay)-dep(1) <=0.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.83412953
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.83412953
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.487488851
            ELSE IF(middep(lay)-dep(1) >0.6 .AND. middep(lay)-dep(1) <=0.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.667303624
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.667303624
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.761085667
            ELSE IF(middep(lay)-dep(1) >0.7 .AND. middep(lay)-dep(1) <=0.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.500477718
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.500477718
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.034682483
            ELSE IF(middep(lay)-dep(1) >0.8 .AND. middep(lay)-dep(1) <=0.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.333651812
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.333651812
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.308279299
            ELSE IF(middep(lay)-dep(1) >0.9 .AND. middep(lay)-dep(1) <=1.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.166825906
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.166825906
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.581876115
            ELSE IF(middep(lay)-dep(1) >1.0 .AND. middep(lay)-dep(1) <=1.1) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.215260078
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.215260078
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.855472932
            ELSE IF(middep(lay)-dep(1) >1.1 .AND. middep(lay)-dep(1) <=1.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.205900944
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.205900944
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.01769224
            ELSE IF(middep(lay)-dep(1) >1.2 .AND. middep(lay)-dep(1) <=1.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.190302388
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.190302388
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.965818518
            ELSE IF(middep(lay)-dep(1) >1.3 .AND. middep(lay)-dep(1) <=1.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.190302388
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.190302388
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.965818518
            ELSE IF(middep(lay)-dep(1) >1.4 .AND. middep(lay)-dep(1) <=1.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.5 .AND. middep(lay)-dep(1) <=1.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.6 .AND. middep(lay)-dep(1) <=1.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.7 .AND. middep(lay)-dep(1) <=1.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.8 .AND. middep(lay)-dep(1) <=1.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >1.9 .AND. middep(lay)-dep(1) <=2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            ELSE IF(middep(lay)-dep(1) >2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.187182676
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.187182676
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.342130858
            END IF
          END DO
 
-       ELSE IF(theSoil%Substrate == ASSSANDL .OR. theSoil%Substrate == ASSSANDH) THEN
+       ELSE IF(theSoil%Substrate == OMSANDL .OR. theSoil%Substrate == OMSANDH) THEN
 
          DO lay = 1,theSoil%nlay
            IF(middep(lay)-dep(1) >0.0 .AND. middep(lay)-dep(1) <=0.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = PASSt       ! Surface concs by CSIRO
+              _DIAG_VAR_S_(data%id_pom0(lay)) = PASSt       ! Surface concs by CSIRO
               _DIAG_VAR_S_(data%id_anc0(lay))  = ANCt        ! Surface concs by CSIRO
            ELSE IF(middep(lay)-dep(1) >0.2 .AND. middep(lay)-dep(1) <=0.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.025127245
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.025127245
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.128028612
            ELSE IF(middep(lay)-dep(1) >0.3 .AND. middep(lay)-dep(1) <=0.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.039191336
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.039191336
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.151751814
            ELSE IF(middep(lay)-dep(1) >0.4 .AND. middep(lay)-dep(1) <=0.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.039191336
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.039191336
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.151751814
            ELSE IF(middep(lay)-dep(1) >0.5 .AND. middep(lay)-dep(1) <=0.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.093591338
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.093591338
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.272543826
            ELSE IF(middep(lay)-dep(1) >0.6 .AND. middep(lay)-dep(1) <=0.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.093591338
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.093591338
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.272543826
            ELSE IF(middep(lay)-dep(1) >0.7 .AND. middep(lay)-dep(1) <=0.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.093591338
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.093591338
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.272543826
            ELSE IF(middep(lay)-dep(1) >0.8 .AND. middep(lay)-dep(1) <=0.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.162224986
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.162224986
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.040779625
            ELSE IF(middep(lay)-dep(1) >0.9 .AND. middep(lay)-dep(1) <=1.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.109189895
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.109189895
               _DIAG_VAR_S_(data%id_anc0(lay))  = 2.741532621
            ELSE IF(middep(lay)-dep(1) >1.0 .AND. middep(lay)-dep(1) <=1.1) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.056154803
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.056154803
               _DIAG_VAR_S_(data%id_anc0(lay))  = 5.44407992
            ELSE IF(middep(lay)-dep(1) >1.1 .AND. middep(lay)-dep(1) <=1.2) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.087351916
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.087351916
               _DIAG_VAR_S_(data%id_anc0(lay))  = 4.750826297
            ELSE IF(middep(lay)-dep(1) >1.2 .AND. middep(lay)-dep(1) <=1.3) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.118549028
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.118549028
               _DIAG_VAR_S_(data%id_anc0(lay))  = 4.057572674
            ELSE IF(middep(lay)-dep(1) >1.3 .AND. middep(lay)-dep(1) <=1.4) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.092343454
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.092343454
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.874113298
            ELSE IF(middep(lay)-dep(1) >1.4 .AND. middep(lay)-dep(1) <=1.5) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.065513937
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.065513937
               _DIAG_VAR_S_(data%id_anc0(lay))  = 3.690556051
            ELSE IF(middep(lay)-dep(1) >1.5 .AND. middep(lay)-dep(1) <=1.6) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.047835573
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.047835573
               _DIAG_VAR_S_(data%id_anc0(lay))  = 2.724078941
            ELSE IF(middep(lay)-dep(1) >1.6 .AND. middep(lay)-dep(1) <=1.7) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.047835573
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.047835573
               _DIAG_VAR_S_(data%id_anc0(lay))  = 2.724078941
            ELSE IF(middep(lay)-dep(1) >1.7 .AND. middep(lay)-dep(1) <=1.8) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.065513937
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.065513937
               _DIAG_VAR_S_(data%id_anc0(lay))  = 1.945188106
            ELSE IF(middep(lay)-dep(1) >1.8 .AND. middep(lay)-dep(1) <=1.9) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.012478845
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.012478845
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.791124722
            ELSE IF(middep(lay)-dep(1) >1.9 .AND. middep(lay)-dep(1) <=2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.012478845
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.012478845
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.791124722
            ELSE IF(middep(lay)-dep(1) >2.0) THEN
-              _DIAG_VAR_S_(data%id_pass0(lay)) = 0.012478845
+              _DIAG_VAR_S_(data%id_pom0(lay)) = 0.012478845
               _DIAG_VAR_S_(data%id_anc0(lay))  = 0.791124722
            END IF
          END DO
@@ -1483,10 +1448,10 @@ SUBROUTINE SetSoilASSProfile(data, column, theSoil, PASSt, ANCt)
      END IF
 
 
-END SUBROUTINE SetSoilASSProfile
+END SUBROUTINE SetSoilPOMProfile
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 
 
-END MODULE aed2_ass
+END MODULE aed2_soilbgc
