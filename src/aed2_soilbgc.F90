@@ -41,10 +41,11 @@ MODULE aed2_soilbgc
       INTEGER :: id_soilbgctracer
 
       !# Environmental variables
-      INTEGER :: id_E_rain, id_E_area, id_E_matz, id_E_bath, id_E_salt, id_E_nearlevel
+      INTEGER :: id_E_rain, id_E_area, id_E_matz, id_E_bath, id_E_salt, id_E_nearlevel, id_E_airtemp
 
       !# Diagnostic variables
       INTEGER :: id_rwet, id_rchg, id_bflw, id_omox, id_so4r, id_pml, id_sflw
+      INTEGER :: id_atm_co2, id_atm_ch4, id_atm_n2o
 
       !# Dependant variable IDs
       INTEGER :: id_o_doc, id_c_dic
@@ -215,9 +216,9 @@ SUBROUTINE aed2_define_soilbgc(data, namlst)
    data%id_pml   = aed2_define_sheet_diag_variable('pml','m','past maximum groundwater level')
    data%id_wettime = aed2_define_sheet_diag_variable('wettime','day','time cell has been innundated')
    data%id_drytime = aed2_define_sheet_diag_variable('drytime','day','time cell has been exposed')
-   data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2','mmolC/m**2/d',  'co2 exchange to the atmosphere')
-   data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4','mmolC/m**2/d',  'ch2 exchange to the atmosphere')
-   data%id_atm_n2o = aed2_define_sheet_diag_variable('atm_n2o','mmolC/m**2/d',  'n2o exchange to the atmosphere')
+   data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2_flux','mmolC/m**2/d',  'co2 exchange to the atmosphere')
+   data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4_flux','mmolC/m**2/d',  'ch2 exchange to the atmosphere')
+   data%id_atm_n2o = aed2_define_sheet_diag_variable('atm_n2o_flux','mmolC/m**2/d',  'n2o exchange to the atmosphere')
 
    ! Register module dependencies
    IF ( .NOT. dom_link .EQ. '' ) &
@@ -246,6 +247,7 @@ SUBROUTINE aed2_define_soilbgc(data, namlst)
    data%id_E_bath = aed2_locate_global_sheet('bathy')       ! cell bathy
    data%id_E_salt = aed2_locate_global('salinity')          ! salinity of overlying water
    data%id_E_nearlevel= aed2_locate_global_sheet('nearest_depth')
+   data%id_E_airtemp =  aed2_locate_global_sheet('air_temp')
 
    ! Initialisation occurs in first call of calculate_riparian
 
@@ -297,7 +299,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
    AED_REAL,INTENT(in) :: pc_wet
 !
 !LOCALS
-   AED_REAL :: rain, salt, bathy, area, matz, soiltemp
+   AED_REAL :: rain, salt, bathy, area, matz, soiltemp, atem
    INTEGER  :: var, i, sub, omz
 
    AED_REAL :: newDOM, domFlux, DOMmnlzn, avgomox, pom_vol
@@ -328,6 +330,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
    bathy = _STATE_VAR_S_(data%id_E_bath)
    IF( ABS(bathy) > 1e9 ) RETURN
    rain = _STATE_VAR_S_(data%id_E_rain)
+   atem = _STATE_VAR_S_(data%id_E_airtemp)
    area = _STATE_VAR_S_(data%id_E_area)
    soiltemp = _STATE_VAR_S_(data%id_l_soiltemp)
 
@@ -415,7 +418,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
                                data%Rom(omz),    &
                                temp=soiltemp     )
 
-       POMt = zero_ 
+       POMt = zero_
        DO i=1,data%nlay
          POMt = POMt + _DIAG_VAR_S_(data%id_pom(i))
        ENDDO

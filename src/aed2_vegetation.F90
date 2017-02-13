@@ -28,7 +28,8 @@ MODULE aed2_vegetation
 !  aed2_vegetation --- multi-group vegetation model
 !-------------------------------------------------------------------------------
    USE aed2_core
-   USE aed2_util,ONLY : find_free_lun,aed2_bio_temp_function,fTemp_function,qsort
+   USE aed2_util !,ONLY : find_free_lun,aed2_bio_temp_function,fTemp_function,qsort
+   USE aed2_bio_utils
 
    IMPLICIT NONE
 
@@ -78,11 +79,12 @@ MODULE aed2_vegetation
       INTEGER  :: id_l_litter_land, id_l_litter_water
 
       !# Environmental variables
-      INTEGER :: id_E_rain, id_E_area, id_E_matz, id_E_bath, id_E_salt, id_E_nearlevel
+      INTEGER :: id_E_rain, id_E_area, id_E_matz, id_E_bath, id_E_salt, id_E_nearlevel, id_E_airtemp, id_E_I0
       AED_REAL,ALLOCATABLE :: active_zones(:)
 
       !# Diagnostic variables
       INTEGER :: id_l_lai, id_gpp, id_lfall, id_resp
+      INTEGER :: id_atm_co2
 
       !# Dependant variable IDs
       INTEGER :: id_l_depth, id_l_Sb, id_l_St, id_l_Ssat, id_l_theta, id_l_Stop, id_l_capz
@@ -290,11 +292,11 @@ SUBROUTINE aed2_define_vegetation(data, namlst)
    data%id_E_bath = aed2_locate_global_sheet('bathy')                 ! cell bathy
    data%id_E_salt = aed2_locate_global('salinity')                    ! salinity of overlying water
    data%id_E_nearlevel= aed2_locate_global_sheet('nearest_depth')
-   data%id_E_atem = aed2_locate_global_sheet('air_temp')
+   data%id_E_airtemp = aed2_locate_global_sheet('air_temp')
    data%id_E_I0 = aed2_locate_global_sheet('par_sf')
 
-   data%id_tem = aed2_locate_global('temperature')
-   data%id_dz = aed2_locate_global('layer_ht')
+!   data%id_tem = aed2_locate_global('temperature')
+!   data%id_dz = aed2_locate_global('layer_ht')
 
    !# NOTE: Initialisation occurs in first call of calculate_riparian
 
@@ -324,7 +326,7 @@ SUBROUTINE aed2_initialize_vegetation(data, column, layer_idx)
 
    DO veg_i=1,data%num_veg
      ! Retrieve current (local) sta te variable values
-     _STATE_VAR_S_(data%id_veg(veg_i)) = _DIAG_VAR_S_(data%id_lai) / data%num_veg
+     _STATE_VAR_S_(data%id_veg(veg_i)) = _DIAG_VAR_S_(data%id_l_lai) / data%num_veg
    END DO
 
 
@@ -344,11 +346,11 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
    AED_REAL,                      INTENT(in)    :: pc_wet
 !
 !LOCALS
-   INTEGER            :: veg_i
-   AED_REAL           :: veg, pc_cover, lai !State variables
-   AED_REAL           :: photsynthesis, respiration, mortality !Growth & decay functions
-   AED_REAL           :: tveg, atemp, salinity, Io, theta, phreatic_depth, matz
-   AED_REAL           :: fI, fT, fSal, fW
+   INTEGER  :: veg_i
+   AED_REAL :: veg, pc_cover, lai !State variables
+   AED_REAL :: veg_flux, photsynthesis, respiration, mortality, litterfall
+   AED_REAL :: tveg, atemp, salinity, Io, theta, phreatic_depth, matz
+   AED_REAL :: fI, fT, fSal, fW
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -358,14 +360,14 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
    if ( .NOT. in_zone_set(matz, data%active_zones) ) return
 
    ! Retrieve current environmental conditions
-   atemp = _STATE_VAR_(data%id_E_atem)      ! local air temperature
+   atemp = _STATE_VAR_(data%id_E_airtemp)      ! local air temperature
    salinity = _STATE_VAR_(data%id_E_salt)   ! local salinity
    Io = _STATE_VAR_S_(data%id_E_I0)         ! surface short wave radiation
    theta = _STATE_VAR_S_(data%id_l_theta)   ! soil moisture in the unsaturated zone
    phreatic_depth = _STATE_VAR_S_(data%id_l_phreatic)   ! depth to water table
 
    ! Initialise cumulative biomass diagnostics
-   _DIAG_VAR_S_(data%id_lai) = zero_
+   _DIAG_VAR_S_(data%id_l_lai) = zero_
    _DIAG_VAR_S_(data%id_atm_co2) = zero_
    tveg = zero_
 
@@ -384,7 +386,7 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
       IF( Io <100 ) fI = 0.0
 
       ! Temperature
-      fT   = 1.03 ** (atem-20.)
+      fT   = 1.03 ** (atemp-20.)
 
       ! Water availability
       IF(pc_wet<0.1) THEN
@@ -393,7 +395,7 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
       ELSE
         ! Depending on species, innundation limites ability for photosynthesis
         fW   = 0.
-        IF (data%growthForm == 3 ) THEN !!?
+        IF (data%vegdata(veg_i)%growthForm == 3 ) THEN !!?
           fW   = 1.
         ENDIF
       ENDIF
@@ -404,12 +406,12 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
       fSal = 1.0
 
       ! Respiration and general metabolic loss
-      respiration = bio_respiration(data%vegdata(veg_i)%R_resp, data%vegdata(veg_i)%theta_resp, atem) * fSal
+      respiration = bio_respiration(data%vegdata(veg_i)%R_resp, data%vegdata(veg_i)%theta_resp, atemp) * fSal
 
-      litterfall = bio_respiration(0.003, 1.10, atem)
+      litterfall = bio_respiration(0.003, 1.10, atemp)
 
       IF( .NOT.data%simStaticBiomass ) THEN
-        veg_flux = (photsynthesis - respiration - litterfall * veg * pc_cover
+        veg_flux = (photsynthesis - respiration - litterfall) * veg * pc_cover
 
         ! Set bottom fluxes for the pelagic (change per surface area per second)
         _FLUX_VAR_B_(data%id_veg(veg_i)) = _FLUX_VAR_B_(data%id_veg(veg_i)) + veg_flux
@@ -422,7 +424,7 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
           _FLUX_VAR_B_(data%id_l_litter_land) = _FLUX_VAR_B_(data%id_l_litter_land) + litterfall*veg*pc_cover
         ELSE
           ! Drop literfall into water organic matter
-          _FLUX_VAR_A_(data%id_l_litter_water) = _FLUX_VAR_A_(data%id_l_litter_water) + litterfall*veg*pc_cover
+          _FLUX_VAR_T_(data%id_l_litter_water) = _FLUX_VAR_T_(data%id_l_litter_water) + litterfall*veg*pc_cover
         ENDIF
       ENDIF
 
@@ -434,7 +436,7 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
       tveg = tveg + veg
    ENDDO
 
-   _DIAG_VAR_S_(id_l_lai) = tveg
+   _DIAG_VAR_S_(data%id_l_lai) = tveg
 
 
 END SUBROUTINE aed2_calculate_riparian_vegetation
@@ -454,7 +456,7 @@ SUBROUTINE aed2_light_shading_vegetation(data,column,layer_idx,shade_frac)
    AED_REAL,INTENT(inout) :: shade_frac
 !
 !LOCALS
-   AED_REAL :: veg
+   AED_REAL :: veg, lai
    INTEGER  :: veg_i
 !
 !-------------------------------------------------------------------------------
@@ -466,7 +468,7 @@ SUBROUTINE aed2_light_shading_vegetation(data,column,layer_idx,shade_frac)
 
    ! needs updating for overstorey vs understory
 
-   lai = _DIAG_VAR_S_(id_l_lai)
+   lai = _DIAG_VAR_S_(data%id_l_lai)
 
    ! Self-shading with explicit contribution from background OM concentration.
    shade_frac = shade_frac + (1.-exp(-0.005*lai))
@@ -475,9 +477,7 @@ END SUBROUTINE aed2_light_shading_vegetation
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
-!###############################################################################
-SUBROUTINE aed2_rain_loss_vegetation(data,column,layer_idx,interception)
+SUBROUTINE aed2_rain_loss_vegetation(data,column,layer_idx,infil)
 !-------------------------------------------------------------------------------
 ! Get the soil moisture deficit, so host model can infiltrate rain accordingly
 !-------------------------------------------------------------------------------
@@ -485,17 +485,16 @@ SUBROUTINE aed2_rain_loss_vegetation(data,column,layer_idx,interception)
    CLASS (aed2_vegetation_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
-   AED_REAL,INTENT(inout) :: interception
+   AED_REAL,INTENT(inout) :: infil
 !LOCALS
    AED_REAL :: smd
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   !interception = some f(LAI)
-   interception = data%int_max * ( _DIAG_VAR_S_(id_lai)/data%lai_max )
+   infil = data%int_max * ( _DIAG_VAR_S_(data%id_l_lai)/data%lai_max )
 
 END SUBROUTINE aed2_rain_loss_vegetation
-!!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 
@@ -522,6 +521,7 @@ AED_REAL , PARAMETER :: CCmax=0.0016   !running 1988 m/s max canopy conductance 
 AED_REAL , PARAMETER :: Cair=7.10e-4   !Lohamar 1980 kg/m3  6.98
 AED_REAL , PARAMETER :: Cleaf=0.        !Lohamar 1980 kg/m3
 AED_REAL , PARAMETER :: lat=32.
+AED_REAL :: drad, CMq, CMt, CM, CMmax, CC, dayl, psn
 
 !relation betweem biomass and litterfall
 ! kl3u=10*10^-5;
@@ -543,7 +543,7 @@ AED_REAL , PARAMETER :: lat=32.
   if (CMq>1.) CMq=1.0
   if (CMq<0.) CMq=0.0
 
-  CMt=((tmax-temp)*(temp-tmin))/tmax^2;
+  CMt=((tmax-temp)*(temp-tmin))/(tmax*tmax)
   if (CMt>1.) CMt=1.0
   if (CMt<0.) CMt=0.0
 

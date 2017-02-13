@@ -25,6 +25,7 @@ MODULE aed2_nitrogen
 ! Nitrogen module contains equations for nitrification and deitrification
 !-------------------------------------------------------------------------------
    USE aed2_core
+   USE aed2_util,  ONLY: aed2_gas_piston_velocity
 
    IMPLICIT NONE
 
@@ -35,15 +36,16 @@ MODULE aed2_nitrogen
    TYPE,extends(aed2_model_data_t) :: aed2_nitrogen_data_t
       !# Variable identifiers
       INTEGER  :: id_nit, id_amm, id_n2o
-      INTEGER  :: id_oxy,id_denit_product
-      INTEGER  :: id_temp, id_salt
-      INTEGER  :: id_Fsed_amm,id_Fsed_nit
-      INTEGER  :: id_nitrif,id_denit
-      INTEGER  :: id_sed_amm,id_sed_nit
+      INTEGER  :: id_oxy, id_denit_product
+      INTEGER  :: id_temp, id_salt, id_wind
+      INTEGER  :: id_Fsed_amm, id_Fsed_nit
+      INTEGER  :: id_nitrif, id_denit
+      INTEGER  :: id_sed_amm, id_sed_nit
+      INTEGER  :: id_atm_n2o
 
       !# Model parameters
       AED_REAL :: Rnitrif,Rdenit,Fsed_amm,Fsed_nit,Knitrif,Kdenit,Ksed_amm,Ksed_nit, &
-                          theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit
+                  theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit, Cn2o_atm
       LOGICAL  :: use_oxy,use_no2,use_sed_model_amm, use_sed_model_nit
       LOGICAL  :: simN2O
 
@@ -98,6 +100,7 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    AED_REAL          :: theta_denit = 1.0
    AED_REAL          :: theta_sed_amm = 1.0
    AED_REAL          :: theta_sed_nit = 1.0
+   AED_REAL          :: Cn2o_atm = 1.0
    CHARACTER(len=64) :: nitrif_reactant_variable=''
    CHARACTER(len=64) :: denit_product_variable=''
    CHARACTER(len=64) :: Fsed_amm_variable=''
@@ -112,7 +115,7 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
                     theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit, &
                     nitrif_reactant_variable,denit_product_variable,      &
                     Fsed_amm_variable, Fsed_nit_variable,                 &
-                    simN2O
+                    simN2O, Cn2o_atm
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -140,6 +143,7 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    data%theta_denit  = theta_denit
    data%theta_sed_amm = theta_sed_amm
    data%theta_sed_nit = theta_sed_nit
+   data%Cn2o_atm = Cn2o_atm
 
 
    ! Register state variables
@@ -173,18 +177,23 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
 
 
    ! Register diagnostic variables
-   data%id_nitrif = aed2_define_diag_variable('nitrif','mmol/m**3/d',       &
+   data%id_nitrif = aed2_define_diag_variable('nitrif','mmol/m**3/d', &
                                                          'nitrification rate')
-   data%id_denit = aed2_define_diag_variable('denit','mmol/m**3/d',         &
+   data%id_denit = aed2_define_diag_variable('denit','mmol/m**3/d', &
                                                          'de-nitrification rate')
-   data%id_sed_amm = aed2_define_sheet_diag_variable('sed_amm','mmol/m**2/d',      &
+   data%id_sed_amm = aed2_define_sheet_diag_variable('sed_amm','mmol/m**2/d', &
                                                          'ammonium sediment flux')
-   data%id_sed_nit = aed2_define_sheet_diag_variable('sed_nit','mmol/m**2/d',      &
+   data%id_sed_nit = aed2_define_sheet_diag_variable('sed_nit','mmol/m**2/d', &
                                                          'nitrate sediment flux')
+   data%id_atm_n2o = aed2_define_sheet_diag_variable('atm_n2o_flux','mmol/m**2/d', &
+                                                     'N2O atmospheric flux')
 
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
    data%id_salt = aed2_locate_global('salinity')
+   data%id_wind = aed2_locate_global_sheet('wind_speed') ! Wind speed at 10 m above surface (m/s)
+
+   ! check here to see if oxy is simulated if simN2O is also on
 
 
 END SUBROUTINE aed2_define_nitrogen
@@ -247,6 +256,60 @@ END SUBROUTINE aed2_calculate_nitrogen
 
 
 !###############################################################################
+SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
+!-------------------------------------------------------------------------------
+! Air-water exchange for the aed nitrogen model (N2O)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_nitrogen_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   ! Environment
+   AED_REAL :: temp, salt, wind
+
+   ! State
+   AED_REAL :: n2o
+
+   ! Temporary variables
+   AED_REAL :: n2o_atm_flux = zero_
+   AED_REAL :: Cn2o_air = zero_    !N2O in the air phase
+   AED_REAL :: kn2o_trans = zero_
+   AED_REAL :: windHt
+   AED_REAL :: f_pres  = 1.0      ! Pressure correction function only applicable at high altitudes
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+
+   IF( .NOT.data%simN2O ) RETURN
+
+   !Get dependent state variables from physical driver
+   temp = _STATE_VAR_(data%id_temp)    ! Temperature (degrees Celsius)
+   salt = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
+   wind = _STATE_VAR_S_(data%id_wind) ! Wind speed at 10 m above surface (m/s)
+   windHt = 10.
+
+    ! Retrieve current (local) state variable values.
+   n2o = _STATE_VAR_(data%id_n2o)! Concentration of oxygen in surface layer
+
+   kn2o_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt)
+
+   ! First get the oxygen concentration in the air phase at interface
+   ! Taken from Riley and Skirrow (1974)
+   f_pres = 1.0
+   Cn2o_air = data%Cn2o_atm  ! f_pres * aed2_n2o_sat(salt,temp)
+
+   ! Get the oxygen flux
+   n2o_atm_flux = kn2o_trans * (Cn2o_air - n2o)
+
+   ! Transfer surface exchange value to AED2 (mmmol/m2) converted by driver.
+   _FLUX_VAR_T_(data%id_n2o) = n2o_atm_flux
+
+   ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2).
+   _DIAG_VAR_S_(data%id_atm_n2o) = n2o_atm_flux
+
+END SUBROUTINE aed2_calculate_surface_nitrogen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
