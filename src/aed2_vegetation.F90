@@ -67,39 +67,44 @@ MODULE aed2_vegetation
      AED_REAL      :: X_ncon
      AED_REAL      :: K_P
      AED_REAL      :: X_pcon
+     !
+     !AED_REAL      :: root ...
    END TYPE
 
    TYPE,extends(aed2_model_data_t) :: aed2_vegetation_data_t
       !# Variable identifiers
       INTEGER  :: id_veg(MAX_VEG_TYPES)
       INTEGER  :: id_vegfrac(MAX_VEG_TYPES)
-      INTEGER  :: id_l_litter_land,id_l_litter_water
+      INTEGER  :: id_l_litter_land, id_l_litter_water
 
       !# Environmental variables
       INTEGER :: id_E_rain, id_E_area, id_E_matz, id_E_bath, id_E_salt, id_E_nearlevel
+      AED_REAL,ALLOCATABLE :: active_zones(:)
 
       !# Diagnostic variables
-      INTEGER :: id_lai, id_gpp, id_lfall, id_resp
+      INTEGER :: id_l_lai, id_gpp, id_lfall, id_resp
 
       !# Dependant variable IDs
       INTEGER :: id_l_depth, id_l_Sb, id_l_St, id_l_Ssat, id_l_theta, id_l_Stop, id_l_capz
       INTEGER :: id_l_phreatic, id_l_qss, id_l_qse, id_l_qcap, id_l_qper, id_l_wt
       INTEGER :: id_l_soiltemp
 
-
       !# Model parameters
-      INTEGER  :: num_veg
+      INTEGER  :: num_veg, n_zones
       LOGICAL  :: simLitterLand, simLitterWater
       LOGICAL  :: simVegFeedback, simStaticBiomass, simVegFrac
       TYPE(macrophyte_data),DIMENSION(:),ALLOCATABLE :: vegdata
+      AED_REAL :: int_max, lai_max
 
      CONTAINS
          PROCEDURE :: define             => aed2_define_vegetation
          PROCEDURE :: calculate_riparian => aed2_calculate_riparian_vegetation
+!        PROCEDURE :: calculate_dry      => aed2_calculate_riparian_vegetation
 !        PROCEDURE :: calculate_benthic  => aed2_calculate_benthic_vegetation
 !        PROCEDURE :: mobility           => aed2_mobility_vegetation
 !        PROCEDURE :: light_extinction   => aed2_light_extinction_vegetation
-!        PROCEDURE :: light_shading      => aed2_light_shading_vegetation
+         PROCEDURE :: rain_loss          => aed2_rain_loss_vegetation
+         PROCEDURE :: light_shading      => aed2_light_shading_vegetation
 !        PROCEDURE :: delete             => aed2_delete_vegetation
 
    END TYPE
@@ -205,24 +210,36 @@ SUBROUTINE aed2_define_vegetation(data, namlst)
    INTEGER  :: num_veg
    INTEGER  :: the_veg(MAX_VEG_TYPES)
    LOGICAL  :: simVegFeedback, simStaticBiomass, simVegFrac
+   INTEGER  :: n_zones = 0, active_zones(MAX_ZONES), i
+   CHARACTER(len=64)  :: lai_link_variable = 'LND_lai'
    CHARACTER(len=64)  :: litter_target_variable_land  = ''
    CHARACTER(len=64)  :: litter_target_variable_water = ''
    CHARACTER(len=128) :: dbase='aed2_vegetation_pars.nml'
+   AED_REAL :: int_max, lai_max
 
-   NAMELIST /aed2_vegetation/ num_veg, the_veg, dbase, &
+   NAMELIST /aed2_vegetation/ num_veg, the_veg, dbase, n_zones, active_zones,  &
                               litter_target_variable_land, litter_target_variable_water, &
-                              simVegFeedback, simStaticBiomass, simVegFrac
+                              simVegFeedback, simStaticBiomass, simVegFrac, &
+                              int_max, lai_max, lai_link_variable
 
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_vegetation initialization"
-   print *,"  WARNING! aed2_vegetation model is currently under development"
 
    ! Read the namelist
    read(namlst,nml=aed2_vegetation,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_vegetation'
 
-    data%num_veg = 0
+   data%num_veg = 0
+   data%int_max = int_max; data%lai_max = lai_max
+
+   data%n_zones = n_zones
+   IF (n_zones > 0) THEN
+       ALLOCATE(data%active_zones(n_zones))
+       DO i=1,n_zones
+          data%active_zones(i) = active_zones(i)
+       ENDDO
+   ENDIF
 
    ! Store species specific parameter values in modules own derived type
    ! NB: all rates must be provided in values per day,
@@ -239,13 +256,18 @@ SUBROUTINE aed2_define_vegetation(data, namlst)
      data%id_l_litter_water = aed2_locate_variable(litter_target_variable_water)
    ENDIF
 
+
    ! Register diagnostic variables
-   data%id_lai   = aed2_define_sheet_diag_variable('lai','mmolC/m**2/d',  'vegetation LAI')
+   IF ( lai_link_variable .EQ. '' ) &
+   data%id_l_lai = aed2_define_sheet_diag_variable('lai','mmolC/m**2/d',  'vegetation LAI')
    data%id_gpp   = aed2_define_sheet_diag_variable('gpp','mmolC/m**2/d',  'net vegetation productivity')
    data%id_resp  = aed2_define_sheet_diag_variable('resp','mmolC/m**2/d','net vegetation respiration')
    data%id_lfall = aed2_define_sheet_diag_variable('lfall','mmolC/m**2/d','net vegetation mortality')
+   data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2','mmolC/m**2/d',  'co2 exchange to the atmosphere')
 
    ! Register module dependencies
+   IF ( .NOT. lai_link_variable .EQ. '' ) &
+   data%id_l_lai      = aed2_locate_global_sheet(TRIM(lai_link_variable))
    data%id_l_depth    = aed2_locate_global_sheet('LND_depth')         !,'m','soil depth (to datum)')
    data%id_l_phreatic = aed2_locate_global_sheet('LND_phreatic')      !,'m','depth of phreatic surface below surface')
    data%id_l_wt       = aed2_locate_global_sheet('LND_wt')            !,'m','depth of phreatic surface below surface')
@@ -268,10 +290,45 @@ SUBROUTINE aed2_define_vegetation(data, namlst)
    data%id_E_bath = aed2_locate_global_sheet('bathy')                 ! cell bathy
    data%id_E_salt = aed2_locate_global('salinity')                    ! salinity of overlying water
    data%id_E_nearlevel= aed2_locate_global_sheet('nearest_depth')
+   data%id_E_atem = aed2_locate_global_sheet('air_temp')
+   data%id_E_I0 = aed2_locate_global_sheet('par_sf')
+
+   data%id_tem = aed2_locate_global('temperature')
+   data%id_dz = aed2_locate_global('layer_ht')
 
    !# NOTE: Initialisation occurs in first call of calculate_riparian
 
 END SUBROUTINE aed2_define_vegetation
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_initialize_vegetation(data, column, layer_idx)
+!-------------------------------------------------------------------------------
+! Routine to set initial state of ASS variables                                !
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_vegetation_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   INTEGER :: veg_i
+!-------------------------------------------------------------------------------
+!BEGIN
+   !---------------------------------------------------------------------------
+!   ! Prime local cell hydrology object with data from global arrays
+!   CALL SetSoilHydrology(data, column, SoilCol)
+
+   !---------------------------------------------------------------------------
+
+   DO veg_i=1,data%num_veg
+     ! Retrieve current (local) sta te variable values
+     _STATE_VAR_S_(data%id_veg(veg_i)) = _DIAG_VAR_S_(data%id_lai) / data%num_veg
+   END DO
+
+
+END SUBROUTINE aed2_initialize_vegetation
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -287,30 +344,100 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
    AED_REAL,                      INTENT(in)    :: pc_wet
 !
 !LOCALS
-   AED_REAL           :: veg,temp,salinity !State variables
-   AED_REAL           :: phy_INcon(MAX_ZOOP_PREY), phy_IPcon(MAX_ZOOP_PREY) !Internal nutrients for veg groups
-   AED_REAL           :: dn_excr, dp_excr, dc_excr !Excretion state variables
-   AED_REAL           :: pon, pop, poc             !Mortaility and literfall state variables
-   AED_REAL           :: FGrowth_Limitation, f_Temp, f_Salinity
-   AED_REAL           :: photsynthesis, respiration, mortality !Growth & decay functions
-   AED_REAL           :: pon_excr, pop_excr, poc_excr !POM excretion rates
-   AED_REAL           :: don_excr, dop_excr, doc_excr, delta_C !DOM excretion rates
    INTEGER            :: veg_i
-
-   !CAB added
-   AED_REAL :: f_dens, W, Imax, psuedofaeces, ingestion, excretion, egestion, iteg, R20, oxy
-
+   AED_REAL           :: veg, pc_cover, lai !State variables
+   AED_REAL           :: photsynthesis, respiration, mortality !Growth & decay functions
+   AED_REAL           :: tveg, atemp, salinity, Io, theta, phreatic_depth, matz
+   AED_REAL           :: fI, fT, fSal, fW
 !
 !-------------------------------------------------------------------------------
 !BEGIN
 
-RETURN
-   ! Retrieve current environmental conditions.
+   ! Check this cell is in an active zone for macrophytes
+   matz = _STATE_VAR_S_(data%id_E_matz)
+   if ( .NOT. in_zone_set(matz, data%active_zones) ) return
+
+   ! Retrieve current environmental conditions
+   atemp = _STATE_VAR_(data%id_E_atem)      ! local air temperature
    salinity = _STATE_VAR_(data%id_E_salt)   ! local salinity
+   Io = _STATE_VAR_S_(data%id_E_I0)         ! surface short wave radiation
+   theta = _STATE_VAR_S_(data%id_l_theta)   ! soil moisture in the unsaturated zone
+   phreatic_depth = _STATE_VAR_S_(data%id_l_phreatic)   ! depth to water table
+
+   ! Initialise cumulative biomass diagnostics
+   _DIAG_VAR_S_(data%id_lai) = zero_
+   _DIAG_VAR_S_(data%id_atm_co2) = zero_
+   tveg = zero_
+
+   DO veg_i=1,data%num_veg
+      ! Retrieve current (local) state variable values
+      veg = _STATE_VAR_S_(data%id_veg(veg_i)) ! vegetation group i
+      pc_cover = _STATE_VAR_S_(data%id_vegfrac(veg_i)) ! vegetation cover i
+
+      !# Photosynthesis
+      !extc = _STATE_VAR_(data%id_extc)
+      !dz   = _STATE_VAR_(data%id_dz)     ! dz = 0.5
+      !fI   = photosynthesis_irradiance(data%mphydata(mphy_i)%lightModel, &
+                    ! data%mphydata(mphy_i)%I_K, data%mphydata(mphy_i)%I_S, par, extc, Io, dz)
+      ! Light
+      fI   = 1.0 * (Io/2000.)
+      IF( Io <100 ) fI = 0.0
+
+      ! Temperature
+      fT   = 1.03 ** (atem-20.)
+
+      ! Water availability
+      IF(pc_wet<0.1) THEN
+        ! Photosynthesis depends on vadose zone soil moisture availability
+        fW   = MAX(zero_, (-4.3717 * theta * theta + 5.1364 * theta - 0.5455))
+      ELSE
+        ! Depending on species, innundation limites ability for photosynthesis
+        fW   = 0.
+        IF (data%growthForm == 3 ) THEN !!?
+          fW   = 1.
+        ENDIF
+      ENDIF
+
+      photsynthesis = data%vegdata(veg_i)%R_growth * fI * fT * fW
+
+      ! Salinity stress effect on respiration
+      fSal = 1.0
+
+      ! Respiration and general metabolic loss
+      respiration = bio_respiration(data%vegdata(veg_i)%R_resp, data%vegdata(veg_i)%theta_resp, atem) * fSal
+
+      litterfall = bio_respiration(0.003, 1.10, atem)
+
+      IF( .NOT.data%simStaticBiomass ) THEN
+        veg_flux = (photsynthesis - respiration - litterfall * veg * pc_cover
+
+        ! Set bottom fluxes for the pelagic (change per surface area per second)
+        _FLUX_VAR_B_(data%id_veg(veg_i)) = _FLUX_VAR_B_(data%id_veg(veg_i)) + veg_flux
+      ENDIF
+      IF( data%simVegFeedback ) THEN
+        !    _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + mphy_flux
+        !    _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) - mphy_flux
+        IF(pc_wet<0.1) THEN
+          ! Drop literfall in soil litter
+          _FLUX_VAR_B_(data%id_l_litter_land) = _FLUX_VAR_B_(data%id_l_litter_land) + litterfall*veg*pc_cover
+        ELSE
+          ! Drop literfall into water organic matter
+          _FLUX_VAR_A_(data%id_l_litter_water) = _FLUX_VAR_A_(data%id_l_litter_water) + litterfall*veg*pc_cover
+        ENDIF
+      ENDIF
+
+      ! Export diagnostic variables
+      _DIAG_VAR_S_(data%id_atm_co2) = _DIAG_VAR_S_(data%id_atm_co2) + (respiration-photsynthesis)*veg*pc_cover
+      _DIAG_VAR_S_(data%id_gpp) = _DIAG_VAR_S_(data%id_gpp) + photsynthesis*veg*pc_cover
+      _DIAG_VAR_S_(data%id_resp) = _DIAG_VAR_S_(data%id_resp) + respiration*veg*pc_cover
+      _DIAG_VAR_S_(data%id_lfall) = _DIAG_VAR_S_(data%id_lfall) + litterfall*veg*pc_cover
+      tveg = tveg + veg
+   ENDDO
+
+   _DIAG_VAR_S_(id_l_lai) = tveg
 
 
 END SUBROUTINE aed2_calculate_riparian_vegetation
-!END SUBROUTINE aed2_calculate_benthic_vegetation
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -333,76 +460,109 @@ SUBROUTINE aed2_light_shading_vegetation(data,column,layer_idx,shade_frac)
 !-------------------------------------------------------------------------------
 !BEGIN
    ! Retrieve current (local) state variable values.
-   DO veg_i=1,data%num_veg
-     veg = veg + _STATE_VAR_S_(data%id_veg(veg_i))
-   END DO
+   !DO veg_i=1,data%num_veg
+   !   veg = veg + _STATE_VAR_S_(data%id_veg(veg_i))
+   !END DO
+
+   ! needs updating for overstorey vs understory
+
+   lai = _DIAG_VAR_S_(id_l_lai)
 
    ! Self-shading with explicit contribution from background OM concentration.
-   shade_frac = shade_frac + veg*0.0001 !coefficient
+   shade_frac = shade_frac + (1.-exp(-0.005*lai))
 
 END SUBROUTINE aed2_light_shading_vegetation
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 
-
 !###############################################################################
-FUNCTION aed2_vegetation_respiration(data,veg_i,iteg,temp,sal) RESULT(resp)
+SUBROUTINE aed2_rain_loss_vegetation(data,column,layer_idx,interception)
+!-------------------------------------------------------------------------------
+! Get the soil moisture deficit, so host model can infiltrate rain accordingly
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed2_vegetation_data_t),INTENT(in) :: data  ! Module data, with params
-   INTEGER  :: veg_i ! Invertebrate group
-   AED_REAL, INTENT(IN)                :: temp  ! Temp value being used
-   AED_REAL, INTENT(IN)                :: sal   ! Salinity value being used
-   AED_REAL, INTENT(IN)                :: iteg  ! Ingestion-Egestion
-!
+   CLASS (aed2_vegetation_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: interception
 !LOCALS
-   AED_REAL :: W, TmaxR, maxTR, VV,WW,YY,XX,fT
-   AED_REAL :: resp, Q, R20
-!
+   AED_REAL :: smd
+
 !-------------------------------------------------------------------------------
 !BEGIN
+   !interception = some f(LAI)
+   interception = data%int_max * ( _DIAG_VAR_S_(id_lai)/data%lai_max )
 
-     !Make this better
-     resp = data%vegdata(veg_i)%R_resp
-
-!   ! Get the salinity limitation.
-!   resp = resp * fSalinity_Limitation(data%vegdata,veg_i,sal)
-
-
-END FUNCTION aed2_vegetation_respiration
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
+END SUBROUTINE aed2_rain_loss_vegetation
+!!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 
 !###############################################################################
-PURE AED_REAL FUNCTION fTemp_function_veg(data,veg,temp)
+PURE AED_REAL FUNCTION vegetation_photosynthesis(data,rsa2,temp,kR2,yearday)
+  !function x=p_a(rsa2,temp,kR2,yearday)
 !-------------------------------------------------------------------------------
-! Temperature growth multiplier for vegdata
+!%%%######          Running and Coughlan, 1998             #####
+!% %%%######         Lohammar et al., 1980                  #####
+!% %%%%%%%%%%%%%%%%    ASSIMILATION      %%%%%%%%%%%%%%%%%%%%%%%%%%
 !
 !ARGUMENTS
-   CLASS (aed2_vegetation_data_t),INTENT(in) :: data  ! Module data, with params
-   INTEGER, INTENT(in)                 :: veg   ! Veg functional group
-   AED_REAL, INTENT(IN)                :: temp  ! Temp value being used
+CLASS (aed2_vegetation_data_t),INTENT(in) :: data  ! Module data, with params
+AED_REAL, INTENT(IN) :: rsa2,temp,kR2,yearday
 !
 !LOCALS
-   AED_REAL , PARAMETER :: a = 1.00
-   AED_REAL             :: MINt,Tmin,Tmax,MAXt
+AED_REAL , PARAMETER :: ext=0.5
+AED_REAL , PARAMETER :: lai_proj=2.2   !2.2 is the coef that changes lai to projected lai in running 1988
+AED_REAL , PARAMETER :: Q0=432.         !running 1988 kJ/m2d
+AED_REAL , PARAMETER :: Q05=9730.       !running 1988 kJ/m2d
+AED_REAL , PARAMETER :: tmax=37.        !running 1988 cent.
+AED_REAL , PARAMETER :: tmin=0.         !running 1988
+AED_REAL , PARAMETER :: CCmax=0.0016   !running 1988 m/s max canopy conductance of CO2
+AED_REAL , PARAMETER :: Cair=7.10e-4   !Lohamar 1980 kg/m3  6.98
+AED_REAL , PARAMETER :: Cleaf=0.        !Lohamar 1980 kg/m3
+AED_REAL , PARAMETER :: lat=32.
 
+!relation betweem biomass and litterfall
+! kl3u=10*10^-5;
+! krt2u=10^-6;
+! krt3u=2*10^-6;
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-       fTemp_function_veg = zero_
+  drad=rsa2    !drad=canopy average daily radiation MJ/m2d
 
- END FUNCTION fTemp_function_veg
+  !instead of using running attenuation, i'm using the canopy radiation
+  !from Feikema et al, 2010:how much is absorved by canopy 2=overstory;
+  !3=understory; but the rest is like running
+  ! I'm multipling by 10^3 because the parameters
+  !Q0 and Q0.5 are in kJ/m2d and rsa2 is in MJ/m2d!
+
+  CMq=(drad*1e3-Q0)/(drad*1e3+Q05)
+
+  if (CMq>1.) CMq=1.0
+  if (CMq<0.) CMq=0.0
+
+  CMt=((tmax-temp)*(temp-tmin))/tmax^2;
+  if (CMt>1.) CMt=1.0
+  if (CMt<0.) CMt=0.0
+
+  CM=CMq*CMt*CMmax
+  if (CM>1.) CM=1.
+
+  CC=CCmax*kR2
+  if (CC>1.) CC=1.0
+
+  dayl=((exp(7.42+0.045*lat))*(sin(yearday-79)*0.01721)+43200);
+
+  PSN=((CC*CM)/(CC+CM))*dayl !potential Canopy photosynthesis [m]
+  if ( (CC+CM)==0. ) PSN=0.
+  !% if PSN<0;PSN=0;end;
+  !% if PSN>0.02;PSN=0.02;end;
+  vegetation_photosynthesis=PSN
+
+END FUNCTION vegetation_photosynthesis
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-
-
 
 
 

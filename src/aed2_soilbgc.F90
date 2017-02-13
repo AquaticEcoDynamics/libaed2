@@ -215,6 +215,9 @@ SUBROUTINE aed2_define_soilbgc(data, namlst)
    data%id_pml   = aed2_define_sheet_diag_variable('pml','m','past maximum groundwater level')
    data%id_wettime = aed2_define_sheet_diag_variable('wettime','day','time cell has been innundated')
    data%id_drytime = aed2_define_sheet_diag_variable('drytime','day','time cell has been exposed')
+   data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2','mmolC/m**2/d',  'co2 exchange to the atmosphere')
+   data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4','mmolC/m**2/d',  'ch2 exchange to the atmosphere')
+   data%id_atm_n2o = aed2_define_sheet_diag_variable('atm_n2o','mmolC/m**2/d',  'n2o exchange to the atmosphere')
 
    ! Register module dependencies
    IF ( .NOT. dom_link .EQ. '' ) &
@@ -392,9 +395,15 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
        !-----------------------------------------------------------------------!
        !-- Update surface litter
        litter = _STATE_VAR_S_(data%id_litter)
-       decomposition = litter * 0.01/86400
+       decomposition = litter * 0.01/86400 * 1.08**(atem-20.)
+
        _FLUX_VAR_B_(data%id_litter) = _FLUX_VAR_B_(data%id_litter) - decomposition
 
+       ! Partition decomposition into CO2 flux, DOM creation and addtion to soil POM
+       _DIAG_VAR_S_(data%id_atm_co2) = 0.69*decomposition  ! assume mainly aerobic
+       _DIAG_VAR_S_(data%id_atm_n2o) = 0.01*decomposition  ! assume mainly aerobic
+       _DIAG_VAR_S_(data%id_pom(1)) = _DIAG_VAR_S_(data%id_pom(1)) + 0.25*decomposition
+       UZDOM =  UZDOM + 0.05*decomposition
 
        !-----------------------------------------------------------------------!
        !-- Change in POM due to change Water Table & then oxidise
@@ -406,7 +415,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
                                data%Rom(omz),    &
                                temp=soiltemp     )
 
-       POMt = zero_
+       POMt = zero_ 
        DO i=1,data%nlay
          POMt = POMt + _DIAG_VAR_S_(data%id_pom(i))
        ENDDO
