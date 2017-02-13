@@ -37,7 +37,7 @@ MODULE aed2_land
       INTEGER :: id_tracer, id_erosion
       INTEGER :: id_St, id_Ssat, id_Scap, id_Strn, id_Stop, id_Theta, id_smd
       INTEGER :: id_Phreatic, id_wt, id_Ucap, id_dh
-      INTEGER :: id_soiltemp_10cm
+      INTEGER :: id_soiltemp_10cm, id_lai
 
       !# Environmental variables
       INTEGER :: id_E_rain,id_E_area,id_E_height,id_E_density,id_E_material,id_E_temp, &
@@ -200,6 +200,8 @@ SUBROUTINE aed2_define_land(data, namlst)
    data%id_tp =       aed2_define_sheet_diag_variable('tp','sec','equivalent time on the Horton curve')
    !-- soil temperature and salinity
    data%id_soiltemp_10cm = aed2_define_sheet_diag_variable('soiltemp_10cm','degC','soiltemp_10cm')
+   !-- vegetation
+   data%id_lai =      aed2_define_sheet_diag_variable('lai','m2/m2','leaf area index')
    !-- outputs for debugging
    data%id_rain =     aed2_define_sheet_diag_variable('rain','m','input rain')
    data%id_evap =     aed2_define_sheet_diag_variable('evap','m','input rain')

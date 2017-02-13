@@ -360,8 +360,8 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
    if ( .NOT. in_zone_set(matz, data%active_zones) ) return
 
    ! Retrieve current environmental conditions
-   atemp = _STATE_VAR_(data%id_E_airtemp)      ! local air temperature
    salinity = _STATE_VAR_(data%id_E_salt)   ! local salinity
+   atemp = _STATE_VAR_S_(data%id_E_airtemp)      ! local air temperature
    Io = _STATE_VAR_S_(data%id_E_I0)         ! surface short wave radiation
    theta = _STATE_VAR_S_(data%id_l_theta)   ! soil moisture in the unsaturated zone
    phreatic_depth = _STATE_VAR_S_(data%id_l_phreatic)   ! depth to water table
@@ -372,6 +372,7 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
    tveg = zero_
 
    DO veg_i=1,data%num_veg
+     print *,'v',veg_i
       ! Retrieve current (local) state variable values
       veg = _STATE_VAR_S_(data%id_veg(veg_i)) ! vegetation group i
       pc_cover = _STATE_VAR_S_(data%id_vegfrac(veg_i)) ! vegetation cover i

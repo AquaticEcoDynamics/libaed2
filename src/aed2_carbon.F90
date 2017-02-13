@@ -43,7 +43,7 @@ MODULE aed2_carbon
       INTEGER  :: id_wind
       INTEGER  :: id_ch4ox, id_pco2
       INTEGER  :: id_sed_dic
-      INTEGER  :: id_atm_co2_exch, id_atm_ch4_exch
+      INTEGER  :: id_atm_co2, id_atm_ch4
       INTEGER  :: id_par, id_extc, id_dz
 
       !# Model parameters
@@ -183,9 +183,9 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    data%id_sed_dic = aed2_define_sheet_diag_variable('sed_dic','mmol/m**2/d',        &
                                                       'CO2 exchange across sed/water interface')
 
-   data%id_atm_co2_exch = aed2_define_sheet_diag_variable('atm_co2_exch',            &
+   data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2_flux',            &
                              'mmol/m**2/d', 'CO2 exchange across atm/water interface')
-   data%id_atm_ch4_exch = aed2_define_sheet_diag_variable('atm_ch4_exch',            &
+   data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4_flux',            &
                              'mmol/m**2/d', 'CH4 exchange across atm/water interface')
 
    !# Register environmental dependencies
@@ -324,7 +324,7 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
      _FLUX_VAR_T_(data%id_dic) = -FCO2
 
      ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2/d).
-     _DIAG_VAR_S_(data%id_atm_co2_exch) = FCO2*secs_per_day
+     _DIAG_VAR_S_(data%id_atm_co2) = FCO2*secs_per_day
    END IF
 
    ! CH4 flux
@@ -364,7 +364,7 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
      _FLUX_VAR_T_(data%id_ch4) = -FCH4
 
      ! Also store ch4 flux across the atm/water interface as diagnostic variable (mmmol/m2/d).
-     _DIAG_VAR_S_(data%id_atm_ch4_exch) = FCH4*secs_per_day
+     _DIAG_VAR_S_(data%id_atm_ch4) = FCH4*secs_per_day
    END IF
 END SUBROUTINE aed2_calculate_surface_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
