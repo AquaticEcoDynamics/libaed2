@@ -300,6 +300,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
    AED_REAL :: newDOM, domFlux, DOMmnlzn, avgomox, pom_vol
    AED_REAL :: Kass, sedDensity, pom_depth, moist, maxqse, OxdnRate,  NeutRate
    AED_REAL :: avgLevel, oldlevel, newlevel, SZDepth, UZDepth
+   AED_REAL :: decomposition, litter
 
    AED_REAL :: dom_flux0, dom_flux1, dom_flux2, dom_flux3, dom_flux4, dom_flux5, dom_flux6, dom_flux7
    AED_REAL :: dom_gen, acid_potl, dom_minl, dom_anc

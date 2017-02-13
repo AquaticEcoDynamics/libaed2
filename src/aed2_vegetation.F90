@@ -177,11 +177,9 @@ SUBROUTINE aed2_vegetation_load_params(data, dbase, count, list)
                               veg(list(i))%m0,                                 &
                               minimum=zero_)
 
-      data%id_vegfrac(i) = aed2_define_sheet_variable(                         &
+      data%id_vegfrac(i) = aed2_define_sheet_diag_variable(                    &
                               TRIM(veg(list(i))%m_name)//'_cover' ,            &
-                              '%', 'vegetation cover',                         &
-                              zero_,                                           &
-                              minimum=zero_)
+                              '%', 'vegetation cover')
     ENDDO
 !
 END SUBROUTINE aed2_vegetation_load_params
@@ -308,9 +306,7 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
 
 RETURN
    ! Retrieve current environmental conditions.
-   temp = _STATE_VAR_(data%id_tem)       ! local temperature
-   salinity = _STATE_VAR_(data%id_sal)   ! local salinity
-   oxy = _STATE_VAR_(data%id_DOupttarget)! local oxygen
+   salinity = _STATE_VAR_(data%id_E_salt)   ! local salinity
 
 
 END SUBROUTINE aed2_calculate_riparian_vegetation
