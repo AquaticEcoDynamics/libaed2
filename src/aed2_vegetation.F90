@@ -83,7 +83,7 @@ MODULE aed2_vegetation
       AED_REAL,ALLOCATABLE :: active_zones(:)
 
       !# Diagnostic variables
-      INTEGER :: id_l_lai, id_gpp, id_lfall, id_resp
+      INTEGER :: id_l_lai, id_gpp, id_lfall, id_resp, id_tveg
       INTEGER :: id_atm_co2
 
       !# Dependant variable IDs
@@ -266,6 +266,7 @@ SUBROUTINE aed2_define_vegetation(data, namlst)
    data%id_resp  = aed2_define_sheet_diag_variable('resp','mmolC/m**2/d','net vegetation respiration')
    data%id_lfall = aed2_define_sheet_diag_variable('lfall','mmolC/m**2/d','net vegetation mortality')
    data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2','mmolC/m**2/d',  'co2 exchange to the atmosphere')
+   data%id_tveg = aed2_define_sheet_diag_variable('veg','mmolC/m**2',  'total veg biomass')
 
    ! Register module dependencies
    IF ( .NOT. lai_link_variable .EQ. '' ) &
@@ -363,16 +364,19 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
    salinity = _STATE_VAR_(data%id_E_salt)   ! local salinity
    atemp = _STATE_VAR_S_(data%id_E_airtemp)      ! local air temperature
    Io = _STATE_VAR_S_(data%id_E_I0)         ! surface short wave radiation
-   theta = _STATE_VAR_S_(data%id_l_theta)   ! soil moisture in the unsaturated zone
+   theta = _STATE_VAR_S_(data%id_l_theta)+0.01   ! soil moisture in the unsaturated zone
    phreatic_depth = _STATE_VAR_S_(data%id_l_phreatic)   ! depth to water table
 
    ! Initialise cumulative biomass diagnostics
    _DIAG_VAR_S_(data%id_l_lai) = zero_
    _DIAG_VAR_S_(data%id_atm_co2) = zero_
+   _DIAG_VAR_S_(data%id_gpp) = zero_
+   _DIAG_VAR_S_(data%id_resp) = zero_
+   _DIAG_VAR_S_(data%id_lfall) = zero_
    tveg = zero_
 
    DO veg_i=1,data%num_veg
-     print *,'v',veg_i
+
       ! Retrieve current (local) state variable values
       veg = _STATE_VAR_S_(data%id_veg(veg_i)) ! vegetation group i
       pc_cover = _STATE_VAR_S_(data%id_vegfrac(veg_i)) ! vegetation cover i
@@ -437,6 +441,7 @@ SUBROUTINE aed2_calculate_riparian_vegetation(data,column,layer_idx, pc_wet)
       tveg = tveg + veg
    ENDDO
 
+   _DIAG_VAR_S_(data%id_tveg) = tveg
    _DIAG_VAR_S_(data%id_l_lai) = tveg
 
 

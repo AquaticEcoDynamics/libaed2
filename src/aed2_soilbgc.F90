@@ -201,11 +201,11 @@ SUBROUTINE aed2_define_soilbgc(data, namlst)
    ENDDO
    DO i=1,nlay
      trac_name(4:4) = CHAR(ICHAR('0') + i)
-     data%id_eh(i) = aed2_define_sheet_diag_variable('anc0_'//TRIM(trac_name),'molH+/kg','starting acid neutralising capacity')
+     data%id_eh(i) = aed2_define_sheet_diag_variable('eh_'//TRIM(trac_name),'molH+/kg','starting acid neutralising capacity')
    ENDDO
    DO i=1,nlay
      trac_name(4:4) = CHAR(ICHAR('0') + i)
-     data%id_ch4(i)  = aed2_define_sheet_diag_variable('anc_'//TRIM(trac_name),'molH+/m2','acid neutralising capacity')
+     data%id_ch4(i)  = aed2_define_sheet_diag_variable('ch4_'//TRIM(trac_name),'molH+/m2','acid neutralising capacity')
    ENDDO
    data%id_rwet  = aed2_define_sheet_diag_variable('rwet','molH+/m2/day','rewetting flux of dom')
    data%id_rchg  = aed2_define_sheet_diag_variable('rchg','molH+/m2/day','percolation of dom')
@@ -350,7 +350,6 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
    dom_flux7 = zero_
    dom_minl  = zero_
    pom_vol   = zero_
-   avgomox   = zero_
    domFlux   = zero_
    newDOM    = zero_
    maxqse    = zero_
@@ -393,7 +392,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
        newLevel = SoilCol%PhreaticHgt
 
        !-----------------------------------------------------------------------!
-       !-- Update surface litter
+       !-- Update surface litter abice the soil
        litter = _STATE_VAR_S_(data%id_litter)
        decomposition = 0.003/86400 * 1.08**(atem-20.) * litter
 
@@ -406,7 +405,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
        UZDOM =  UZDOM + 0.05*decomposition
 
        !-----------------------------------------------------------------------!
-       !-- Update redox profile
+       !-- Update redox profile of the soil layers
        CALL UpdateRedoxProfile(SoilCol,column)
 
        !-----------------------------------------------------------------------!
@@ -415,36 +414,18 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
        CALL UpdatePOMProfile( SoilCol,           &
                                column,           &
                                newDOM,           &
-                               avgomox,          &
+                               OMOX,             &
                                data%Rom(omz),    &
                                temp=soiltemp     )
+
 
        POMt = zero_
        DO i=1,data%nlay
          POMt = POMt + _DIAG_VAR_S_(data%id_pom(i)) + _DIAG_VAR_S_(data%id_pom0(i))
        ENDDO
-       IF( pom_depth > 0.05 ) THEN
-         _DIAG_VAR_S_(data%id_pomt) = POMt / (pom_depth * SoilCol%Density * 1e-3)
-       ENDIF
-
-       ! Increase available acidity
-       UZDOM =  UZDOM + newDOM
-       dom_gen = dom_gen + newDOM
-       OMOX = avgomox
-
-       newDOM = zero_ !consumption/mineralisation here
-       !CALL UpdateRedoxProfile( SoilCol, &
-       !                         column, &
-       !                      newAcidity )
-       !
-       !ANCt = zero_
-       !DO i=1,data%nlay
-       !   ANCt = ANCt + _DIAG_VAR_S_(data%id_ch4(i))
-       !ENDDO
-
-       ! Consume available acidity
-       UZDOM = UZDOM - newDOM
-       dom_anc = dom_anc - newDOM
+       !IF( pom_depth > 0.05 ) THEN
+       !   _DIAG_VAR_S_(data%id_pomt) = POMt / (pom_depth * SoilCol%Density * 1e-3)
+       !ENDIF
 
        ! Reset pastMaxLevel if necessary
        oldLevel = newLevel
@@ -453,20 +434,24 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
            SoilCol%pastMaxLevel = SoilCol%PhreaticHgt
        END IF
 
-       !-----------------------------------------------------------------------
-       !-- Decrease in available DOM in SZ due to (anaerobic) mineralisation
 
-       !newANC = data%flux_rn_max(assz) * MIN(SZDepth,0.5) * area * DDT * 1e-3
+
+       CALL UpdateMethaneProfile(SoilCol,column,soiltemp)
+
+       !-----------------------------------------------------------------------
+       !-- Change in available DOM in UZ and SZ due to creation and mineralisation
+
+       ! Increase available DOM in UZ from POM
+       UZDOM =  UZDOM + newDOM
+
        DOMmnlzn = data%flux_rn_max(omz) * MIN(SZDepth,0.5) * DDT * 1e-3
        IF(DOMmnlzn > SZDOM) DOMmnlzn=SZDOM
 
-       ! Consume available acidty
+       ! Consume available DOM from SZ
        SZDOM = SZDOM - DOMmnlzn
 
-       dom_minl = dom_minl - DOMmnlzn
-
        !-----------------------------------------------------------------------
-       !-- Decrease in available DOM in UZ due to recharge/discharge/etc
+       !-- Change in available DOM due to recharge/discharge/etc
 
        ! R-RCG : recharge/percolation   [UNITS=> mol/L/timestep = mol/L * ((m/ts)/m) ]
        IF( SoilCol%recharge>zero_ .AND. UZDepth>0.1 ) THEN
@@ -476,7 +461,6 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
          UZDOM = UZDOM - domFlux
          SZDOM = SZDOM + domFlux
 
-         dom_flux0 = dom_flux0 + domFlux
          DOMRCHG = domFlux/DDT  ! molH+/L/day
        END IF
 
@@ -494,7 +478,6 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
          END IF
 
          SZDOM = SZDOM - domFlux
-         dom_flux1 = dom_flux1 + domFlux
 
         ! set diagnostic flux and update seepage tracer into the water: mol/m2/day
          DOMBFLW = domFlux/DDT
@@ -518,7 +501,6 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
          UZDOM = UZDOM - domFlux
          SZDOM = SZDOM + domFlux
 
-         dom_flux6 = dom_flux6 + domFlux
        END IF
 
 
@@ -529,9 +511,8 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
          domFlux = UZDOM * ( MIN(SoilCol%qse/UZDepth,1.0) **data%flux_rn(omz) )
 
          UZDOM = UZDOM - domFlux
-         dom_flux5 = dom_flux5 + domFlux
 
-        ! set diagnostic flux and update seepage tracer into the water: mol/m2/day
+         ! set diagnostic flux and update seepage tracer into the water: mol/m2/day
          DOMSFLW = domFlux/DDT
 
         _FLUX_VAR_R_(data%id_soilbgctracer) = _FLUX_VAR_R_(data%id_soilbgctracer) + DOMSFLW/secs_per_day
@@ -546,18 +527,16 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
 
        END IF
 
-
-
-
        DOMRWET = 0.0
+
        _DIAG_VAR_S_(data%id_drytime) = _DIAG_VAR_S_(data%id_drytime) + DDT
        _DIAG_VAR_S_(data%id_wettime) = zero_
 
        TOC = zero_
-       TOC = UZDOM + SZDOM + POMt !? * 1e3 / ( MAX(UZDepth,0.01)  * SoilCol%Density )
+       TOC = UZDOM + SZDOM + POMt + litter  !? * 1e3 / ( MAX(UZDepth,0.01)  * SoilCol%Density )
 
      !-------------------------------------------------------------------------
-     ! R-WET : Newly re-wetted sediment
+     ! R-WET : Newly re-wetted soil/sediment
      ! Flux rate is initially high
      ELSE IF(pc_wet>0.1 .AND. _DIAG_VAR_S_(data%id_wettime)<=0.25) THEN
 
@@ -571,10 +550,7 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
          _FLUX_VAR_B_(data%id_c_dic) = _FLUX_VAR_B_(data%id_c_dic) + (DOMRWET/secs_per_day) !* data%X_hso4
        ENDIF
 
-       dom_flux3 = dom_flux3 + domFlux*DDT
-
        _DIAG_VAR_S_(data%id_wettime) = _DIAG_VAR_S_(data%id_wettime) + DDT
-
 
        SZDOM = SZDOM + UZDOM
        UZDOM = zero_
@@ -599,7 +575,6 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
          domFlux = domFlux * ( SO4 ) / ( SO4+(153.*(1e3/96.)) )
 
          SO4REDN = domFlux
-         dom_flux7 = dom_flux7 + domFlux*DDT
 
          ! Past dryness and PASS production is reset by now
          _DIAG_VAR_S_(data%id_drytime) = zero_
@@ -608,13 +583,10 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
          ! Innundated within last 1 days
          domFlux = GetDOMFluxRate(data%flux_rw_a(omz),salt,omz,1)
 
-         dom_flux3 = dom_flux3 + domFlux*DDT
-
        ELSE
          ! Innundated within last 1-90 days
          domFlux = GetDOMFluxRate(data%flux_rw_d(omz),salt,omz,2)
 
-         dom_flux4 = dom_flux4 + domFlux*DDT
        END IF
 
        ! Store acidity flux in ASSRWET for update within routine
@@ -635,14 +607,14 @@ SUBROUTINE aed2_calculate_riparian_soilbgc(data, column, layer_idx, pc_wet)
    ! Update the main arrays
    _DIAG_VAR_S_(data%id_uzdom) = UZDOM
    _DIAG_VAR_S_(data%id_szdom) = SZDOM
-   _DIAG_VAR_S_(data%id_toc)    = TOC
-   _DIAG_VAR_S_(data%id_rwet)   = DOMRWET
-   _DIAG_VAR_S_(data%id_rchg)   = DOMRCHG
-   _DIAG_VAR_S_(data%id_bflw)   = DOMBFLW
-   _DIAG_VAR_S_(data%id_sflw)   = DOMSFLW
-   _DIAG_VAR_S_(data%id_omox)   = OMOX
-   _DIAG_VAR_S_(data%id_so4r)   = SO4REDN
-   _DIAG_VAR_S_(data%id_pml)    = SoilCol%pastMaxLevel  ! _DIAG_VAR_S_(data%id_l_wt)
+   _DIAG_VAR_S_(data%id_toc)   = TOC
+   _DIAG_VAR_S_(data%id_rwet)  = DOMRWET
+   _DIAG_VAR_S_(data%id_rchg)  = DOMRCHG
+   _DIAG_VAR_S_(data%id_bflw)  = DOMBFLW
+   _DIAG_VAR_S_(data%id_sflw)  = DOMSFLW
+   _DIAG_VAR_S_(data%id_omox)  = OMOX
+   _DIAG_VAR_S_(data%id_so4r)  = SO4REDN
+   _DIAG_VAR_S_(data%id_pml)   = SoilCol%pastMaxLevel  ! _DIAG_VAR_S_(data%id_l_wt)
 
 
 
@@ -659,7 +631,7 @@ CONTAINS
    AED_REAL, OPTIONAL                 :: temp
    !-- Local
    INTEGER  :: lay
-   AED_REAL :: dep, depm1, middep, newAcidity, OxdnRate
+   AED_REAL :: dep, depm1, middep, newAcidity, OxdnRate, decomp, fdec
 
    !---------------------------------------------------------------------------!
 
@@ -689,21 +661,29 @@ CONTAINS
          IF( middep > 0.5 )  _DIAG_VAR_S_(data%id_pom(lay)) = zero_
        END IF
 
-
        !-----------------------------------------------------------------------!
-       !-- Increase in actual acidity due to oxidation process
-       OxdnRate = GetOMOxidnRate( Rom, theSoil%Moisture(lay),  theSoil%Substrate )
-       IF( PRESENT(temp) )  OxdnRate = OxdnRate * 1.05**(temp-20.)
+       !-- Compute aerobic/anaerobic factor for decomposition
+       fdec = zero_
+       decomp = zero_
+       IF ( _DIAG_VAR_S_(data%id_eh(lay)) <600 ) THEN
+         ! anaerobic
+         fdec = 0.02 + 0.05*exp(_DIAG_VAR_S_(data%id_eh(lay))/250.)
+         decomp = fdec * Rom *  _DIAG_VAR_S_(data%id_pom0(lay))
+         _DIAG_VAR_S_(data%id_pom0(lay)) = _DIAG_VAR_S_(data%id_pom0(lay)) - decomp
+       ELSE
+         ! aerobic
+         IF( theSoil%Moisture(lay)/theSoil%porosity <0.6 ) THEN
+           fdec = -0.1 + (theSoil%Moisture(lay)/theSoil%porosity)*(1./0.5)
+         ELSE
+           fdec = 1.0 + ((theSoil%Moisture(lay)/theSoil%porosity-0.6))*(-0.25/0.4)
+         ENDIF
+         decomp = fdec * Rom *  _DIAG_VAR_S_(data%id_pom(lay))
+         _DIAG_VAR_S_(data%id_pom(lay)) = _DIAG_VAR_S_(data%id_pom(lay)) - decomp
+         _DIAG_VAR_S_(data%id_atm_co2) = _DIAG_VAR_S_(data%id_atm_co2) + decomp
+       ENDIF
 
-       newAcidity = _DIAG_VAR_S_(data%id_pom(lay)) * OxdnRate * DDT
 
-       ! Reduce POM0 based on used amount
-       _DIAG_VAR_S_(data%id_pom(lay)) = _DIAG_VAR_S_(data%id_pom(lay)) - newAcidity
-
-       ! Increase available acidity
-    !   newAASS = newAASS + newAcidity
-
-       avgomox  =  avgomox + OxdnRate
+       avgomox  =  avgomox + decomp
    END DO
 
    ! Profile averaged OM oxidation rate (for plots)
@@ -797,9 +777,13 @@ CONTAINS
      ENDIF
      fT = 1.05**(temp-20.)
      Moxd = (ch4/(Kch4+ch4)) * fT * fEhMO
+     _DIAG_VAR_S_(data%id_atm_co2) = _DIAG_VAR_S_(data%id_atm_co2) + Moxd
 
      ! Diffusion
-
+     IF( theSoil%Moisture(lay)/theSoil%Porosity <one_ ) THEN
+       Mdfs = 0.1*ch4
+     ENDIF
+     _DIAG_VAR_S_(data%id_atm_ch4) = Mdfs
 
      ! Ebullition
 

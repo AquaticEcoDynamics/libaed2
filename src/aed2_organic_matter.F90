@@ -62,7 +62,7 @@ MODULE aed2_organic_matter
       INTEGER  :: id_sed_pop, id_sed_dop
       INTEGER  :: id_sed_poc, id_sed_doc
       INTEGER  :: id_bod, id_cdom
-      INTEGER  :: id_l_resus
+      INTEGER  :: id_l_resus, id_n_den
 
       !# Model parameters
       AED_REAL :: Rpoc_hydrol, Rdoc_minerl, Rpon_hydrol, &
@@ -149,6 +149,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    CHARACTER(len=64)         :: doc_miner_reactant_variable=''
    CHARACTER(len=64)         :: don_miner_product_variable=''
    CHARACTER(len=64)         :: dop_miner_product_variable=''
+   CHARACTER(len=64)         :: denit_link='NIT_denit'
+
    !-- Refractory organic matter (optional)
    LOGICAL                   :: simRPools = .false.
    AED_REAL                  :: Rdocr_miner
@@ -417,6 +419,13 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
       data%resuspension = 0
    ENDIF
 
+   !-- denitrification
+   IF ( .NOT. denit_link .EQ. '' ) THEN
+      data%id_n_den  = aed2_locate_global(TRIM(denit_link))
+   ELSE
+      data%id_n_den  = 0
+   ENDIF
+
    !-- light
    IF (simRPools) THEN
      data%id_vis= aed2_locate_global('par')
@@ -512,7 +521,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: docr,donr,dopr,cpom,cdom
    AED_REAL :: docr_mineralisation, donr_mineralisation
    AED_REAL :: dopr_mineralisation, cpom_breakdown
-   AED_REAL :: photolysis
+   AED_REAL :: photolysis, denitrification
    AED_REAL :: vis, uva, uvb, photo_fmin, cdoc
 
    AED_REAL, PARAMETER :: Yoxy_doc_miner = 32./12. !ratio of oxygen to carbon utilised during doc mineralisation
@@ -523,6 +532,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
 
    photolysis = zero_
    photo_fmin = data%photo_fmin
+   denitrification = zero_
 
    ! Retrieve current (local) state variable values.
    pon = _STATE_VAR_(data%id_pon)! particulate organic nitrogen
@@ -531,6 +541,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    dop = _STATE_VAR_(data%id_dop)! dissolved organic phosphorus
    poc = _STATE_VAR_(data%id_poc)! particulate organic carbon
    doc = _STATE_VAR_(data%id_doc)! dissolved organic carbon
+   IF (data%id_n_den>0) denitrification = _DIAG_VAR_(data%id_n_den) /secs_per_day
 
    docr = zero_
    IF(data%simRPools) THEN
@@ -590,11 +601,11 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
 
    ! Set temporal derivatives
    _FLUX_VAR_(data%id_pon)  = _FLUX_VAR_(data%id_pon) + (-pon*pon_hydrolysis)
-   _FLUX_VAR_(data%id_don)  = _FLUX_VAR_(data%id_don) + (pon*pon_hydrolysis-don*don_mineralisation)
+   _FLUX_VAR_(data%id_don)  = _FLUX_VAR_(data%id_don) + (pon*pon_hydrolysis-don*don_mineralisation) - denitrification*16./106.
    _FLUX_VAR_(data%id_pop)  = _FLUX_VAR_(data%id_pop) + (-pop*pop_hydrolysis)
-   _FLUX_VAR_(data%id_dop)  = _FLUX_VAR_(data%id_dop) + (pop*pop_hydrolysis-dop*dop_mineralisation)
+   _FLUX_VAR_(data%id_dop)  = _FLUX_VAR_(data%id_dop) + (pop*pop_hydrolysis-dop*dop_mineralisation) - denitrification*1./106.
    _FLUX_VAR_(data%id_poc)  = _FLUX_VAR_(data%id_poc) + (-poc*poc_hydrolysis)
-   _FLUX_VAR_(data%id_doc)  = _FLUX_VAR_(data%id_doc) + (poc*poc_hydrolysis-doc*doc_mineralisation)
+   _FLUX_VAR_(data%id_doc)  = _FLUX_VAR_(data%id_doc) + (poc*poc_hydrolysis-doc*doc_mineralisation) - denitrification
    IF(data%simRPools) THEN
       docr = MAX(1.e-3,docr)
       _FLUX_VAR_(data%id_docr) = _FLUX_VAR_(data%id_docr) - docr*docr_mineralisation - photolysis

@@ -425,7 +425,7 @@ SUBROUTINE aed2_calculate_benthic_geochemistry(data,column,layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-
+   RETURN
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
@@ -545,14 +545,14 @@ SUBROUTINE aed2_equilibrate_geochemistry(data,column,layer_idx)
 
    !-- Update diagnostic arrays
    IF( returnGCDerivedVector("pCO2",pco2) > 0) THEN
-     !print *,'pco2: ',pco2
+      !print *,'pco2: ',pco2,data%id_c_pco2
      _DIAG_VAR_(data%id_c_pco2) = pco2
-     _DIAG_VAR_(data%id_gcdiag(6)) = pco2
+!     _DIAG_VAR_(data%id_gcdiag(2)) = pco2
    ENDIF
-   IF( returnGCDerivedVector("NONCON",nc) > 0) THEN
-     _DIAG_VAR_(data%id_noncon) = nc
-     _DIAG_VAR_(data%id_gcdiag(5)) = nc
-   ENDIF
+!   IF( returnGCDerivedVector("NONCON",nc) > 0) THEN
+!     _DIAG_VAR_(data%id_noncon) = nc
+!     _DIAG_VAR_(data%id_gcdiag(3)) = nc
+!   ENDIF
 
 
 END SUBROUTINE aed2_equilibrate_geochemistry

@@ -30,7 +30,7 @@ MODULE aed2_util
    PRIVATE
 !
    PUBLIC find_free_lun, qsort
-   PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, exp_integral
+   PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, aed2_n2o_sat, exp_integral
    PUBLIC aed2_bio_temp_function,fTemp_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC water_viscosity
@@ -185,6 +185,93 @@ PURE AED_REAL FUNCTION aed2_oxygen_sat(salt,temp)
    !Convert to mmol/m3
    aed2_oxygen_sat = (aed2_oxygen_sat / 32.) * 1e3
 END FUNCTION aed2_oxygen_sat
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+PURE AED_REAL FUNCTION aed2_n2o_sat(salt,temp)
+!-------------------------------------------------------------------------------
+!  gsw_N2Osol_SP_pt                            solubility of N2O in seawater
+!
+!  USAGE:
+!   N2Osol = gsw_N2Osol_SP_pt(SP,pt)
+!
+!  DESCRIPTION:
+!   Calculates the nitrous oxide, N2O, concentration expected at equilibrium
+!   with air at an Absolute Pressure of 101325 Pa (sea pressure of 0 dbar)
+!   including saturated water vapor  This function uses the solubility
+!   coefficients as listed in Hamme and Emerson (2004).
+!
+!   Note that this algorithm has not been approved by IOC and is not work
+!   from SCOR/IAPSO Working Group 127. It is included in the GSW
+!   Oceanographic Toolbox as it seems to be oceanographic best practice.
+!
+!  INPUT:
+!   salt  =  Practical Salinity  (PSS-78)                         [ unitless ]
+!   temp  =  potential temperature (ITS-90) referenced               [ deg C ]
+!          to one standard atmosphere (0 dbar).
+!
+!  OUTPUT:
+!   N2Osol = solubility of argon                                  [ umol/kg ]
+!
+!  AUTHOR:  Rich Pawlowicz, Paul Barker and Trevor McDougall
+!                                                       [ help@teos-10.org ]
+!
+!  VERSION NUMBER: 3.05 (27th January 2015)
+!
+!  REFERENCES:
+!   IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of
+!    seawater - 2010: Calculation and use of thermodynamic properties.
+!    Intergovernmental Oceanographic Commission, Manuals and Guides No. 56,
+!    UNESCO (English), 196 pp.  Available from http://www.TEOS-10.org
+!
+!   Weiss, R.F. and B.A. Price, 1980: Nitrous oxide solubility in water and
+!    seawater. Mar. Chem., 8, 347-359.
+!
+!   The software is available from http://www.TEOS-10.org
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: salt,temp
+!
+!LOCALS
+   AED_REAL :: x, y, y_100, pt68, ph2odP
+   AED_REAL :: a0,a1,a2,a3,b1,b2,b3,m0,m1,m2,m3
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+
+  x = salt     !  Note that salinity argument is Practical Salinity, this is
+               !  beacuse the major ionic components of seawater related to Cl
+               !  are what affect the solubility of non-electrolytes in seawater
+
+  pt68 = temp*1.00024 ! pt68 is the potential temperature in degress C on
+                      ! the 1968 International Practical Temperature Scale IPTS-68.
+  y = pt68 + 273.15
+  y_100 = y*1e-2
+
+  !  The coefficents below are from Table 2 of Weiss and Price (1980)
+  a0 = -165.8806
+  a1 =  222.8743
+  a2 =  92.0792
+  a3 = -1.48425
+  b1 = -0.056235
+  b2 =  0.031619
+  b3 = -0.0048472
+
+  m0 = 24.4543
+  m1 = 67.4509
+  m2 = 4.8489
+  m3 = 0.000544
+
+  ph2odP = exp(m0 - m1*100.0/y - m2*log(y_100) - m3*x) !  Moist air correction at 1 atm.
+
+  !aed2_n2o_sat = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
+  aed2_n2o_sat = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
+
+  !?!!Convert to mmol/m3
+  !? aed2_n2o_sat = (aed2_n2o_sat / 32.) * 1e3 ??
+
+END FUNCTION aed2_n2o_sat
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
