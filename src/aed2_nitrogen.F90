@@ -37,17 +37,21 @@ MODULE aed2_nitrogen
       !# Variable identifiers
       INTEGER  :: id_nit, id_amm, id_n2o
       INTEGER  :: id_oxy, id_denit_product
-      INTEGER  :: id_temp, id_salt, id_wind, id_E_depth
-      INTEGER  :: id_Fsed_amm, id_Fsed_nit
-      INTEGER  :: id_nitrif, id_denit, id_n2op
-      INTEGER  :: id_sed_amm, id_sed_nit
+      INTEGER  :: id_temp, id_salt, id_wind, id_E_depth, id_E_tau, id_E_dens
+      INTEGER  :: id_Fsed_amm, id_Fsed_nit, id_Fsed_n2o
+      INTEGER  :: id_nitrif, id_denit, id_n2op, id_anammox, id_dnra
+      INTEGER  :: id_sed_amm, id_sed_nit, id_sed_n2o
       INTEGER  :: id_atm_n2o
 
       !# Model parameters
-      AED_REAL :: Rnitrif,Rdenit,Fsed_amm,Fsed_nit,Knitrif,Kdenit,Ksed_amm,Ksed_nit, &
-                  theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit,Cn2o_atm, Rn2o
-      LOGICAL  :: use_oxy,use_no2,use_sed_model_amm, use_sed_model_nit
-      LOGICAL  :: simN2O, simNitrfpH
+      AED_REAL :: Rnitrif,Rdenit,Ranammox,Rn2o,Rdnra, &
+                  Knitrif,Kdenit,Kanmx_nit,Kanmx_amm,Kdnra_oxy, &
+                  theta_nitrif,theta_denit, &
+                  Fsed_amm,Fsed_nit,Fsed_n2o,Ksed_amm,Ksed_nit,Ksed_n2o, &
+                  theta_sed_amm,theta_sed_nit, &
+                  Cn2o_atm
+      LOGICAL  :: use_oxy, use_sed_model_amm, use_sed_model_nit
+      LOGICAL  :: simN2O, simNitrfpH, simNitrfLight
       INTEGER  :: oxy_lim
 
      CONTAINS
@@ -81,6 +85,8 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    INTEGER           :: status
    INTEGER           :: oxy_lim = 1
    LOGICAL           :: simN2O = .false.
+   LOGICAL           :: simNitrfpH = .false.
+   LOGICAL           :: simNitrfLight = .false.
    AED_REAL          :: nit_initial=4.5
    AED_REAL          :: nit_min=zero_
    AED_REAL          :: nit_max=1e6
@@ -93,22 +99,29 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    AED_REAL          :: Rnitrif = 0.01
    AED_REAL          :: Rdenit = 0.01
    AED_REAL          :: Rn2o = 0.0015
-   AED_REAL          :: Fsed_amm = 3.5
-   AED_REAL          :: Fsed_nit = 3.5
+   AED_REAL          :: Ranammox = 0.0
+   AED_REAL          :: Rdnra = 0.0
    AED_REAL          :: Knitrif = 150.0
    AED_REAL          :: Kdenit = 150.0
-   AED_REAL          :: Ksed_amm = 30.0
-   AED_REAL          :: Ksed_nit = 30.0
+   AED_REAL          :: Kanmx_nit = 150.0
+   AED_REAL          :: Kanmx_amm = 150.0
+   AED_REAL          :: Kdnra_oxy = 150.0
    AED_REAL          :: theta_nitrif = 1.0
    AED_REAL          :: theta_denit = 1.0
+   AED_REAL          :: Fsed_amm = 3.5
+   AED_REAL          :: Fsed_nit = 3.5
+   AED_REAL          :: Fsed_n2o = 3.5
+   AED_REAL          :: Ksed_amm = 30.0
+   AED_REAL          :: Ksed_nit = 30.0
+   AED_REAL          :: Ksed_n2o = 30.0
    AED_REAL          :: theta_sed_amm = 1.0
    AED_REAL          :: theta_sed_nit = 1.0
-   AED_REAL          :: Cn2o_atm = 1.0
+   AED_REAL          :: Cn2o_atm = 0.32 * 1e-6 !## current atmospheric N2O data (in ppm)
+
    CHARACTER(len=64) :: nitrif_reactant_variable=''
    CHARACTER(len=64) :: denit_product_variable=''
    CHARACTER(len=64) :: Fsed_amm_variable=''
    CHARACTER(len=64) :: Fsed_nit_variable=''
-
 
    NAMELIST /aed2_nitrogen/ nit_initial,nit_min, nit_max,                 &
                     amm_initial, amm_min, amm_max,                        &
@@ -118,61 +131,74 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
                     theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit, &
                     nitrif_reactant_variable,denit_product_variable,      &
                     Fsed_amm_variable, Fsed_nit_variable,                 &
-                    simN2O, Cn2o_atm, oxy_lim, Rn2o
+                    simN2O, Cn2o_atm, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o,  &
+                    Ranammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,     &
+                    simNitrfpH, simNitrfLight
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_nitrogen initialization"
 
+   !-----------------------------------------------
    ! Read the namelist
    read(namlst,nml=aed2_nitrogen,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_nitrogen'
 
-   ! Store parameter values in our own derived type
-   ! NB: all rates must be provided in values per day,
-   ! and are converted here to values per second.
-
-   data%simNitrfpH = .false.
+   !-----------------------------------------------
+   ! Store config options and parameter values in module's own derived type
+   ! Note: all rates must be provided in values per day,
+   ! and are converted for internal use as values per second.
+   data%simNitrfpH = simNitrfpH
+   data%simNitrfLight = simNitrfLight
    data%simN2O = simN2O
    data%oxy_lim = oxy_lim
 
    data%Rnitrif  = Rnitrif/secs_per_day
    data%Rdenit   = Rdenit/secs_per_day
    data%Rn2o     = Rn2o/secs_per_day
-   data%Fsed_amm = Fsed_amm/secs_per_day
-   data%Fsed_nit = Fsed_nit/secs_per_day
+   data%Ranammox = Ranammox/secs_per_day
+   data%Rdnra    = Rdnra/secs_per_day
    data%Knitrif  = Knitrif
    data%Kdenit   = Kdenit
-   data%Ksed_amm  = Ksed_amm
-   data%Ksed_nit  = Ksed_nit
+   data%Kanmx_nit  = Kanmx_nit
+   data%Kanmx_amm  = Kanmx_amm
+   data%Kdnra_oxy  = Kdnra_oxy
    data%theta_nitrif = theta_nitrif
    data%theta_denit  = theta_denit
+   data%Cn2o_atm   = Cn2o_atm
+
+   data%Fsed_amm = Fsed_amm/secs_per_day
+   data%Fsed_nit = Fsed_nit/secs_per_day
+   data%Fsed_n2o = Fsed_n2o/secs_per_day
+   data%Ksed_amm  = Ksed_amm
+   data%Ksed_nit  = Ksed_nit
+   data%Ksed_n2o  = Ksed_n2o
    data%theta_sed_amm = theta_sed_amm
    data%theta_sed_nit = theta_sed_nit
-   data%Cn2o_atm = Cn2o_atm
 
-
+   !-----------------------------------------------
    ! Register state variables
    data%id_amm = aed2_define_variable('amm','mmol/m**3','ammonium',            &
                                     amm_initial,minimum=amm_min, maximum=amm_max)
    data%id_nit = aed2_define_variable('nit','mmol/m**3','nitrate',             &
                                     nit_initial,minimum=nit_min, maximum=nit_max)
 
-
    IF( simN2O ) THEN
-     data%id_n2o = aed2_define_variable('n2o','mmol/m**3','nitrous oxide',     &
+     ! TODO check here to see if oxy is simulated if simN2O is also on
+     IF (nitrif_reactant_variable .NE. '') THEN
+       data%id_n2o = aed2_define_variable('n2o','mmol/m**3','nitrous oxide',     &
                                     n2o_initial,minimum=n2o_min, maximum=n2o_max)
+      ELSE
+        print *,'simN2O is true, however oxygen not provided so variable disabled'
+      ENDIF
    ENDIF
 
-
+   !-----------------------------------------------
    ! Register external state variable dependencies
    data%use_oxy = nitrif_reactant_variable .NE. '' !This means oxygen module switched on
    IF (data%use_oxy) THEN
      data%id_oxy = aed2_locate_variable(nitrif_reactant_variable)
    ENDIF
-
-   !data%use_no2 = denit_product_variable .NE. '' !This means n2 module switched on
-   !IF (data%use_no2) data%id_denit_product = aed2_locate_variable(denit_product_variable)
 
    data%use_sed_model_amm = Fsed_amm_variable .NE. ''
    IF (data%use_sed_model_amm) &
@@ -181,28 +207,29 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    IF (data%use_sed_model_nit) &
      data%id_Fsed_nit = aed2_locate_global_sheet(Fsed_nit_variable)
 
-
+     !-----------------------------------------------
    ! Register diagnostic variables
-   data%id_nitrif = aed2_define_diag_variable('nitrif','mmol/m**3/d', &
-                                                         'nitrification rate')
-   data%id_denit = aed2_define_diag_variable('denit','mmol/m**3/d', &
-                                                         'de-nitrification rate')
-   data%id_n2op = aed2_define_diag_variable('n2oprod','mmol/m**3/d', &
-                                                       'n2o prod rate')
-   data%id_sed_amm = aed2_define_sheet_diag_variable('sed_amm','mmol/m**2/d', &
-                                                         'ammonium sediment flux')
-   data%id_sed_nit = aed2_define_sheet_diag_variable('sed_nit','mmol/m**2/d', &
-                                                         'nitrate sediment flux')
-   data%id_atm_n2o = aed2_define_sheet_diag_variable('atm_n2o_flux','mmol/m**2/d', &
-                                                     'N2O atmospheric flux')
+   data%id_nitrif = aed2_define_diag_variable('nitrif','mmol/m**3/d','nitrification rate')
+   data%id_denit = aed2_define_diag_variable('denit','mmol/m**3/d','de-nitrification rate')
+   data%id_anammox = aed2_define_diag_variable('anammox','mmol/m**3/d','anammox rate')
+   data%id_dnra = aed2_define_diag_variable('dnra','mmol/m**3/d','dnra rate')
+   data%id_sed_amm = aed2_define_sheet_diag_variable('sed_amm','mmol/m**2/d','ammonium sediment flux')
+   data%id_sed_nit = aed2_define_sheet_diag_variable('sed_nit','mmol/m**2/d','nitrate sediment flux')
+   IF( simN2O ) THEN
+    data%id_n2op = aed2_define_diag_variable('n2oprod','mmol/m**3/d','n2o prod rate')
+    data%id_atm_n2o = aed2_define_sheet_diag_variable('atm_n2o_flux','mmol/m**2/d','n2o atmospheric flux')
+    data%id_sed_n2o = aed2_define_sheet_diag_variable('sed_n2o','mmol/m**2/d','n2o sediment flux')
+   ENDIF
 
+   !-----------------------------------------------
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
    data%id_salt = aed2_locate_global('salinity')
-   data%id_wind = aed2_locate_global_sheet('wind_speed') ! Wind speed at 10 m above surface (m/s)
+   data%id_wind = aed2_locate_global_sheet('wind_speed') ! @ 10 m above surface
    data%id_E_depth = aed2_locate_global('layer_ht')
-   ! check here to see if oxy is simulated if simN2O is also on
-
+   !data%id_E_vel = aed2_locate_global('velocity') ! needed for k600
+   data%id_E_tau = aed2_locate_global('taub') ! tau to be converted to velocity
+   data%id_E_dens = aed2_locate_global('density') ! density needed for tau-vel
 
 END SUBROUTINE aed2_define_nitrogen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -220,7 +247,7 @@ SUBROUTINE aed2_calculate_nitrogen(data,column,layer_idx)
 !
 !LOCALS
    AED_REAL           :: amm,nit,n2o,oxy,temp,pH !State variables
-   AED_REAL           :: nitrification,denitrification
+   AED_REAL           :: nitrification,denitrification,anammox,dnra
    AED_REAL           :: denit_n2o_prod,denit_n2o_cons,nit_n2o_prod
    AED_REAL,PARAMETER :: Xon = 3. !ratio of oxygen to nitrogen utilised during nitrification
    AED_REAL,PARAMETER :: Knev = 3. !Nevison nitrification O2 threshold
@@ -234,51 +261,76 @@ SUBROUTINE aed2_calculate_nitrogen(data,column,layer_idx)
 !-------------------------------------------------------------------------------
 !BEGIN
 
-   ! Retrieve current (local) state variable values.
-   amm = _STATE_VAR_(data%id_amm)! ammonium
-   nit = _STATE_VAR_(data%id_nit)! nitrate
-   IF (data%use_oxy) THEN ! & use_oxy
-      oxy = _STATE_VAR_(data%id_oxy)! oxygen
+   !-----------------------------------------------
+   ! Set current (local) state variable values.
+   amm = _STATE_VAR_(data%id_amm)    ! ammonium
+   nit = _STATE_VAR_(data%id_nit)    ! nitrate
+   IF( data%use_oxy ) THEN
+      oxy = _STATE_VAR_(data%id_oxy) ! oxygen
    ELSE
-      oxy = zero_
+      oxy = 300.0
    ENDIF
    pH = 7.
 
+   !-----------------------------------------------
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_temp) ! temperature
 
+   !-----------------------------------------------
    ! Define process rates in units mmol N/m3/s
-   nitrification = fnitrif(data%use_oxy,data%Rnitrif,data%Knitrif,data%theta_nitrif,oxy,temp)
-   IF( data%simNitrfpH ) nitrification = nitrification* NitrfpHFunction(pH)
 
-   denitrification = fdenit(data%Rdenit, &
+   !## nitrification
+   nitrification = amm * fnitrif(data%use_oxy,data%Rnitrif,data%Knitrif,data%theta_nitrif,oxy,temp)
+   IF( data%simNitrfpH ) nitrification = nitrification* NitrfpHFunction(pH)
+   !IF( data%simNitrfLight ) nitrification = nitrification* NitrfLightFunction(I) ! Capone Pg 238
+
+   !## de-nitrification
+   denitrification = nit * fdenit(data%Rdenit, &
                             data%use_oxy,data%oxy_lim, &
                             data%Kdenit,data%theta_denit,Kno3, &
                             oxy,temp,nit)
 
    IF( data%simN2O ) THEN
-     denit_n2o_prod = 0.5 * nit * denitrification !* Xnc
+     ! Babbin style model to capture intermediate N2O pool
+     denit_n2o_prod = 0.5 * denitrification !* Xnc
      denit_n2o_cons = data%Rn2o * n2o * exp(-oxy/Kn2oc)
      nit_n2o_prod = zero_
-     IF(oxy>Knev) nit_n2o_prod = ((aa/oxy)+bb)*nitrification*amm
+     IF(oxy>Knev) nit_n2o_prod = ((aa/oxy)+bb)*nitrification
      !IF(oxy>Knev) nit_n2o_prod = ((aa/oxy)+bb)*remin*Xnc
    ENDIF
 
-   ! Set temporal derivatives
-   _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (-amm*nitrification)
-   _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + (amm*nitrification - nit*denitrification)
+   !## anammox (NO2 + NH4 +CO2 -> N2); assuming nit ~ NO2
+   anammox = zero_
+   IF( data%use_oxy .AND. oxy < 1e-1*(1e3/32.) ) THEN
+     anammox = data%Ranammox * nit/(data%Kanmx_nit+nit) * amm/(data%Kanmx_amm+amm)
+   ENDIF
 
+   !## dissasimilatory nitrate reduction to ammonia (DNRA)
+   dnra = zero_
+   IF( data%use_oxy ) THEN
+     dnra = data%Rdnra * data%Kdnra_oxy/(data%Kdnra_oxy+oxy) * nit
+   ENDIF
+
+   !-----------------------------------------------
+   ! Set temporal derivatives
+   _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) -nitrification - anammox + dnra
+   _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + nitrification - denitrification - anammox - dnra
    IF( data%simN2O ) &
     _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o) + (denit_n2o_prod - denit_n2o_cons + nit_n2o_prod)
 
    ! If an externally maintained oxygen pool is linked, take nitrification from it
    IF (data%use_oxy) &
-   _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + (-Xon*amm*nitrification)
+   _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + (-Xon*nitrification)
 
+   !! add annamox use of dic & dnra creation + concsumption of DOC
+
+   !-----------------------------------------------
    ! Export diagnostic variables
-   _DIAG_VAR_(data%id_nitrif) = amm*nitrification*secs_per_day
-   _DIAG_VAR_(data%id_denit) = nit*denitrification*secs_per_day
-   _DIAG_VAR_(data%id_n2op) = (denit_n2o_prod+nit_n2o_prod)*secs_per_day
+   _DIAG_VAR_(data%id_nitrif) = nitrification*secs_per_day
+   _DIAG_VAR_(data%id_anammox) = anammox*secs_per_day
+   _DIAG_VAR_(data%id_denit) = denitrification*secs_per_day
+   _DIAG_VAR_(data%id_dnra) = dnra*secs_per_day
+   IF( data%simN2O ) _DIAG_VAR_(data%id_n2op) = (denit_n2o_prod+nit_n2o_prod)*secs_per_day
 
 
 END SUBROUTINE aed2_calculate_nitrogen
@@ -297,49 +349,56 @@ SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp, salt, wind
-
+   AED_REAL :: temp, salt, wind, vel, depth
    ! State
    AED_REAL :: n2o
-
    ! Temporary variables
    AED_REAL :: n2o_atm_flux = zero_
    AED_REAL :: Cn2o_air = zero_    !N2O in the air phase
    AED_REAL :: kn2o_trans = zero_
-   AED_REAL :: windHt, vel, depth
-   AED_REAL :: f_pres  = 1.0      ! Pressure correction function only applicable at high altitudes
+   AED_REAL :: windHt
+   AED_REAL :: f_pres  = 1.0      ! Pressure correction function (unsued as only applicable at high altitudes)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
 
    IF( .NOT.data%simN2O ) RETURN
 
+   !-----------------------------------------------
    !Get dependent state variables from physical driver
    temp = _STATE_VAR_(data%id_temp)    ! Temperature (degrees Celsius)
    salt = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
    wind = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10 m above surface (m/s)
    windHt = 10.
-   vel  = 0.
    depth = _STATE_VAR_(data%id_E_depth)
+   vel  = SQRT(_STATE_VAR_(data%id_E_tau)/_STATE_VAR_(data%id_E_dens))
+   vel = vel/0.41 * log(depth/0.01)
 
-    ! Retrieve current (local) state variable values.
+   !-----------------------------------------------
+   ! Retrieve current (local) state variable values.
    n2o = _STATE_VAR_(data%id_n2o)! Concentration of N2O in surface layer
 
-   !kn2o_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt)
-   kn2o_trans = 0.77*( (vel**0.5)*(depth**(-0.5)) + 0.266*wind**2. )  ! transfer velocity k of Ho et al. 2016
+   !-----------------------------------------------
+   ! Get the surface piston velocity  (THIS IS BASED ON 2D FLOWS)
+   !kn2o_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt,schmidt_model=?)
+   kn2o_trans = 0.77*( (vel**0.5)*(depth**(-0.5)) + 0.266*wind**2. ) / 3.6e5  ! transfer velocity k of Ho et al. 2016
 
-   ! First get the oxygen concentration in the air phase at interface
-   ! Taken from Riley and Skirrow (1974)
-   f_pres = 1.0
-   !Cn2o_air = data%Cn2o_atm
-   Cn2o_air = aed2_n2o_sat(salt,temp)
+   !-----------------------------------------------
+   ! First get the N2O concentration in the air-phase at interface
+   ! C_N2O = F x' P ; Capone (2008) pg 56
+   F_pres = 1.0
+   Cn2o_air = data%Cn2o_atm
+   Cn2o_air = Cn2o_air * aed2_n2o_sat(salt,temp)
 
-   ! Get the oxygen flux
-   n2o_atm_flux = kn2o_trans * (Cn2o_air - n2o)
+   !-----------------------------------------------
+   ! Get the N2O flux:    [ mmol/m2/s = m/s * mmol/m3 ]
+   n2o_atm_flux = kn2o_trans * (Cn2o_air - n2o) * F_pres
 
-   ! Transfer surface exchange value to AED2 (mmmol/m2) converted by driver.
+   !-----------------------------------------------
+   ! Transfer surface exchange value to AED2 (mmmol/m2), converted by driver.
    _FLUX_VAR_T_(data%id_n2o) = n2o_atm_flux
 
+   !-----------------------------------------------
    ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2).
    _DIAG_VAR_S_(data%id_atm_n2o) = n2o_atm_flux
 
@@ -361,24 +420,26 @@ SUBROUTINE aed2_calculate_benthic_nitrogen(data,column,layer_idx)
 !LOCALS
    ! Environment
    AED_REAL :: temp !, layer_ht
-
    ! State
-   AED_REAL :: amm,nit,oxy
-
+   AED_REAL :: amm,nit,n2o,oxy
    ! Temporary variables
-   AED_REAL :: amm_flux,nit_flux
-   AED_REAL :: Fsed_amm, Fsed_nit
+   AED_REAL :: amm_flux, nit_flux, n2o_flux
+   AED_REAL :: Fsed_amm, Fsed_nit, Fsed_n2o
+   AED_REAL :: fTa, fTo
 !
 !-------------------------------------------------------------------------------
 !BEGIN
 
-  ! Retrieve current environmental conditions for the bottom pelagic layer.
+   !-----------------------------------------------
+   ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
-    ! Retrieve current (local) state variable values.
-   amm = _STATE_VAR_(data%id_amm) ! ammonium
-   nit = _STATE_VAR_(data%id_nit) ! nitrate
+   !! Retrieve current (local) state variable values.
+   !amm = _STATE_VAR_(data%id_amm) ! ammonium
+   !nit = _STATE_VAR_(data%id_nit) ! nitrate
 
+   !-----------------------------------------------
+   ! Set the maximum flux (@20C) to use in this cell
    IF (data%use_sed_model_amm) THEN
       Fsed_amm = _STATE_VAR_S_(data%id_Fsed_amm)
    ELSE
@@ -389,36 +450,46 @@ SUBROUTINE aed2_calculate_benthic_nitrogen(data,column,layer_idx)
    ELSE
       Fsed_nit = data%Fsed_nit
    ENDIF
+   Fsed_n2o = data%Fsed_n2o
 
+   !-----------------------------------------------
+   ! Compute temperature scaling
+   fTa = data%theta_sed_amm**(temp-20.0)
+   fTo = data%theta_sed_nit**(temp-20.0)
+
+   !-----------------------------------------------
+   ! Compute actual flux based on oxygen and temperature
+   n2o_flux = zero_
    IF (data%use_oxy) THEN
       ! Sediment flux dependent on oxygen and temperature
       oxy = _STATE_VAR_(data%id_oxy)
-      amm_flux = Fsed_amm * data%Ksed_amm/(data%Ksed_amm+oxy) * (data%theta_sed_amm**(temp-20.0))
-      nit_flux = Fsed_nit * oxy/(data%Ksed_nit+oxy) * (data%theta_sed_nit**(temp-20.0))
+      amm_flux = Fsed_amm * data%Ksed_amm/(data%Ksed_amm+oxy) * fTa
+      nit_flux = Fsed_nit *           oxy/(data%Ksed_nit+oxy) * fTo
+      IF( data%simN2O ) n2o_flux = Fsed_n2o * data%Ksed_n2o/(data%Ksed_n2o+oxy) * fTa
    ELSE
       ! Sediment flux dependent on temperature only.
-      oxy = 0.
-      amm_flux = Fsed_amm * (data%theta_sed_amm**(temp-20.0))
-      nit_flux = Fsed_nit * (data%theta_sed_nit**(temp-20.0))
+      amm_flux = Fsed_amm * fTa
+      nit_flux = Fsed_nit * fTo
    ENDIF
 
-   ! TODO:
-   ! (1) Get benthic sink and source terms (sccb?) for current environment
-   ! (2) Get pelagic bttom fluxes (per surface area - division by layer height will be handled at a higher level)
-
+   !-----------------------------------------------
    ! Set bottom fluxes for the pelagic (change per surface area per second)
    ! Transfer sediment flux value to AED2.
-   !_SET_BOTTOM_FLUX_(data%id_amm,amm_flux/secs_per_day)
-   _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (amm_flux)
-   _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + (nit_flux)
+   _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + amm_flux
+   _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + nit_flux
+   IF( data%simN2O ) _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o) + n2o_flux
 
+   !-----------------------------------------------
    ! Set sink and source terms for the benthos (change per surface area per second)
    ! Note that this must include the fluxes to and from the pelagic.
    !_FLUX_VAR_B_(data%id_ben_amm) = _FLUX_VAR_B_(data%id_ben_amm) + (-amm_flux/secs_per_day)
 
+   !-----------------------------------------------
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_amm) = amm_flux*secs_per_day
    _DIAG_VAR_S_(data%id_sed_nit) = nit_flux*secs_per_day
+   IF( data%simN2O ) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux*secs_per_day
+
 END SUBROUTINE aed2_calculate_benthic_nitrogen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -547,6 +618,25 @@ END FUNCTION fdenit
    ENDIF
 
  END FUNCTION NitrfpHFunction
+!------------------------------------------------------------------------------!
+
+
+
+
+!###############################################################################
+ FUNCTION NitrfLightFunction(light) RESULT(limitation)
+   !----------------------------------------------------------------------------
+   ! Dependence of nitrification rate on light
+   !----------------------------------------------------------------------------
+   !-- Incoming
+   AED_REAL, INTENT(IN) :: light              ! pH in the water column
+   !-- Returns the salinity function
+   AED_REAL :: limitation
+   !-- Local
+
+     limitation = one_   ! TO BE COMPLETED - SEE CAPONE 2008
+
+ END FUNCTION NitrfLightFunction
 !------------------------------------------------------------------------------!
 
 

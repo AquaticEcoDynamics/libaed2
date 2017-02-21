@@ -304,6 +304,7 @@ SUBROUTINE aed2_calculate_dry_land(data, column, layer_idx)!
    bathy = _STATE_VAR_S_(data%id_E_bathy)
    airtemp = _STATE_VAR_S_(data%id_E_airtemp)
    avgLevel = _STATE_VAR_S_(data%id_E_nearlevel)
+   !print *,'dryLevel',avgLevel
 
    ! Prime local cell object with data from global arrays
    CALL SetBucketParameters(data, SoilCol, INT(matz))
@@ -835,6 +836,7 @@ SUBROUTINE aed2_calculate_benthic_land(data, column, layer_idx)
    matz = _STATE_VAR_S_(data%id_E_material)
    bathy = _STATE_VAR_S_(data%id_E_bathy)
    avgLevel = _STATE_VAR_S_(data%id_E_nearlevel)
+   !print *,'wetLevel',avgLevel
 
    ! Prime local cell object with data from global arrays
    CALL SetBucketParameters(data, SoilCol, INT(matz))

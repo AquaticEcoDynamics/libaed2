@@ -79,48 +79,43 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_mo
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx
-   INTEGER :: schmidt_model_l
+   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x
+   INTEGER  :: schmidt_model_l
    ! Parameters
-   AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length(m)
+   AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   schmidt_model_l = 2
-   k_flow = zero_ ! Needs to be set based on flow velocity
+
+   !-----------------------------------------------
+   ! Decide on Sc equation to apply
+   schmidt_model_l = 2 !default
+   IF (PRESENT(schmidt_model)) schmidt_model_l = schmidt_model
 
    ! Adjust the windspeed if the sensor height is not 10m
    hgtCorrx =  LOG(10.00 / roughLength) / LOG(wshgt / roughLength)
 
-
-   IF (PRESENT(schmidt_model)) schmidt_model_l = schmidt_model
-
+   !-----------------------------------------------
+   ! Compute k_wind
    IF (PRESENT(LA)) THEN
 
-      ! 2)  - in aed2_util, I want to add a new option for the calculation of k_wind.
-      !    This piston velocity routine is called by oxygen and carbon, and so we would
-      !    need a new switch ("k600_model")  in both of those to choose which k_wind
-      !    formulation to use.
-      ! but note that this has a "lake area" (LA) variable included in it.  Is it possible
-      ! in AED2 to know what the area of the lake surface is from this function?
+      ! New option for the calculation of k_wind. Note that this has a
+      ! "lake area" (LA) variable included in it.
 
       ! Valchon & Prairie 2013: The ecosystem size and shape dependence of gas transfer
       !                              velocity versus wind speed relationships in lakes
       ! k600 = 2.51 (±0.99) + 1.48 (±0.34) · U10 + 0.39 (±0.08) · U10 · log10 LA
 
-      k_wind = 2.51 + 1.48*wind*hgtCorrx  +  0.39 * wind*hgtCorrx * log10(LA)
+      k_wind = 2.51 + 1.48*wind*hgtCorrx  +  0.39*wind*hgtCorrx*log10(LA)
 
    ELSE
       temp=tem
       salt=sal
-      IF (temp < 0.0)       temp = 0.0
-      IF (temp > 38.0)      temp = 38.0
-      IF (salt < 0.0)       salt = 0.0
-      IF (salt > 75.0)      salt = 75.0
+      IF (temp < 0.0)       temp = 0.0; IF (temp > 38.0)      temp = 38.0
+      IF (salt < 0.0)       salt = 0.0; IF (salt > 75.0)      salt = 75.0
 
       ! Schmidt, Sc
       ! control value : Sc = 590 at 20°C and 35 psu
-
       schmidt = 590.
 
       SELECT CASE (schmidt_model_l)
@@ -137,21 +132,33 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_mo
          ! CH4 one from Arianto Santoso <abs11@students.waikato.ac.nz>
          schmidt = 2039.2 - (120.31*temp) + (3.4209*temp*temp) - (0.040437*temp*temp*temp)
          schmidt = schmidt / 600
+       CASE (5)
+         ! CH4 from Sturm et al. 2014 (ex Wanninkhof, 1992)
+         schmidt = 1897.8 - (114.28*temp) + (3.2902*temp*temp) - (0.039061*temp*temp*temp)
+       CASE (6)
+         ! N2O from Sturm et al. 2014 (ex Wanninkhof, 1992)
+         schmidt = 2055.6 - (137.11*temp) + (4.3173*temp*temp) - (0.054350*temp*temp*temp)
       END SELECT
 
-      ! Gas transfer velocity, kCO2 (cm/hr)
-      ! k = 0.31 u^2 (Sc/660)^-0.5
-      ! This parameterization of course assumes 10m windspeed, and so
-      ! must be scaled by hgtCorrx
-
-      k_wind = 0.31 * wind*wind*hgtCorrx*hgtCorrx / SQRT(schmidt/660.0) !in cm/hr
+      ! Gas transfer velocity (cm/hr)
+      ! k = a u^2 (Sc/600)^-x
+      ! This parameterization assumes 10m windspeed, and must be scaled by hgtCorrx
+      a = 0.31
+      x = 0.50
+      IF( wind*hgtCorrx <3.) x = 0.66
+      k_wind = a * (wind*hgtCorrx)*(wind*hgtCorrx) * (schmidt/600.0)**(-x)
    ENDIF
-
    ! convert to m/s
    k_wind = k_wind / 3.6e5
 
+   !-----------------------------------------------
+   ! Compute k_flow
+   k_flow = zero_ !(vel**0.5)*(depth**(-0.5))
+
+   !-----------------------------------------------
    ! piston velocity is the sum due to flow and wind
    aed2_gas_piston_velocity = k_flow + k_wind
+
 END FUNCTION aed2_gas_piston_velocity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -212,7 +219,7 @@ PURE AED_REAL FUNCTION aed2_n2o_sat(salt,temp)
 !          to one standard atmosphere (0 dbar).
 !
 !  OUTPUT:
-!   N2Osol = solubility of argon                                  [ umol/kg ]
+!   N2Osol = solubility of N2O                                      [ mol/L ]
 !
 !  AUTHOR:  Rich Pawlowicz, Paul Barker and Trevor McDougall
 !                                                       [ help@teos-10.org ]
@@ -265,11 +272,11 @@ PURE AED_REAL FUNCTION aed2_n2o_sat(salt,temp)
 
   ph2odP = exp(m0 - m1*100.0/y - m2*log(y_100) - m3*x) !  Moist air correction at 1 atm.
 
-  !aed2_n2o_sat = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
+  !aed2_n2o_sat [mol/L] = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
   aed2_n2o_sat = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
 
-  !?!!Convert to mmol/m3
-  !? aed2_n2o_sat = (aed2_n2o_sat / 32.) * 1e3 ??
+  !Convert to mmol/m3
+  aed2_n2o_sat = aed2_n2o_sat * 1e6
 
 END FUNCTION aed2_n2o_sat
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -338,7 +338,6 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
      kCH4 = aed2_gas_piston_velocity(windHt,wind,temp,salt,schmidt_model=4)
 
      ! Solubility, Ko (mol/L/atm)
-
      atm = 1.76 * 1e-6 !## current atmospheric CH4 data from NOAA (in ppm)
 
      A1 = -415.2807
@@ -354,12 +353,10 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
 
      CH4solub = exp(logC) * 1e-3
 
-
      ! mmol/m2/s = m/s * mmol/m3
      FCH4 = kCH4 *  (ch4 - CH4solub)
 
      !----------------------------------------------------------------------------
-
      ! Transfer surface exchange value to AED2 (mmmol/m2) converted by driver.
      _FLUX_VAR_T_(data%id_ch4) = -FCH4
 
