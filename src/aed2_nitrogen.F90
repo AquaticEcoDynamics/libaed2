@@ -371,8 +371,10 @@ SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
    salt = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
    wind = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10 m above surface (m/s)
    windHt = 10.
+   depth = MAX( _STATE_VAR_(data%id_E_depth), one_ )
 !   vel  = SQRT(_STATE_VAR_(data%id_E_tau)/_STATE_VAR_(data%id_E_dens))
 !   vel = vel/0.41 * log(depth/0.01)
+   vel = 0.0001
    !-----------------------------------------------
    ! Retrieve current (local) state variable values.
    n2o = _STATE_VAR_(data%id_n2o)! Concentration of N2O in surface layer
