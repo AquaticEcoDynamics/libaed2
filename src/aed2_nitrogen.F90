@@ -58,6 +58,7 @@ MODULE aed2_nitrogen
          PROCEDURE :: define            => aed2_define_nitrogen
          PROCEDURE :: calculate         => aed2_calculate_nitrogen
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_nitrogen
+         PROCEDURE :: calculate_surface => aed2_calculate_surface_nitrogen
 !        PROCEDURE :: mobility          => aed2_mobility_nitrogen
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_nitrogen
 !        PROCEDURE :: delete            => aed2_delete_nitrogen
@@ -370,10 +371,8 @@ SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
    salt = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
    wind = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10 m above surface (m/s)
    windHt = 10.
-   depth = _STATE_VAR_(data%id_E_depth)
-   vel  = SQRT(_STATE_VAR_(data%id_E_tau)/_STATE_VAR_(data%id_E_dens))
-   vel = vel/0.41 * log(depth/0.01)
-
+!   vel  = SQRT(_STATE_VAR_(data%id_E_tau)/_STATE_VAR_(data%id_E_dens))
+!   vel = vel/0.41 * log(depth/0.01)
    !-----------------------------------------------
    ! Retrieve current (local) state variable values.
    n2o = _STATE_VAR_(data%id_n2o)! Concentration of N2O in surface layer
