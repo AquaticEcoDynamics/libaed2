@@ -266,7 +266,7 @@ SUBROUTINE aed2_initialize_soilbgc(data, column, layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   AED_REAL :: POMt, ANCt
+   AED_REAL :: POMt, Eh
 !-------------------------------------------------------------------------------
 !BEGIN
    !---------------------------------------------------------------------------
@@ -276,9 +276,9 @@ SUBROUTINE aed2_initialize_soilbgc(data, column, layer_idx)
    !---------------------------------------------------------------------------
    ! Initialise vertical profiles of ANC and POM
    _DIAG_VAR_S_(data%id_pml) = SoilCol%PhreaticHgt  !Reset
-   ANCt = 600. !_DIAG_VAR_S_(data%id_eh(1))
+   Eh = zero_ !_DIAG_VAR_S_(data%id_eh(1))
    POMt = _DIAG_VAR_S_(data%id_pom0(1))
-   CALL SetSoilPOMProfile(data, column, SoilCol, POMt, ANCt)
+   CALL SetSoilPOMProfile(data, column, SoilCol, POMt, Eh)
    _DIAG_VAR_S_(data%id_uzdom)= zero_
 
 
@@ -665,24 +665,23 @@ CONTAINS
        !-- Compute aerobic/anaerobic factor for decomposition
        fdec = zero_
        decomp = zero_
-       IF ( _DIAG_VAR_S_(data%id_eh(lay)) <600 ) THEN
+       IF ( _DIAG_VAR_S_(data%id_eh(lay)) < 599. ) THEN
          ! anaerobic
          fdec = 0.02 + 0.05*exp(_DIAG_VAR_S_(data%id_eh(lay))/250.)
          decomp = fdec * Rom *  _DIAG_VAR_S_(data%id_pom0(lay))
          _DIAG_VAR_S_(data%id_pom0(lay)) = _DIAG_VAR_S_(data%id_pom0(lay)) - decomp
+         _DIAG_VAR_S_(data%id_atm_n2o) = _DIAG_VAR_S_(data%id_atm_n2o) + 0.1*decomp !denit
        ELSE
          ! aerobic
-         IF( theSoil%Moisture(lay)/theSoil%porosity <0.6 ) THEN
-           fdec = -0.1 + (theSoil%Moisture(lay)/theSoil%porosity)*(1./0.5)
+         IF( theSoil%Moisture(lay) <0.6 ) THEN
+           fdec = -0.1 + (theSoil%Moisture(lay))*(1./0.5)
          ELSE
-           fdec = 1.0 + ((theSoil%Moisture(lay)/theSoil%porosity-0.6))*(-0.25/0.4)
+           fdec = 1.0 + ((theSoil%Moisture(lay)-0.6))*(-0.25/0.4)
          ENDIF
          decomp = fdec * Rom *  _DIAG_VAR_S_(data%id_pom(lay))
          _DIAG_VAR_S_(data%id_pom(lay)) = _DIAG_VAR_S_(data%id_pom(lay)) - decomp
          _DIAG_VAR_S_(data%id_atm_co2) = _DIAG_VAR_S_(data%id_atm_co2) + decomp
        ENDIF
-
-
        avgomox  =  avgomox + decomp
    END DO
 
@@ -713,11 +712,11 @@ CONTAINS
      middep = (dep+depm1)/2.
 
      !IF(middep > theSoil%pastMaxLevel)
-     IF(middep > theSoil%PhreaticHgt)THEN !~?
+     IF(middep < theSoil%PhreaticHgt)THEN !~?
          ! decrease Eh for soil below the water table
          dEh = CR * ( aeren-1. )
      ELSE
-         wfps = theSoil%Moisture(lay)/theSoil%Porosity
+         wfps = theSoil%Moisture(lay)
          dEh = CR * ( aeren+1.-wfps )
      ENDIF
 
@@ -780,8 +779,8 @@ CONTAINS
      _DIAG_VAR_S_(data%id_atm_co2) = _DIAG_VAR_S_(data%id_atm_co2) + Moxd
 
      ! Diffusion
-     IF( theSoil%Moisture(lay)/theSoil%Porosity <one_ ) THEN
-       Mdfs = 0.1*ch4
+     IF( theSoil%Moisture(lay) <one_ ) THEN
+       Mdfs = 0.1 * (1.-theSoil%Moisture(lay)) *ch4
      ENDIF
      _DIAG_VAR_S_(data%id_atm_ch4) = Mdfs
 
@@ -962,8 +961,8 @@ SUBROUTINE SetSoilHydrology(data, column, theSoil)
          !print *,'moist',lay,dep,middep,theSoil%Moisture(lay)
 
          ! convert to % wtWC
-         theSoil%Moisture(lay) = theSoil%Moisture(lay)*theSoil%Porosity * 1e3 /        &
-            ( theSoil%Moisture(lay)*theSoil%Porosity*1e3 + (1.-theSoil%Porosity)*theSoil%Density )
+        ! theSoil%Moisture(lay) = theSoil%Moisture(lay)*theSoil%Porosity * 1e3 /        &
+            !( theSoil%Moisture(lay)*theSoil%Porosity*1e3 + (1.-theSoil%Porosity)*theSoil%Density )
 
          !theSoil%Moisture(lay) =theSoil%theta  !TEMPP
    ENDDO
@@ -1088,7 +1087,6 @@ SUBROUTINE SetSoilPOMProfile(data, column, theSoil, PASSt, ANCt)
        zindex = i
      ENDIF
    ENDDO
-
 
    ! Set the grid depths of layers below surface
    DO lay = 1,theSoil%nlay
@@ -1391,7 +1389,6 @@ SUBROUTINE SetSoilPOMProfile(data, column, theSoil, PASSt, ANCt)
 
 
      ! Lake Albert == 3
-!CAB was KASS
      ELSEIF( data%zOM(zindex)>2.5 .AND. data%zOM(zindex) <3.5) THEN
 
        IF(theSoil%Substrate == OMCLAYL .OR. theSoil%Substrate == OMCLAYH) THEN

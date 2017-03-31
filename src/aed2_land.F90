@@ -322,6 +322,7 @@ SUBROUTINE aed2_calculate_dry_land(data, column, layer_idx)!
    SoilCol%PhreaticDepth = _DIAG_VAR_S_(data%id_phreatic)
    IF ( data%infil_model==HORTON )  SoilCol%inf%tp = _DIAG_VAR_S_(data%id_tp)
 
+
    ! Update the Soil Water Balance based on hydrological processes
    CALL UpdateSoilHydrology(data, SoilCol, rain, avgLevel, airtemp)
 
@@ -974,7 +975,7 @@ FUNCTION GetInfiltration( data, theSoil, RainIntensity , PondingDepth ) RESULT (
 
      ! PHI index model - all rain upto phi m/d can infiltrate
      infiltration = MIN( RainIntensity, theSoil%phi )
-
+ IF(RainIntensity>0.005) print *,'infiltration',RainIntensity, theSoil%phi,infiltration
   ELSEIF( data%infil_model==HORTON ) THEN
 
      ! HORTON model

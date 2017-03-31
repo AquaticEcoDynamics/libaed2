@@ -327,7 +327,7 @@ SUBROUTINE aed2_initialize_vegetation(data, column, layer_idx)
 
    DO veg_i=1,data%num_veg
      ! Retrieve current (local) sta te variable values
-     _STATE_VAR_S_(data%id_veg(veg_i)) = _DIAG_VAR_S_(data%id_l_lai) / data%num_veg
+     _STATE_VAR_S_(data%id_veg(veg_i)) = 1e6 * _DIAG_VAR_S_(data%id_l_lai) / data%num_veg
    END DO
 
 

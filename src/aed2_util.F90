@@ -273,7 +273,7 @@ PURE AED_REAL FUNCTION aed2_n2o_sat(salt,temp)
   ph2odP = exp(m0 - m1*100.0/y - m2*log(y_100) - m3*x) !  Moist air correction at 1 atm.
 
   !aed2_n2o_sat [mol/L] = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
-  aed2_n2o_sat = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
+  aed2_n2o_sat = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP)
 
   !Convert to mmol/m3
   aed2_n2o_sat = aed2_n2o_sat * 1e6
