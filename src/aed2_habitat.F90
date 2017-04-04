@@ -176,8 +176,8 @@ SUBROUTINE aed2_define_habitat(data, namlst)
      data%id_rhsd =  aed2_define_sheet_diag_variable('ruppia_hsi_seed','-', 'Ruppia Habitat Suitability - seed germination')
      data%id_rhtr =  aed2_define_sheet_diag_variable('ruppia_hsi_turion','-', 'Ruppia Habitat Suitability - turion')
 
-  !   rhsi_falg_link = 'PHY_bfa'
-  !   rhsi_salg_link = 'PHY_bfa_slough'
+  !   rhsi_falg_link = 'MAG_ulva_ben'
+  !   rhsi_salg_link = 'MAG_ulva'
 
   !   data%id_l_salg  = aed2_locate_global(TRIM(rhsi_salg_link))
   !   data%id_l_falg  = aed2_locate_global_sheet(TRIM(rhsi_falg_link))

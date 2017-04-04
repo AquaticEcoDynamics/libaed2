@@ -31,7 +31,7 @@ MODULE aed2_util
 !
    PUBLIC find_free_lun, qsort
    PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, aed2_n2o_sat, exp_integral
-   PUBLIC aed2_bio_temp_function,fTemp_function
+   PUBLIC aed2_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC water_viscosity
 !
@@ -767,6 +767,68 @@ FUNCTION water_viscosity(temperature) RESULT(mu)
 END FUNCTION water_viscosity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+!###############################################################################
+AED_REAL FUNCTION fSal_function(salinity, minS, Smin, Smax, maxS )
+!-------------------------------------------------------------------------------
+! Salinity tolerance of biotic variables
+!
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+  AED_REAL :: salinity
+  AED_REAL :: minS, Smin, Smax, maxS
+!
+!LOCALS
+  AED_REAL :: tmp1,tmp2
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   !-- Check for non-sensical salinity values
+
+   ! Salinity is non-limiting for sals > Smin and <Smax
+   ! minS is salinity when organisms stop production (feeding/photosynthesis)
+   ! Note the exception for FW species: Smin and minS are both zero.
+
+   ! Salinity is within the tolerance; no limitation.
+   ! If sal in bott cell is > min sal & < max sal set in WQcons, pf=1
+   IF( salinity >= Smin .and. salinity <= Smax ) THEN
+     fSal_function = one_
+     RETURN
+   ENDIF
+
+   ! Salinity is greater than the upper bound
+   ! maxS is set in caedym_globals at 45psu
+   IF( salinity > Smax ) THEN
+     fSal_function = (-salinity*salinity+2.0*Smax*salinity-  &
+            2.0*Smax*maxS+maxS*maxS)/((Smax-maxS)*(Smax-maxS))
+   ENDIF
+
+   ! Salinity is less than the lower bound but greater than low cut
+   ! If sal is < min set in WQcons but > clamLowCut set at clamCons.dat)!
+   tmp1 = zero_
+   tmp2 = zero_
+   IF( salinity < Smin .AND. salinity > minS ) THEN
+     tmp1 = salinity-minS
+     tmp2 = Smin-minS
+     fSal_function =  (2*tmp1/Smin-(tmp1*tmp1/(Smin*Smin)))/ &
+            (2*tmp2/Smin-(tmp2*tmp2/(Smin*Smin)))
+   ENDIF
+
+   ! Salinity is less than the minS
+   ! If sal < lowest sal (hardwired at start of fn), shells close
+   IF( salinity <= minS ) fSal_function = zero_
+
+   ! If lower bound and low cut are both zero then it is a freshwater species
+   ! and we need to set f(S) to one
+   IF( Smin==zero_ ) THEN
+     IF( salinity <= Smin ) fSal_function =  one_
+   ENDIF
+
+   ! Ensure salinity function is not negative
+   IF(fSal_function <= zero_) fSal_function = zero_
+
+ END FUNCTION fSal_function
+!-------------------------------------------------------------------------------
 
 
 END MODULE aed2_util

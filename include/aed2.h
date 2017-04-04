@@ -56,6 +56,7 @@
 #define _MOB_TEMP_  2
 #define _MOB_STOKES_  3
 #define _MOB_MOTILE_  4
+#define _MOB_ATTACHED_  5
 
 #ifdef SINGLE
 #  define AED_REAL real(4)

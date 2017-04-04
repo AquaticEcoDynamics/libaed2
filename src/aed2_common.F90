@@ -45,6 +45,7 @@ MODULE aed2_common
    USE aed2_nitrogen
    USE aed2_phosphorus
    USE aed2_macrophyte
+   USE aed2_macroalgae
    USE aed2_organic_matter
    USE aed2_phytoplankton
    USE aed2_pathogens
@@ -126,6 +127,7 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_zooplankton');    prefix = 'ZOO'; ALLOCATE(aed2_zooplankton_data_t::model)
       CASE ('aed2_bivalve');        prefix = 'BIV'; ALLOCATE(aed2_bivalve_data_t::model)
       CASE ('aed2_macrophyte');     prefix = 'MAC'; ALLOCATE(aed2_macrophyte_data_t::model)
+      CASE ('aed2_macroalgae');     prefix = 'MAG'; ALLOCATE(aed2_macroalgae_data_t::model)
       CASE ('aed2_pathogens');      prefix = 'PAT'; ALLOCATE(aed2_pathogens_data_t::model)
       CASE ('aed2_iron');           prefix = 'IRN'; ALLOCATE(aed2_iron_data_t::model)
       CASE ('aed2_isotope');        prefix = 'ISO'; ALLOCATE(aed2_isotope_data_t::model)

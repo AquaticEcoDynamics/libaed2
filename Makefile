@@ -91,6 +91,7 @@ ${objdir}/aed2_zoop_utils.o \
 ${objdir}/aed2_zooplankton.o \
 ${objdir}/aed2_bivalve.o \
 ${objdir}/aed2_macrophyte.o \
+${objdir}/aed2_macroalgae.o \
 ${objdir}/aed2_pathogens.o \
 ${objdir}/aed2_isotope.o \
 ${objdir}/aed2_isotope_c.o \
