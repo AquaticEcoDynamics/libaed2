@@ -25,7 +25,7 @@ MODULE aed2_macroalgae
    USE aed2_util,ONLY : find_free_lun, &
                         exp_integral, &
                         aed2_bio_temp_function, &
-                        fTemp_function, &
+                        fTemp_function,fSal_function, &
                         water_viscosity
    USE aed2_bio_utils
 
@@ -596,7 +596,7 @@ SUBROUTINE aed2_calculate_macroalgae(data,column,layer_idx)
                           data%phytos(phy_i)%kTn,temp)
 
       !fSal = fTemp_function(salinity, minS, Smin, Smax, maxS )
-      fSal = fTemp_function(salinity, 25., 30., 45., 80. )
+      fSal = fSal_function(salinity, 25., 30., 45., 80. )
 
       ! Get the light and nutrient limitation.
       ! NITROGEN.
@@ -950,9 +950,26 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   INTEGER  :: malg_i
+   INTEGER  :: malg_i,phy_i,c
    AED_REAL :: malg,temp,extc,par,dz,Io,fI,bottom_stress        ! State
    AED_REAL :: malg_flux,malg_prod,malg_resp                    ! Fluxes
+
+   AED_REAL :: tphy, tin, tip, tchla
+   AED_REAL :: INi, IPi
+   AED_REAL :: pup
+   AED_REAL :: no3up,nh4up
+   AED_REAL :: cup, rsiup
+   AED_REAL :: salinity
+   AED_REAL :: primprod(data%num_malgae), exudation(data%num_malgae), &
+               a_nfix(data%num_malgae), respiration(data%num_malgae)
+   AED_REAL :: cuptake(data%num_malgae), cexcretion(data%num_malgae), cmortality(data%num_malgae)
+   AED_REAL :: nuptake(data%num_malgae,1:4), nexcretion(data%num_malgae), nmortality(data%num_malgae)
+   AED_REAL :: puptake(data%num_malgae,1:2), pexcretion(data%num_malgae), pmortality(data%num_malgae)
+   AED_REAL :: siuptake(data%num_malgae), siexcretion(data%num_malgae), simortality(data%num_malgae)
+   AED_REAL :: fT, fNit, fPho, fSil, fXl, fSal, PNf
+   AED_REAL :: upTot,net_cuptake,available,flux
+
+
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -964,13 +981,11 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
    !    !_FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + phy_flux
    !    !_FLUX_VAR_B_(data%id_p(phy_i)) = _FLUX_VAR_B_(data%id_p(phy_i)) - phy_flux
    !ENDDO
-
    DO malg_i=1,data%num_malgae
 
      ! Process benthic / attached macroalgae
      IF ( data%phytos(malg_i)%settling == _MOB_ATTACHED_ ) THEN
        ! Get local conditions
-       malg = _STATE_VAR_S_(data%id_pben(malg_i)) ! local malg density
        temp = _STATE_VAR_(data%id_tem)  ! local temperature
        extc = _STATE_VAR_(data%id_extc) ! cell extinction
        dz = _STATE_VAR_(data%id_dz)     ! cell depth
@@ -978,43 +993,218 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
        Io = _STATE_VAR_S_(data%id_I_0)  ! surface short wave radiation
        bottom_stress = _STATE_VAR_S_(data%id_taub)
 
-       ! Compute photosynthesis and respiration
+
+
+       phy_i = malg_i
+
+       !---- FROM ABOVE ----
+       pup = 0.
+       ! Retrieve current (local) state variable values.
+       IF (data%do_Puptake)  pup = _STATE_VAR_(data%id_Pupttarget(1))
+
+       no3up = 0.
+       nh4up = 0.
+       IF (data%do_Nuptake) THEN
+           no3up = _STATE_VAR_(data%id_Nupttarget(1))
+           nh4up = _STATE_VAR_(data%id_Nupttarget(2))
+       ENDIF
+       cup = 0.
+       IF (data%do_Cuptake)  cup = _STATE_VAR_(data%id_Cupttarget)
+       rsiup = 0.
+       IF (data%do_Siuptake)  rsiup = _STATE_VAR_(data%id_Siupttarget)
+
+       tphy = 0.0
+       tchla = 0.0
+       tin  = 0.0
+       tip  = 0.0
+
+       INi = 0.
+       IPi = 0.
+
+       primprod(phy_i)    = zero_
+       exudation(phy_i)   = zero_
+       a_nfix(phy_i)      = zero_
+       respiration(phy_i) = zero_
+
+       cuptake(phy_i)     = zero_
+       cexcretion(phy_i)  = zero_
+       cmortality(phy_i)  = zero_
+       nuptake(phy_i,:)   = zero_
+       nexcretion(phy_i)  = zero_
+       nmortality(phy_i)  = zero_
+       puptake(phy_i,:)   = zero_
+       pexcretion(phy_i)  = zero_
+       pmortality(phy_i)  = zero_
+
+       ! Retrieve this macroalgae group
+       malg = _STATE_VAR_S_(data%id_pben(malg_i)) ! local malg density
+
+       ! Get the temperature limitation function
+       fT = fTemp_function(data%phytos(phy_i)%fT_Method,    &
+                           data%phytos(phy_i)%T_max,        &
+                           data%phytos(phy_i)%T_std,        &
+                           data%phytos(phy_i)%theta_growth, &
+                           data%phytos(phy_i)%aTn,          &
+                           data%phytos(phy_i)%bTn,          &
+                           data%phytos(phy_i)%kTn,temp)
+
+       !fSal = fTemp_function(salinity, minS, Smin, Smax, maxS )
+       fSal = fSal_function(salinity, 25., 30., 45., 80. )
+
+       ! Get the light and nutrient limitation.
+       ! NITROGEN.
+       fNit = 0.0
+       IF(data%phytos(phy_i)%simINDynamics /= 0) THEN
+          ! IN variable available
+          INi = _STATE_VAR_S_(data%id_inben(phy_i))
+       ELSE
+          ! Assumed constant IN:
+          INi = malg*data%phytos(phy_i)%X_ncon
+       END IF
+
+       ! Estimate fN limitation from IN or ext N value
+       IF(data%phytos(phy_i)%simINDynamics > 1) THEN
+          IF (malg > data%phytos(phy_i)%p0) THEN
+             fNit = INi / malg
+             fNit = phyto_fN(data%phytos,phy_i,IN=fNit)
+          ENDIF
+          IF (malg > zero_ .AND. malg <= data%phytos(phy_i)%p0) THEN
+             fNit = phyto_fN(data%phytos,phy_i,din=no3up+nh4up)
+          ENDIF
+       ELSE
+          fNit = phyto_fN(data%phytos,phy_i,din=no3up+nh4up)
+       ENDIF
+       IF (data%phytos(phy_i)%simNFixation /= 0) THEN
+          ! Nitrogen fixer: apply no N limitation. N Fixation ability
+          ! depends on DIN concentration
+          a_nfix = (one_ - fNit)
+          fNit = one_
+       ENDIF
+
+
+       ! PHOSPHOROUS.
+       fPho = zero_
+       IF (data%phytos(phy_i)%simIPDynamics /= 0) THEN
+          ! IP variable available
+          IPi = _STATE_VAR_S_(data%id_ipben(phy_i))
+       ELSE
+          ! Assumed constant IP:
+          IPi = malg*data%phytos(phy_i)%X_pcon
+       END IF
+
+       ! Estimate fP limitation from IP or ext P value
+       IF (data%phytos(phy_i)%simIPDynamics > 1) THEN
+          IF (malg > data%phytos(phy_i)%p0) THEN
+             fPho = IPi / malg
+             fPho = phyto_fP(data%phytos,phy_i,IP=fPho)
+          ENDIF
+          IF (malg > zero_ .AND. malg <= data%phytos(phy_i)%p0) THEN
+             fPho = phyto_fP(data%phytos,phy_i,frp=pup)
+          ENDIF
+       ELSE
+          fPho = phyto_fP(data%phytos,phy_i,frp=pup)
+       ENDIF
+
+       ! SILICA.
+       fSil = 1.0
+
+       ! METAL AND TOXIC EFFECTS
+       fXl = 1.0
+
+       ! Compute P-I
        fI = photosynthesis_irradiance(0, &  ! 0 is vertical integral
             data%phytos(malg_i)%I_K, data%phytos(malg_i)%I_S, par, extc, Io, dz)
-       malg_prod = 0.3*fI
-       malg_resp = 0.02
-       malg_flux = (malg_prod-malg_resp)*malg
 
-!       ! Nitrogen uptake and excretion
-!       CALL phyto_internal_nitrogen(data%phytos,malg_i,data%do_N2uptake,malg,INi,primprod(malg_i),&
-!                              fT,no3up,nh4up,a_nfix(malg_i),respiration(malg_i),exudation(malg_i),PNf,&
-!                                    nuptake(malg_i,:),nexcretion(malg_i),nmortality(malg_i))
-!
-!       ! Phosphorus uptake and excretion
-!       CALL phyto_internal_phosphorus(data%phytos,malg_i,data%npup,malg,IPi,primprod(malg_i),&
-!                                  fT,pup,respiration(malg_i),exudation(malg_i),&
-!                                          puptake(malg_i,:),pexcretion(malg_i),pmortality(malg_i))
+            IF (extra_diag) THEN
+               _DIAG_VAR_S_(data%id_fT_ben(phy_i)) =  fT
+               _DIAG_VAR_S_(data%id_fI_ben(phy_i)) =  fI
+               _DIAG_VAR_S_(data%id_fNit_ben(phy_i)) =  fNit
+               _DIAG_VAR_S_(data%id_fPho_ben(phy_i)) =  fPho
+               _DIAG_VAR_S_(data%id_fSal_ben(phy_i)) =  fSal
+            ENDIF
+
+      ! Primary production rate
+      primprod(phy_i) = data%phytos(phy_i)%R_growth * fT * findMin(fI,fNit,fPho,fSil) * fxl * fSal
+
+      ! Respiration and general metabolic loss
+      respiration(phy_i) = bio_respiration(data%phytos(phy_i)%R_resp,data%phytos(phy_i)%theta_resp,temp)
+
+      ! Photo-exudation
+      exudation(phy_i) = primprod(phy_i)*data%phytos(phy_i)%f_pr
+
+      ! Limit respiration if at the min biomass to prevent leak in the C mass balance
+      IF (malg <= data%phytos(phy_i)%p0) THEN
+         respiration(phy_i) = zero_
+         exudation(phy_i) = zero_
+      ENDIF
+
+      ! Carbon uptake and excretion
+      cuptake(phy_i)    = -primprod(phy_i) * malg
+      cexcretion(phy_i) = (data%phytos(phy_i)%k_fdom*(1.0-data%phytos(phy_i)%k_fres)*respiration(phy_i)+exudation(phy_i)) * malg
+      cmortality(phy_i) = ((1.0-data%phytos(phy_i)%k_fdom)*(1.0-data%phytos(phy_i)%k_fres)*respiration(phy_i)) * malg
+
+      ! Nitrogen uptake and excretion
+      CALL phyto_internal_nitrogen(data%phytos,phy_i,data%do_N2uptake,malg,INi,primprod(phy_i),&
+                             fT,no3up,nh4up,a_nfix(phy_i),respiration(phy_i),exudation(phy_i),PNf,&
+                                   nuptake(phy_i,:),nexcretion(phy_i),nmortality(phy_i))
+
+      ! Phosphorus uptake and excretion
+      CALL phyto_internal_phosphorus(data%phytos,phy_i,data%npup,malg,IPi,primprod(phy_i),&
+                                 fT,pup,respiration(phy_i),exudation(phy_i),&
+                                         puptake(phy_i,:),pexcretion(phy_i),pmortality(phy_i))
+
+       malg_flux = (primprod(phy_i)-respiration(phy_i)-exudation(phy_i))*malg
 
 
-       ! Update the attached biomass, and water O2/CO2
+       ! Update the attached biomass, and water O2/CO2/Nuts
        _FLUX_VAR_B_(data%id_pben(malg_i)) = _FLUX_VAR_B_(data%id_pben(malg_i)) + malg_flux
+       !# macroalgae INTERNAL NITROGEN
+       IF (data%phytos(phy_i)%simINDynamics /= 0) THEN
+          INi = _STATE_VAR_S_(data%id_inben(phy_i))
+          flux = (-sum(nuptake(phy_i,:)) - nexcretion(phy_i) - nmortality(phy_i) )
+          available = MAX(zero_, INi - data%phytos(phy_i)%X_nmin*malg)
+          IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
+          _FLUX_VAR_B_(data%id_inben(phy_i)) = _FLUX_VAR_B_(data%id_inben(phy_i)) + ( flux)
+       ENDIF
+       !# macroalgae INTERNAL PHOSPHORUS
+       IF (data%phytos(phy_i)%simIPDynamics /= 0) THEN
+          IPi = _STATE_VAR_S_(data%id_ipben(phy_i))
+          flux = (-sum(puptake(phy_i,:)) - pexcretion(phy_i) - pmortality(phy_i) )
+          available = MAX(zero_, IPi - data%phytos(phy_i)%X_pmin*malg)
+          IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
+          _FLUX_VAR_(data%id_ipben(phy_i)) = _FLUX_VAR_(data%id_ipben(phy_i)) + ( flux)
+       ENDIF
        IF (data%do_DOuptake) THEN
          _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + malg_flux
        ENDIF
        IF (data%do_Cuptake) THEN
          _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - malg_flux
        ENDIF
+       IF (data%do_Puptake) THEN
+          DO c = 1,data%npup
+             _FLUX_VAR_(data%id_Pupttarget(c)) = _FLUX_VAR_(data%id_Pupttarget(c)) + ( puptake(phy_i,c))
+          ENDDO
+       ENDIF
+       IF (data%do_Nuptake) THEN
+          DO c = 1,data%nnup
+             _FLUX_VAR_(data%id_Nupttarget(c)) = _FLUX_VAR_(data%id_Nupttarget(c)) + ( nuptake(phy_i,c))
+          ENDDO
+       ENDIF
+       ! OM exretion here
+
 
        ! Redistribute into the water column if sloughing occurs.
        IF( bottom_stress>one_ ) THEN
          malg_flux = 0.67*malg
          _FLUX_VAR_(data%id_p(malg_i)) = _FLUX_VAR_(data%id_p(malg_i)) + malg_flux
          _FLUX_VAR_B_(data%id_pben(malg_i)) = _FLUX_VAR_B_(data%id_pben(malg_i)) - malg_flux
+
+         !% in & ip here
+
        ENDIF
 
        ! Update the diagnostic variables
-       !_DIAG_VAR_S_(data%id_d_mpb) = mpb
-       !_DIAG_VAR_S_(data%id_d_bpp) = mpb_flux
+       _DIAG_VAR_(data%id_TPHY) =  _DIAG_VAR_(data%id_TPHY) + malg
      ENDIF
 
    ENDDO
@@ -1077,16 +1267,24 @@ SUBROUTINE aed2_mobility_macroalgae(data,column,layer_idx,mobility)
             vvel = -9.807*(data%phytos(phy_i)%d_phy**2.)*( rho_p-pw ) / ( 18.*mu )
 
           CASE ( _MOB_ATTACHED_ )
-             ! settling velocity based on Stokes Law calculation and cell density
-             pw = _STATE_VAR_(data%id_dens)       ! water density
-             temp = _STATE_VAR_(data%id_tem)
-             mu = water_viscosity(temp)                 ! water dynamic viscosity
-             IF( data%id_rho(phy_i)>0 ) THEN
-               rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density
-             ELSE
-               rho_p = data%phytos(phy_i)%rho_phy
-             ENDIF
-             vvel = -9.807*(data%phytos(phy_i)%d_phy**2.)*( rho_p-pw ) / ( 18.*mu )
+            ! ! settling velocity based on Stokes Law calculation and cell density
+            ! pw = _STATE_VAR_(data%id_dens)       ! water density
+            ! temp = _STATE_VAR_(data%id_tem)
+            ! mu = water_viscosity(temp)                 ! water dynamic viscosity
+            ! IF( data%id_rho(phy_i)>0 ) THEN
+            !   rho_p = _STATE_VAR_(data%id_rho(phy_i))  ! cell density
+            ! ELSE
+            !   rho_p = data%phytos(phy_i)%rho_phy
+            ! ENDIF
+            ! vvel = -9.807*(data%phytos(phy_i)%d_phy**2.)*( rho_p-pw ) / ( 18.*mu )
+
+            ! constant settling velocity @20C corrected for density changes
+            pw = _STATE_VAR_(data%id_dens)
+            temp = _STATE_VAR_(data%id_tem)
+            mu = water_viscosity(temp)
+            mu20 = 0.001002  ! N s/m2
+            pw20 = 998.2000  ! kg/m3 (assuming freshwater)
+            vvel = data%phytos(phy_i)%w_p*mu20*pw / ( mu*pw20 )
 
          CASE DEFAULT
             ! unknown settling/migration option selection
