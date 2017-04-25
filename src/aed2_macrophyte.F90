@@ -338,9 +338,10 @@ SUBROUTINE aed2_calculate_benthic_macrophyte(data,column,layer_idx)
       dz   = _STATE_VAR_(data%id_dz)     ! dz = 0.5
       fI   = photosynthesis_irradiance(data%mphydata(mphy_i)%lightModel, &
                      data%mphydata(mphy_i)%I_K, data%mphydata(mphy_i)%I_S, par, extc, Io, dz)
-      fT   = 1.
+      fT   = 1. ! / fTemp_function(temp,     ) !1.
+      fSal = fSal_function(salinity,10.,72.,123.,230.) 
 
-      primprod(mphy_i) = data%mphydata(mphy_i)%R_growth * fI * fT
+      primprod(mphy_i) = data%mphydata(mphy_i)%R_growth * fI * fT * fSal
 
       ! Respiration and general metabolic loss
       respiration(mphy_i) = bio_respiration(data%mphydata(mphy_i)%R_resp, data%mphydata(mphy_i)%theta_resp, temp)
@@ -371,11 +372,12 @@ SUBROUTINE aed2_calculate_benthic_macrophyte(data,column,layer_idx)
    ! Export diagnostic variables
    _DIAG_VAR_S_(data%id_diag_par)= par
    _DIAG_VAR_S_(data%id_gpp) = SUM(primprod)*secs_per_day
-   IF( SUM(respiration(:)) > 1e-5 ) THEN
-     _DIAG_VAR_S_(data%id_p2r)  = (SUM(primprod(:))/data%num_mphy) / (SUM(respiration(:))/data%num_mphy)
-   ELSE
-     _DIAG_VAR_S_(data%id_p2r)  = 9999.
-   ENDIF
+!   IF( SUM(respiration(:)) > 1e-5 ) THEN
+!     _DIAG_VAR_S_(data%id_p2r)  = (SUM(primprod(:))/data%num_mphy) / (SUM(respiration(:))/data%num_mphy)
+!   ELSE
+!     _DIAG_VAR_S_(data%id_p2r)  = 9999.
+!   ENDIF
+   _DIAG_VAR_S_(data%id_p2r)  = SUM(primprod) - SUM(respiration)
 
 
 END SUBROUTINE aed2_calculate_benthic_macrophyte

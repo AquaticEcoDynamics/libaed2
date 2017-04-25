@@ -198,6 +198,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, re
                               'phytoplankton '//TRIM(data%phytos(i)%p_name),   &
                               pd(list(i))%p_initial,                           &
                               minimum=pd(list(i))%p0,                          &
+                              maximum=1e4,                          &
                               mobility = data%phytos(i)%w_p)
 
        ! Register rho (density) group as a state variable, if required
@@ -208,6 +209,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, re
                         'phytoplankton '//TRIM(data%phytos(i)%p_name)//'_rho', &
                               (data%min_rho+data%max_rho)/2.,                  &
                               minimum=data%min_rho,                            &
+                              maximum=data%max_rho,                            &
                               mobility = data%phytos(i)%w_p)
        ENDIF
 
@@ -449,7 +451,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
 
    !-- resuspension link variable
    IF ( .NOT.resus_link .EQ. '' ) THEN
-      data%id_l_resus  = aed2_locate_global(TRIM(resus_link))
+      data%id_l_resus  = aed2_locate_global_sheet(TRIM(resus_link))
    ELSE
       data%id_l_resus = 0
       data%resuspension = 0.
@@ -974,7 +976,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
      IF (data%do_Cuptake) THEN
         _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
      ENDIF
-
+!RETURN
      ! Resuspension (simple assumption here)
      Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * data%resuspension(1)
      _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy

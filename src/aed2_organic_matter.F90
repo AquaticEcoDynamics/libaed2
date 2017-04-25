@@ -413,7 +413,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
 
    !-- resuspension link variable
    IF ( resuspension>0 .AND. .NOT.resus_link .EQ. '' ) THEN
-      data%id_l_resus  = aed2_locate_global(TRIM(resus_link)) ! ('TRC_resus')
+      data%id_l_resus  = aed2_locate_global_sheet(TRIM(resus_link)) ! ('TRC_resus')
    ELSE
       data%id_l_resus = 0
       data%resuspension = 0

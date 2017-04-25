@@ -155,7 +155,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
          trac_name(3:3) = CHAR(ICHAR('0') + i)
                                              ! divide settling by secs_per_day to convert m/d to m/s
          data%id_ss(i) = aed2_define_variable(TRIM(trac_name),'mmol/m**3','tracer', &
-                                              trace_initial,minimum=zero_,mobility=(w_ss(i)/secs_per_day))
+                                              trace_initial,minimum=zero_,maximum=1e3,mobility=(w_ss(i)/secs_per_day))
          data%id_ss_vvel(i) = aed2_define_diag_variable(TRIM(trac_name)//'_vvel','m/s','vertical velocity')
       ENDDO
    ENDIF

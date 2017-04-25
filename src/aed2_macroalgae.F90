@@ -56,7 +56,7 @@ MODULE aed2_macroalgae
       INTEGER :: id_par, id_I_0, id_extc, id_taub
       INTEGER :: id_tem, id_sal, id_dz, id_dens
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
-      INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP, id_MPB, id_d_MPB, id_d_BPP
+      INTEGER :: id_TMALG, id_TCHLA, id_TIN, id_TIP, id_MPB, id_d_MPB, id_d_BPP
       INTEGER :: id_NUP, id_PUP, id_CUP
 
       !# Model parameters
@@ -71,6 +71,7 @@ MODULE aed2_macroalgae
       AED_REAL :: dic_per_n
       AED_REAL :: min_rho,max_rho
       AED_REAL,ALLOCATABLE :: resuspension(:)
+      AED_REAL :: slough_stress
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_macroalgae
@@ -277,7 +278,8 @@ SUBROUTINE aed2_macroalgae_load_params(data, dbase, count, list, settling, resus
                                 'mmolC/m**2',                                &
                                 'macroalgae '//TRIM(data%phytos(i)%p_name),  &
                                 pd(list(i))%p_initial,                       &
-                                minimum=pd(list(i))%p0 )
+                                minimum=pd(list(i))%p0,                   &
+                                maximum=8e3 )
 
          IF (data%phytos(i)%simIPDynamics /= 0) THEN
             IF(data%phytos(i)%simIPDynamics == 1)THEN
@@ -292,30 +294,30 @@ SUBROUTINE aed2_macroalgae_load_params(data, dbase, count, list, settling, resus
                               'macroalgae '//TRIM(data%phytos(i)%p_name)//'_IP_ben', &
                               pd(list(i))%p_initial*data%phytos(i)%X_pcon,     &
                               minimum=minNut)
-       ENDIF
-       IF (data%phytos(i)%simINDynamics /= 0) THEN
-          IF(data%phytos(i)%simINDynamics == 1)THEN
+         ENDIF
+         IF (data%phytos(i)%simINDynamics /= 0) THEN
+           IF(data%phytos(i)%simINDynamics == 1)THEN
             minNut = data%phytos(i)%p0*data%phytos(i)%X_ncon
-          ELSE
+           ELSE
             minNut = data%phytos(i)%p0*data%phytos(i)%X_nmin
-          ENDIF
-          ! Register IN group as a state variable
-          data%id_inben(i) = aed2_define_sheet_variable(                     &
+           ENDIF
+           ! Register IN group as a state variable
+           data%id_inben(i) = aed2_define_sheet_variable(                     &
                             TRIM(data%phytos(i)%p_name)//'_IN_ben',          &
                             'mmol/m**2',                                     &
                             'macroalgae '//TRIM(data%phytos(i)%p_name)//'_IN_ben', &
                             pd(list(i))%p_initial*data%phytos(i)%X_ncon,     &
                             minimum=minNut)
-       ENDIF
-       ! Group specific diagnostic variables
-       IF (extra_diag) THEN
+         ENDIF
+         ! Group specific diagnostic variables
+         IF (extra_diag) THEN
           data%id_fI_ben(i)   = aed2_define_sheet_diag_variable( TRIM(data%phytos(i)%p_name)//'_fI_ben', '-', 'fI (0-1)')
           data%id_fNit_ben(i) = aed2_define_sheet_diag_variable( TRIM(data%phytos(i)%p_name)//'_fNit_ben', '-', 'fNit (0-1)')
           data%id_fPho_ben(i) = aed2_define_sheet_diag_variable( TRIM(data%phytos(i)%p_name)//'_fPho_ben', '-', 'fPho (0-1)')
           data%id_fT_ben(i)   = aed2_define_sheet_diag_variable( TRIM(data%phytos(i)%p_name)//'_fT_ben', '-', 'fT (>0)')
           data%id_fSal_ben(i) = aed2_define_sheet_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSal_ben', '-', 'fSal (-)')
+         ENDIF
        ENDIF
-     ENDIF
 
 
 
@@ -364,6 +366,7 @@ SUBROUTINE aed2_define_macroalgae(data, namlst)
    AED_REAL           :: zerolimitfudgefactor = 0.9 * 3600
    AED_REAL           :: min_rho, max_rho
    LOGICAL            :: extra_debug = .false.
+   AED_REAL           :: slough_stress = one_
 
    NAMELIST /aed2_macroalgae/ num_malgae, the_malgae, settling,resuspension,&
                     p_excretion_target_variable,p_mortality_target_variable,   &
@@ -375,7 +378,7 @@ SUBROUTINE aed2_define_macroalgae(data, namlst)
                       c_uptake_target_variable, do_uptake_target_variable,     &
                     si_excretion_target_variable,si_mortality_target_variable, &
                       si_uptake_target_variable,                               &
-                    dbase, zerolimitfudgefactor, extra_debug, extra_diag
+                    dbase, zerolimitfudgefactor, extra_debug, extra_diag, slough_stress
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_macroalgae initialization"
@@ -390,6 +393,7 @@ SUBROUTINE aed2_define_macroalgae(data, namlst)
    dtlim = zerolimitfudgefactor
    IF( extra_debug ) extra_diag = .true.       ! legacy use of extra_debug
    data%min_rho = min_rho ; data%max_rho = max_rho
+   data%slough_stress = slough_stress
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
@@ -478,17 +482,17 @@ SUBROUTINE aed2_define_macroalgae(data, namlst)
 
    ! Register diagnostic variables
    data%id_GPP = aed2_define_diag_variable('GPP','mmol/m**3/d',  'gross primary production')
-   data%id_NCP = aed2_define_diag_variable('NCP','mmol/m**3/d',  'net community production')
-   data%id_PPR = aed2_define_diag_variable('PPR','-','macroalgae p/r ratio (gross)')
-   data%id_NPR = aed2_define_diag_variable('NPR','-','macroalgae p/r ratio (net)')
+  !data%id_NCP = aed2_define_diag_variable('NCP','mmol/m**3/d',  'net community production')
+  !data%id_PPR = aed2_define_diag_variable('PPR','-','macroalgae p/r ratio (gross)')
+  !data%id_NPR = aed2_define_diag_variable('NPR','-','macroalgae p/r ratio (net)')
 
-   data%id_NUP = aed2_define_diag_variable('NUP','mmol/m**3/d','nitrogen uptake')
-   data%id_PUP = aed2_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
-   data%id_CUP = aed2_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
+  !data%id_NUP = aed2_define_diag_variable('NUP','mmol/m**3/d','nitrogen uptake')
+  !data%id_PUP = aed2_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
+  !data%id_CUP = aed2_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
    data%id_dPAR = aed2_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
-   data%id_TCHLA = aed2_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
-   data%id_TPHY = aed2_define_diag_variable('TPHYS','mmol/m**3', 'total macroalgae')
+   data%id_TCHLA = aed2_define_diag_variable('EXTC','/m', 'extinction')
+   data%id_TMALG = aed2_define_diag_variable('TMALG','g DW/m**2', 'total macroalgae')
    data%id_TIN = aed2_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed2_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
 
@@ -522,7 +526,7 @@ SUBROUTINE aed2_calculate_macroalgae(data,column,layer_idx)
    AED_REAL :: pup
    AED_REAL :: no3up,nh4up
    AED_REAL :: cup, rsiup
-   AED_REAL :: temp, par, Io, salinity, extc, dz
+   AED_REAL :: temp, par, Io, salinity, extc, dz, salt
    AED_REAL :: primprod(data%num_malgae), exudation(data%num_malgae), &
                a_nfix(data%num_malgae), respiration(data%num_malgae)
    AED_REAL :: cuptake(data%num_malgae), cexcretion(data%num_malgae), cmortality(data%num_malgae)
@@ -537,6 +541,10 @@ SUBROUTINE aed2_calculate_macroalgae(data,column,layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
+
+RETURN
+
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_tem)    ! local temperature
    salinity = _STATE_VAR_(data%id_sal)! local salinity
@@ -596,7 +604,20 @@ SUBROUTINE aed2_calculate_macroalgae(data,column,layer_idx)
                           data%phytos(phy_i)%kTn,temp)
 
       !fSal = fTemp_function(salinity, minS, Smin, Smax, maxS )
-      fSal = fSal_function(salinity, 25., 30., 45., 80. )
+      fSal = one_ ! fSal_function(salinity, 25., 30., 45., 80. )
+
+       salt = salinity
+       IF( salt<=5. ) THEN
+         fSal = zero_
+       ELSE IF ( salt>5. .AND. salt<=18.  ) THEN
+         fSal = 0. + ( (salt-5.)/(18.-5.) )
+       ELSE IF ( salt>18. .AND. salt<=40. ) THEN
+         fSal = one_
+       ELSE IF ( salt>40. .AND. salt<=65. ) THEN
+         fSal = 1. - ( (salt-40.)/(65.-40.) )
+       ELSE IF ( salt>65. ) THEN
+         fSal = zero_
+       ENDIF
 
       ! Get the light and nutrient limitation.
       ! NITROGEN.
@@ -902,18 +923,6 @@ SUBROUTINE aed2_calculate_macroalgae(data,column,layer_idx)
 
       ! total macroalgae carbon
       tphy = tphy + phy
-
-      ! total chlorophyll-a
-      IF (data%phytos(phy_i)%Xcc > 0.1) THEN
-        !-- assume Xcc (mol C/ mol chla) is a constant
-        tchla = tchla + ( phy / data%phytos(phy_i)%Xcc ) * 12.0
-      ELSE
-        !-- use dynamic equation (Eq 13: of Baklouti, Cloern et al. 1995)
-        !-- theta = 1/Xcc [mg Chl (mg C)1] = 0.003 + 0.0154  e^0.050T  e^0.059E mu
-        tchla = tchla + ( phy * (0.003 + 0.0154 * exp(0.050*temp) * exp(0.059*par) &
-                        * primprod(phy_i)))
-      ENDIF
-
       ! total internal nutrients
       tin = tin + INi
       tip = tip + IPi
@@ -921,21 +930,22 @@ SUBROUTINE aed2_calculate_macroalgae(data,column,layer_idx)
 
    ! Set diagnostic arrays for combined assemblage properties
    _DIAG_VAR_(data%id_GPP) =  sum(cuptake)*secs_per_day
-   _DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
-   _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
-   _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
-   _DIAG_VAR_(data%id_NUP) =  sum(nuptake)*secs_per_day
-   _DIAG_VAR_(data%id_PUP) =  sum(puptake)*secs_per_day
-   _DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
+  !_DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
+  !_DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
+  !_DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
+  !_DIAG_VAR_(data%id_NUP) =  sum(nuptake)*secs_per_day
+  !_DIAG_VAR_(data%id_PUP) =  sum(puptake)*secs_per_day
+  !_DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
 
-   _DIAG_VAR_(data%id_dPAR) =  par
-   _DIAG_VAR_(data%id_TCHLA)=  tchla
-   _DIAG_VAR_(data%id_TPHY) =  tphy
-   _DIAG_VAR_(data%id_TIN)  =  tin
-   _DIAG_VAR_(data%id_TIP)  =  tip
+  !_DIAG_VAR_(data%id_dPAR) =  par
+  !_DIAG_VAR_(data%id_TCHLA)=  tchla
+   _DIAG_VAR_(data%id_TMALG) =  tphy
+   _DIAG_VAR_(data%id_TIN)   =  tin
+   _DIAG_VAR_(data%id_TIP)   =  tip
 
 END SUBROUTINE aed2_calculate_macroalgae
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 !###############################################################################
@@ -951,7 +961,7 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
 !
 !LOCALS
    INTEGER  :: malg_i,phy_i,c
-   AED_REAL :: malg,temp,extc,par,dz,Io,fI,bottom_stress        ! State
+   AED_REAL :: malg,temp,extc,par,dz,Io,fI,bottom_stress, depth,light        ! State
    AED_REAL :: malg_flux,malg_prod,malg_resp                    ! Fluxes
 
    AED_REAL :: tphy, tin, tip, tchla
@@ -959,7 +969,7 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
    AED_REAL :: pup
    AED_REAL :: no3up,nh4up
    AED_REAL :: cup, rsiup
-   AED_REAL :: salinity
+   AED_REAL :: salinity, salt
    AED_REAL :: primprod(data%num_malgae), exudation(data%num_malgae), &
                a_nfix(data%num_malgae), respiration(data%num_malgae)
    AED_REAL :: cuptake(data%num_malgae), cexcretion(data%num_malgae), cmortality(data%num_malgae)
@@ -968,32 +978,32 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
    AED_REAL :: siuptake(data%num_malgae), siexcretion(data%num_malgae), simortality(data%num_malgae)
    AED_REAL :: fT, fNit, fPho, fSil, fXl, fSal, PNf
    AED_REAL :: upTot,net_cuptake,available,flux
-
-
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   ! Loop through pelagic plankton groups (CURRENTLY DISABLED)
-   !    ! Retrieve current (local) state variable values.
-   !    phy = _STATE_VAR_(data%id_p(phy_i))! macroalgae
-   !    phy_flux = zero_  ! no groups currently accumulate biomass in the sediment
-   !    ! Set bottom fluxes for the pelagic (change per surface area per second)
-   !    !_FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + phy_flux
-   !    !_FLUX_VAR_B_(data%id_p(phy_i)) = _FLUX_VAR_B_(data%id_p(phy_i)) - phy_flux
-   !ENDDO
+  extc = _STATE_VAR_(data%id_extc) ! cell extinction
+  depth = _STATE_VAR_(data%id_dz)
+  IF( depth<0.1 ) THEN
+    light = 100.
+  ELSE
+    light = 100. * exp(-extc*(depth-0.08))
+  ENDIF
+  _DIAG_VAR_(data%id_dPAR) =  light
+  _DIAG_VAR_(data%id_TCHLA) = extc 
+
+
+
    DO malg_i=1,data%num_malgae
 
      ! Process benthic / attached macroalgae
      IF ( data%phytos(malg_i)%settling == _MOB_ATTACHED_ ) THEN
        ! Get local conditions
        temp = _STATE_VAR_(data%id_tem)  ! local temperature
-       extc = _STATE_VAR_(data%id_extc) ! cell extinction
-       dz = _STATE_VAR_(data%id_dz)     ! cell depth
-       par = _STATE_VAR_(data%id_par)   ! local photosynthetically active radiation
-       Io = _STATE_VAR_S_(data%id_I_0)  ! surface short wave radiation
+      !extc = _STATE_VAR_(data%id_extc) ! cell extinction
+       dz   = _STATE_VAR_(data%id_dz)     ! cell depth
+       par  = _STATE_VAR_(data%id_par)   ! local photosynthetically active radiation
+       Io   = _STATE_VAR_S_(data%id_I_0)  ! surface short wave radiation
        bottom_stress = _STATE_VAR_S_(data%id_taub)
-
-
 
        phy_i = malg_i
 
@@ -1005,13 +1015,11 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
        no3up = 0.
        nh4up = 0.
        IF (data%do_Nuptake) THEN
-           no3up = _STATE_VAR_(data%id_Nupttarget(1))
-           nh4up = _STATE_VAR_(data%id_Nupttarget(2))
+         no3up = _STATE_VAR_(data%id_Nupttarget(1))
+         nh4up = _STATE_VAR_(data%id_Nupttarget(2))
        ENDIF
        cup = 0.
        IF (data%do_Cuptake)  cup = _STATE_VAR_(data%id_Cupttarget)
-       rsiup = 0.
-       IF (data%do_Siuptake)  rsiup = _STATE_VAR_(data%id_Siupttarget)
 
        tphy = 0.0
        tchla = 0.0
@@ -1048,9 +1056,22 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
                            data%phytos(phy_i)%bTn,          &
                            data%phytos(phy_i)%kTn,temp)
 
-       !fSal = fTemp_function(salinity, minS, Smin, Smax, maxS )
-       fSal = fSal_function(salinity, 25., 30., 45., 80. )
-
+       !fSal = fSal_function(salinity, minS, Smin, Smax, maxS )
+       fSal = one_ !fSal_function(salinity, 5., 18., 35., 45. )
+       
+       salt = salinity
+       IF( salt<=5. ) THEN
+         fSal = zero_
+       ELSE IF ( salt>5. .AND. salt<=18.  ) THEN
+         fSal = 0. + ( (salt-5.)/(18.-5.) )
+       ELSE IF ( salt>18. .AND. salt<=40. ) THEN
+         fSal = one_
+       ELSE IF ( salt>40. .AND. salt<=65. ) THEN
+         fSal = 1. - ( (salt-40.)/(65.-40.) )
+       ELSE IF ( salt>65. ) THEN
+         fSal = zero_
+       ENDIF
+      
        ! Get the light and nutrient limitation.
        ! NITROGEN.
        fNit = 0.0
@@ -1104,6 +1125,7 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
        ELSE
           fPho = phyto_fP(data%phytos,phy_i,frp=pup)
        ENDIF
+       fPho = 1.0
 
        ! SILICA.
        fSil = 1.0
@@ -1153,7 +1175,7 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
                                  fT,pup,respiration(phy_i),exudation(phy_i),&
                                          puptake(phy_i,:),pexcretion(phy_i),pmortality(phy_i))
 
-       malg_flux = (primprod(phy_i)-respiration(phy_i)-exudation(phy_i))*malg
+      malg_flux = (primprod(phy_i)-respiration(phy_i)-exudation(phy_i))*malg
 
 
        ! Update the attached biomass, and water O2/CO2/Nuts
@@ -1172,7 +1194,7 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
           flux = (-sum(puptake(phy_i,:)) - pexcretion(phy_i) - pmortality(phy_i) )
           available = MAX(zero_, IPi - data%phytos(phy_i)%X_pmin*malg)
           IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
-          _FLUX_VAR_(data%id_ipben(phy_i)) = _FLUX_VAR_(data%id_ipben(phy_i)) + ( flux)
+          _FLUX_VAR_B_(data%id_ipben(phy_i)) = _FLUX_VAR_B_(data%id_ipben(phy_i)) + ( flux)
        ENDIF
        IF (data%do_DOuptake) THEN
          _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + malg_flux
@@ -1194,7 +1216,7 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
 
 
        ! Redistribute into the water column if sloughing occurs.
-       IF( bottom_stress>one_ ) THEN
+       IF( bottom_stress>data%slough_stress ) THEN
          malg_flux = 0.67*malg
          _FLUX_VAR_(data%id_p(malg_i)) = _FLUX_VAR_(data%id_p(malg_i)) + malg_flux
          _FLUX_VAR_B_(data%id_pben(malg_i)) = _FLUX_VAR_B_(data%id_pben(malg_i)) - malg_flux
@@ -1204,10 +1226,11 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
        ENDIF
 
        ! Update the diagnostic variables
-       _DIAG_VAR_(data%id_TPHY) =  _DIAG_VAR_(data%id_TPHY) + malg
+       _DIAG_VAR_(data%id_TMALG) =  malg*(12.*1e-3/0.5)
      ENDIF
 
    ENDDO
+   !_DIAG_VAR_(data%id_TMALG) =  _DIAG_VAR_(data%id_TMALG)*dz *(12.*1e-3/0.5)
 
 END SUBROUTINE aed2_calculate_benthic_macroalgae
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1311,7 +1334,7 @@ SUBROUTINE aed2_light_extinction_macroalgae(data,column,layer_idx,extinction)
    AED_REAL,INTENT(inout) :: extinction
 !
 !LOCALS
-   AED_REAL :: phy
+   AED_REAL :: phy,malg,dz
    INTEGER  :: phy_i
 !
 !-----------------------------------------------------------------------
@@ -1322,7 +1345,15 @@ SUBROUTINE aed2_light_extinction_macroalgae(data,column,layer_idx,extinction)
 
       ! Self-shading with explicit contribution from background macroalgae concentration.
       extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
+
+      ! Process benthic / attached macroalgae
+      IF ( data%phytos(phy_i)%settling == _MOB_ATTACHED_ ) THEN
+        dz   = MAX(_STATE_VAR_(data%id_dz),0.1)     ! cell depth
+        malg = _STATE_VAR_S_(data%id_pben(phy_i))/dz ! attached macroalgae
+        extinction = extinction + (data%phytos(phy_i)%KePHY*malg)
+      ENDIF
    ENDDO
+
 END SUBROUTINE aed2_light_extinction_macroalgae
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

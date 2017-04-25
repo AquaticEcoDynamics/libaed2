@@ -37,6 +37,8 @@ MODULE aed2_habitat
       INTEGER :: id_bird, id_mtox
       INTEGER :: id_chsi, id_chpl, id_chfl, id_chsd
       INTEGER :: id_rhsi, id_rhpl, id_rhfl, id_rhsd, id_rhtr, id_rhsp
+      INTEGER :: id_d_rupfs,id_d_rupft,id_d_rupfl,id_d_rupfa,id_d_rupfd
+
       !# Dependencies
       INTEGER :: id_l_ph, id_l_hab, id_l_aass, id_l_rveg, id_l_bveg
       INTEGER :: id_l_salg, id_l_falg
@@ -62,6 +64,7 @@ MODULE aed2_habitat
 
    END TYPE
 
+   LOGiCAL :: extra_diag
 
 !===============================================================================
 CONTAINS
@@ -92,7 +95,7 @@ SUBROUTINE aed2_define_habitat(data, namlst)
    NAMELIST /aed2_habitat/ simBirdForaging, simBenthicProd, simFishTolerance, &
                            simMetalTox, mtox_vars, mtox_lims,   &
                            simCyanoRisk, simCrabHabitat, &
-                           simRuppiaHabitat !, rhsi_falg_link,
+                           simRuppiaHabitat, extra_diag !, rhsi_falg_link,
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -107,6 +110,8 @@ SUBROUTINE aed2_define_habitat(data, namlst)
    simCyanoRisk = .false.
    simCrabHabitat = .false.
    simRuppiaHabitat = .false.
+
+   extra_diag = .false.
 
    ! Read the namelist
    read(namlst,nml=aed2_habitat,iostat=status)
@@ -184,6 +189,15 @@ SUBROUTINE aed2_define_habitat(data, namlst)
 
      data%id_l_salg  = aed2_locate_global(TRIM(rhsi_salg_link))
      data%id_l_falg  = aed2_locate_global_sheet(TRIM(rhsi_falg_link))
+
+     if( extra_diag )then
+       data%id_d_rupfs = aed2_define_sheet_diag_variable('ruppia_hsi_fsal','-', 'Ruppia Habitat Suitability - fSal')
+       data%id_d_rupft = aed2_define_sheet_diag_variable('ruppia_hsi_ftem','-', 'Ruppia Habitat Suitability - fTem')
+       data%id_d_rupfl = aed2_define_sheet_diag_variable('ruppia_hsi_flgt','-', 'Ruppia Habitat Suitability - fLgt')
+       data%id_d_rupfa = aed2_define_sheet_diag_variable('ruppia_hsi_falg','-', 'Ruppia Habitat Suitability - fAlg')
+       data%id_d_rupfd = aed2_define_sheet_diag_variable('ruppia_hsi_fdep','-', 'Ruppia Habitat Suitability - fDep')
+     endif
+
    ENDIF
 
 
@@ -291,6 +305,7 @@ SUBROUTINE aed2_calculate_riparian_habitat(data,column,layer_idx, pc_wet)
    AED_REAL, PARAMETER :: crit_hab_conc = 500.
 
    AED_REAL :: rhpl,rhfl,rhsd,rhtr,rhsp,falg,Io,vel
+   AED_REAL :: limitation(5,6)
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -399,12 +414,13 @@ SUBROUTINE aed2_calculate_riparian_habitat(data,column,layer_idx, pc_wet)
      temp  = _STATE_VAR_(data%id_E_temp)   ! degC
      extc  = _STATE_VAR_(data%id_E_salt)   ! /m
      Io    = _STATE_VAR_S_(data%id_E_Io)   ! W/m2
-     falg  =(_STATE_VAR_S_(data%id_l_falg) + _STATE_VAR_(data%id_l_salg)) * 12. * 1e-3 / 0.5  ! convert mmolC/m2 to gDW/m2
+     falg  =(_STATE_VAR_S_(data%id_l_falg) + _STATE_VAR_(data%id_l_salg)*depth) * 12. * 1e-3 / 0.5  ! convert mmolC/m2 to gDW/m2
      vel   = 0. !
 
      CALL ruppia_habitat_suitability(data, &
                                      rhpl,rhfl,rhsd,rhtr,rhsp,&
-                                     depth,salt,temp,extc,falg,Io,vel,pc_wet)
+                                     depth,salt,temp,extc,falg,Io,vel,pc_wet,&
+                                     limitation)
 
      _DIAG_VAR_S_(data%id_rhpl) = rhpl
      _DIAG_VAR_S_(data%id_rhfl) = rhfl
@@ -415,6 +431,14 @@ SUBROUTINE aed2_calculate_riparian_habitat(data,column,layer_idx, pc_wet)
      ! Overall HSI : Habitat Suitability Index (Issue here re time integration)
      _DIAG_VAR_S_(data%id_rhsi) = (rhpl+rhfl+rhsd+rhtr+rhsp)/5.
 
+     iF( extra_diag ) THEN
+       _DIAG_VAR_S_(data%id_d_rupfs) = limitation(1,1)
+       _DIAG_VAR_S_(data%id_d_rupft) = limitation(1,2)
+       _DIAG_VAR_S_(data%id_d_rupfl) = limitation(1,3)
+       _DIAG_VAR_S_(data%id_d_rupfa) = limitation(1,4)
+       _DIAG_VAR_S_(data%id_d_rupfd) = limitation(1,5)
+      !_DIAG_VAR_S_(data%id_d_rupfm) = limitation(1,6)
+     ENDiF
    ENDIF
 
 
@@ -453,7 +477,7 @@ END SUBROUTINE aed2_light_extinction_habitat
 
 
 !###############################################################################
-SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,temp,extc,fa,Io,vel,pc_wet)
+SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,temp,extc,fa,Io,vel,pc_wet,limitation)
 !-------------------------------------------------------------------------------
 ! Get the light extinction coefficient due to biogeochemical variables
 !-------------------------------------------------------------------------------
@@ -461,6 +485,7 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
    CLASS (aed2_habitat_data_t),INTENT(in) :: data
    AED_REAL :: rhpl,rhfl,rhsd,rhtr,rhsp
    AED_REAL :: depth,salt,temp,extc,fa,Io,vel,pc_wet
+   AED_REAL :: limitation(:,:)
 !
 !LOCALS
    AED_REAL :: rupp_salt,rupp_temp,rupp_lght,rupp_falg,rupp_matz,rupp_dess
@@ -478,10 +503,9 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        light = 100. * exp(-extc*(depth-0.08))
      ENDIF
 
-     !-- First do adult tolerance
+     !-- First do ADULT tolerance
      IF( pc_wet < 0.1 ) THEN
        ! Dry cell - set dessication factor
-
        rupp_dess = zero_    ! maybe need a time counter here.
 
      ELSE
@@ -496,10 +520,17 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
      ! Adult plant habitat suitability
      rhpl = MIN(rupp_salt,rupp_temp,rupp_lght,rupp_falg,rupp_matz,rupp_dess)
 
-     !-- Second do flowering tolerance
+     limitation(1,1) = rupp_salt
+     limitation(1,2) = rupp_temp
+     limitation(1,3) = rupp_lght
+     limitation(1,4) = rupp_falg
+     limitation(1,5) = rupp_dess
+     limitation(1,6) = rupp_matz
+
+
+     !-- Second do FLOWER tolerance
      IF( pc_wet < 0.1 ) THEN
        ! Dry cell - set dessication factor
-
        rupp_dess = zero_    ! maybe need a time counter here.
 
      ELSE
@@ -523,7 +554,7 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
      ELSE
        ! Wet cell
        rupp_salt = ruppia_salinity(salt, "seed")
-       rupp_temp = ruppia_temp(salt, "seed")
+       rupp_temp = ruppia_temp(temp, "seed")
        rupp_lght = one_
        rupp_falg = one_
        rupp_dess = ruppia_depth(depth, "seed")
@@ -542,7 +573,7 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
      ELSE
        ! Wet cell
        rupp_salt = ruppia_salinity(salt, "turion")
-       rupp_temp = ruppia_temp(salt, "turion")
+       rupp_temp = ruppia_temp(temp, "turion")
        rupp_lght = one_
        rupp_falg = one_
        rupp_dess = ruppia_depth(depth, "turion")
@@ -597,11 +628,11 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        IF( salt<=19. ) THEN
          ruppia_salinity = zero_
        ELSE IF ( salt>19. .AND. salt<=40.  ) THEN
-         ruppia_salinity = 0. + ( (salt-19.)/(72.-40.) )
+         ruppia_salinity = 0. + ( (salt-19.)/(40.-19.) )
        ELSE IF ( salt>40. .AND. salt<=60. ) THEN
          ruppia_salinity = one_
        ELSE IF ( salt>60. .AND. salt<=85. ) THEN
-         ruppia_salinity = 1. - ( (salt-60.)/(230.-85.) )
+         ruppia_salinity = 1. - ( (salt-60.)/(85.-60.) )
        ELSE IF ( salt>85. ) THEN
          ruppia_salinity = zero_
        ENDIF
@@ -740,25 +771,18 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
 
      ruppia_light = one_
 
-     IF( TRIM(stage)=="seed"   .OR. &
-         TRIM(stage)=="sprout" .OR. &
-         TRIM(stage)=="adult"  .OR. &
-         TRIM(stage)=="flower" .OR. &
-         TRIM(stage)=="turion" ) THEN
+     IF( TRIM(stage)=="sprout" .OR. &
+         TRIM(stage)=="adult"  ) THEN
 
        !0 - 7.5 unsuitable
        !7.5 - 24 suboptimal
        !>24 optimal
-       IF( light<=4. ) THEN
+       IF( light<=7.5 ) THEN
          ruppia_light = zero_
-       ELSE IF ( light>4. .AND. light<=10.  ) THEN
-         ruppia_light = 0. + ( (light-4.)/(10.-4.) )
-       ELSE IF ( light>10. .AND. light<=20. ) THEN
+       ELSE IF ( light>7.5 .AND. light<=24.  ) THEN
+         ruppia_light = 0. + ( (light-7.5)/(24.-7.5) )
+       ELSE IF ( light>24. ) THEN
          ruppia_light = one_
-       ELSE IF ( light>20. .AND. light<=30. ) THEN
-         ruppia_light = 1. - ( (light-20.)/(30.-20.) )
-       ELSE IF ( light>30. ) THEN
-         ruppia_light = zero_
        ENDIF
 
      ENDIF
@@ -809,18 +833,36 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
 
      ruppia_depth = one_
 
-     IF( TRIM(stage)=="sprout" .OR. &
-         TRIM(stage)=="adult"  .OR. &
-         TRIM(stage)=="flower" ) THEN
+     IF( TRIM(stage)=="adult" ) THEN
 
-       IF ( depth>=0. .AND. depth<=0.2 ) THEN
+       IF ( depth>=0. .AND. depth<=0.1 ) THEN
          ruppia_depth = zero_
-       ELSE IF ( depth>0.2 .AND. depth<=0.4 ) THEN
-         ruppia_depth = 1. - ( (depth-0.1)/(0.4-0.1) )
-       ELSE IF ( depth>0.4 ) THEN
+       ELSE IF ( depth>0.1 .AND. depth<=0.3 ) THEN
+         ruppia_depth = 1. - ( (depth-0.1)/(0.3-0.1) )
+       ELSE IF ( depth>0.3 ) THEN
          ruppia_depth = one_
        ENDIF
 
+     ELSEIF( TRIM(stage)=="sprout" ) THEN
+ 
+       IF ( depth<=0.01 ) THEN
+         ruppia_depth = zero_
+       ELSE IF ( depth>0.01 .AND. depth<=0.2 ) THEN
+         ruppia_depth = 1. - ( (depth-0.01)/(0.2-0.01) )
+       ELSE IF ( depth>0.2 ) THEN
+         ruppia_depth = one_
+       ENDIF
+     
+     ELSEIF( TRIM(stage)=="flower" ) THEN
+ 
+       IF ( depth<=0.01 ) THEN
+         ruppia_depth = zero_
+       ELSE IF ( depth>0.01 .AND. depth<=0.1 ) THEN
+         ruppia_depth = 1. - ( (depth-0.01)/(0.1-0.01) )
+       ELSE IF ( depth>0.1 ) THEN
+         ruppia_depth = one_
+       ENDIF
+     
      ENDIF
 
   END FUNCTION ruppia_depth
