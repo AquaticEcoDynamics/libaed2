@@ -26,7 +26,8 @@ MODULE aed2_phytoplankton
                         exp_integral, &
                         aed2_bio_temp_function, &
                         fTemp_function, &
-                        water_viscosity
+                        water_viscosity, &
+                        in_zone_set
    USE aed2_bio_utils
 
    IMPLICIT NONE
@@ -51,7 +52,7 @@ MODULE aed2_phytoplankton
       INTEGER :: id_Cexctarget,id_Cmorttarget,id_Cupttarget
       INTEGER :: id_Siexctarget,id_Simorttarget,id_Siupttarget
       INTEGER :: id_DOupttarget, id_l_resus, id_Psed_phy
-      INTEGER :: id_par, id_I_0, id_extc
+      INTEGER :: id_par, id_I_0, id_extc, id_sedzone
       INTEGER :: id_tem, id_sal, id_dz, id_dens
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP, id_MPB, id_d_MPB, id_d_BPP, id_d_mpbv
@@ -65,12 +66,12 @@ MODULE aed2_phytoplankton
       LOGICAL  :: do_Siuptake, do_DOuptake, do_N2uptake
       LOGICAL  :: do_Pmort, do_Nmort, do_Cmort, do_Simort
       LOGICAL  :: do_Pexc, do_Nexc, do_Cexc, do_Siexc
-      INTEGER  :: do_mpb
+      INTEGER  :: do_mpb, n_zones
       AED_REAL :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
       INTEGER  :: nnup, npup
       AED_REAL :: dic_per_n
       AED_REAL :: min_rho,max_rho
-      AED_REAL,ALLOCATABLE :: resuspension(:)
+      AED_REAL,ALLOCATABLE :: resuspension(:), active_zones(:)
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_phytoplankton
@@ -287,7 +288,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    INTEGER,INTENT(in) :: namlst
 !
 !LOCALS
-   INTEGER  :: status
+   INTEGER  :: status,i
 
    INTEGER  :: num_phytos
    INTEGER  :: the_phytos(MAX_PHYTO_TYPES)
@@ -316,7 +317,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    AED_REAL           :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
    AED_REAL           :: min_rho, max_rho
    LOGICAL            :: extra_debug = .false.
-   INTEGER            :: do_mpb
+   INTEGER            :: do_mpb, n_zones
+   AED_REAL           :: active_zones(1000)
 
    NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, settling,resuspension,&
                     p_excretion_target_variable,p_mortality_target_variable,   &
@@ -330,7 +332,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                       si_uptake_target_variable,                               &
                     dbase, zerolimitfudgefactor, extra_debug, extra_diag,      &
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
-                    resus_link
+                    resus_link, n_zones, active_zones
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_phytoplankton initialization"
@@ -350,6 +352,13 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%R_mpbg = R_mpbg/secs_per_day   ; data%R_mpbr = R_mpbr/secs_per_day
    data%I_Kmpb = I_Kmpb   ; data%mpb_max = mpb_max
    ALLOCATE(data%resuspension(num_phytos)); data%resuspension = resuspension(1:num_phytos)
+   data%n_zones = n_zones
+   IF( n_zones>0 ) THEN
+     ALLOCATE(data%active_zones(n_zones))
+     DO i=1,n_zones
+       data%active_zones(i) = active_zones(i)
+     ENDDO
+   ENDIF
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
@@ -487,7 +496,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_dz = aed2_locate_global('layer_ht')
    data%id_extc = aed2_locate_global('extc_coef')
    data%id_dens = aed2_locate_global('density')
-
+   data%id_sedzone = aed2_locate_global_sheet('sed_zone')
+ 
 END SUBROUTINE aed2_define_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -934,7 +944,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
 !
 !LOCALS
    INTEGER  :: phy_i
-   AED_REAL :: phy,mpb,temp,extc,par,dz,Io,fI        ! State
+   AED_REAL :: phy,mpb,temp,extc,par,dz,Io,fI,matz        ! State
    AED_REAL :: Fsed_phy,Psed_phy,mpb_flux,mpb_prod,mpb_resp
 !
 !-------------------------------------------------------------------------------
@@ -952,6 +962,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
    ! Process microphytobenthos
    IF ( data%do_mpb>0 ) THEN
      ! Get local conditions
+     matz = _STATE_VAR_S_(data%id_sedzone) ! local benthic type 
      mpb = _STATE_VAR_S_(data%id_mpb) ! local mpb density
      temp = _STATE_VAR_(data%id_tem)  ! local temperature
      extc = _STATE_VAR_(data%id_extc) ! cell extinction
@@ -978,7 +989,10 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
      ENDIF
 !RETURN
      ! Resuspension (simple assumption here)
-     Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * data%resuspension(1)
+     Fsed_phy = zero_
+     IF( in_zone_set(matz,data%active_zones) ) THEN 
+       Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * data%resuspension(1)
+     ENDIF
      _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy
      _FLUX_VAR_(data%id_p(1)) = _FLUX_VAR_(data%id_p(1)) + Fsed_phy
 

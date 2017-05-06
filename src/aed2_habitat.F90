@@ -37,7 +37,7 @@ MODULE aed2_habitat
       INTEGER :: id_bird, id_mtox
       INTEGER :: id_chsi, id_chpl, id_chfl, id_chsd
       INTEGER :: id_rhsi, id_rhpl, id_rhfl, id_rhsd, id_rhtr, id_rhsp
-      INTEGER :: id_d_rupfs,id_d_rupft,id_d_rupfl,id_d_rupfa,id_d_rupfd
+      INTEGER, ALLOCATABLE :: id_d_rupfs(:),id_d_rupft(:),id_d_rupfl(:),id_d_rupfa(:),id_d_rupfd(:)
 
       !# Dependencies
       INTEGER :: id_l_ph, id_l_hab, id_l_aass, id_l_rveg, id_l_bveg
@@ -191,11 +191,18 @@ SUBROUTINE aed2_define_habitat(data, namlst)
      data%id_l_falg  = aed2_locate_global_sheet(TRIM(rhsi_falg_link))
 
      if( extra_diag )then
-       data%id_d_rupfs = aed2_define_sheet_diag_variable('ruppia_hsi_fsal','-', 'Ruppia Habitat Suitability - fSal')
-       data%id_d_rupft = aed2_define_sheet_diag_variable('ruppia_hsi_ftem','-', 'Ruppia Habitat Suitability - fTem')
-       data%id_d_rupfl = aed2_define_sheet_diag_variable('ruppia_hsi_flgt','-', 'Ruppia Habitat Suitability - fLgt')
-       data%id_d_rupfa = aed2_define_sheet_diag_variable('ruppia_hsi_falg','-', 'Ruppia Habitat Suitability - fAlg')
-       data%id_d_rupfd = aed2_define_sheet_diag_variable('ruppia_hsi_fdep','-', 'Ruppia Habitat Suitability - fDep')
+       ALLOCATE(data%id_d_rupfs(5))
+       ALLOCATE(data%id_d_rupft(5))
+       ALLOCATE(data%id_d_rupfl(5))
+       ALLOCATE(data%id_d_rupfa(5))
+       ALLOCATE(data%id_d_rupfd(5))
+       DO i =1,5
+        data%id_d_rupfs(i) = aed2_define_sheet_diag_variable('ruppia_hsi_fsal_'//CHAR(ICHAR('0') + i),'-', 'Ruppia Habitat Suitability - fSal')
+        data%id_d_rupft(i) = aed2_define_sheet_diag_variable('ruppia_hsi_ftem_'//CHAR(ICHAR('0') + i),'-', 'Ruppia Habitat Suitability - fTem')
+        data%id_d_rupfl(i) = aed2_define_sheet_diag_variable('ruppia_hsi_flgt_'//CHAR(ICHAR('0') + i),'-', 'Ruppia Habitat Suitability - fLgt')
+        data%id_d_rupfa(i) = aed2_define_sheet_diag_variable('ruppia_hsi_falg_'//CHAR(ICHAR('0') + i),'-', 'Ruppia Habitat Suitability - fAlg')
+        data%id_d_rupfd(i) = aed2_define_sheet_diag_variable('ruppia_hsi_fdep_'//CHAR(ICHAR('0') + i),'-', 'Ruppia Habitat Suitability - fDep')
+       ENDDO
      endif
 
    ENDIF
@@ -412,7 +419,7 @@ SUBROUTINE aed2_calculate_riparian_habitat(data,column,layer_idx, pc_wet)
      depth = _STATE_VAR_(data%id_E_depth)  ! metres
      salt  = _STATE_VAR_(data%id_E_salt)   ! salinity g/L
      temp  = _STATE_VAR_(data%id_E_temp)   ! degC
-     extc  = _STATE_VAR_(data%id_E_salt)   ! /m
+     extc  = _STATE_VAR_(data%id_E_extc)   ! /m
      Io    = _STATE_VAR_S_(data%id_E_Io)   ! W/m2
      falg  =(_STATE_VAR_S_(data%id_l_falg) + _STATE_VAR_(data%id_l_salg)*depth) * 12. * 1e-3 / 0.5  ! convert mmolC/m2 to gDW/m2
      vel   = 0. !
@@ -432,12 +439,14 @@ SUBROUTINE aed2_calculate_riparian_habitat(data,column,layer_idx, pc_wet)
      _DIAG_VAR_S_(data%id_rhsi) = (rhpl+rhfl+rhsd+rhtr+rhsp)/5.
 
      iF( extra_diag ) THEN
-       _DIAG_VAR_S_(data%id_d_rupfs) = limitation(1,1)
-       _DIAG_VAR_S_(data%id_d_rupft) = limitation(1,2)
-       _DIAG_VAR_S_(data%id_d_rupfl) = limitation(1,3)
-       _DIAG_VAR_S_(data%id_d_rupfa) = limitation(1,4)
-       _DIAG_VAR_S_(data%id_d_rupfd) = limitation(1,5)
-      !_DIAG_VAR_S_(data%id_d_rupfm) = limitation(1,6)
+       DO i = 1,5
+        _DIAG_VAR_S_(data%id_d_rupfs(i)) = limitation(i,1)
+        _DIAG_VAR_S_(data%id_d_rupft(i)) = limitation(i,2)
+        _DIAG_VAR_S_(data%id_d_rupfl(i)) = limitation(i,3)
+        _DIAG_VAR_S_(data%id_d_rupfa(i)) = limitation(i,4)
+        _DIAG_VAR_S_(data%id_d_rupfd(i)) = limitation(i,5)
+      !_DIAG_VAR_S_(data%id_d_rupfm(i)) = limitation(i,6)
+      ENDDO
      ENDiF
    ENDIF
 
@@ -519,7 +528,6 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
      ENDIF
      ! Adult plant habitat suitability
      rhpl = MIN(rupp_salt,rupp_temp,rupp_lght,rupp_falg,rupp_matz,rupp_dess)
-
      limitation(1,1) = rupp_salt
      limitation(1,2) = rupp_temp
      limitation(1,3) = rupp_lght
@@ -544,6 +552,12 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
      ENDIF
      ! Habitat suitability for flowering
      rhfl = MIN(rupp_salt,rupp_temp,rupp_lght,rupp_falg,rupp_matz,rupp_dess)
+     limitation(2,1) = rupp_salt
+     limitation(2,2) = rupp_temp
+     limitation(2,3) = rupp_lght
+     limitation(2,4) = rupp_falg
+     limitation(2,5) = rupp_dess
+     limitation(2,6) = rupp_matz
 
      !-- Third do seed germination
      IF( pc_wet < 0.1 ) THEN
@@ -562,6 +576,12 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
      ENDIF
      ! Habitat suitability for seed germination
      rhsd = MIN(rupp_salt,rupp_temp,rupp_lght,rupp_falg,rupp_matz,rupp_dess)
+     limitation(3,1) = rupp_salt
+     limitation(3,2) = rupp_temp
+     limitation(3,3) = rupp_lght
+     limitation(3,4) = rupp_falg
+     limitation(3,5) = rupp_dess
+     limitation(3,6) = rupp_matz
 
 
      !-- Fourth do sediment suitability for turions/turion sprouting
@@ -582,6 +602,12 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
      !IF( .NOT. _STATE_VAR_S_(data%id_E_matz)==in_zone_set ) rupp_matz = zero_
      ! Habitat suitability for seed germination
     rhtr = MIN(rupp_salt,rupp_temp,rupp_lght,rupp_falg,rupp_matz,rupp_dess)
+    limitation(4,1) = rupp_salt
+    limitation(4,2) = rupp_temp
+    limitation(4,3) = rupp_lght
+    limitation(4,4) = rupp_falg
+    limitation(4,5) = rupp_dess
+    limitation(4,6) = rupp_matz
 
     !-- Fifth do sprout tolerance
     IF( pc_wet < 0.1 ) THEN
@@ -600,6 +626,12 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
     ENDIF
     ! Habitat suitability for flowering
     rhsp = MIN(rupp_salt,rupp_temp,rupp_lght,rupp_falg,rupp_matz,rupp_dess)
+    limitation(5,1) = rupp_salt
+    limitation(5,2) = rupp_temp
+    limitation(5,3) = rupp_lght
+    limitation(5,4) = rupp_falg
+    limitation(5,5) = rupp_dess
+    limitation(5,6) = rupp_matz
 
   !---------------------------------------------------------------------
   CONTAINS
@@ -685,11 +717,11 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
          ruppia_salinity = zero_
        ELSE IF ( salt>47. .AND. salt<=50.  ) THEN
          ruppia_salinity = 0. + ( (salt-47.)/(50.-47.) )
-       ELSE IF ( salt>50. .AND. salt<=62. ) THEN
+       ELSE IF ( salt>50. .AND. salt<=70. ) THEN
          ruppia_salinity = one_
-       ELSE IF ( salt>62. .AND. salt<=70. ) THEN
-         ruppia_salinity = 1. - ( (salt-62.)/(70.-62.) )
-       ELSE IF ( salt>70. ) THEN
+       ELSE IF ( salt>70. .AND. salt<=100. ) THEN
+         ruppia_salinity = 1. - ( (salt-70.)/(100.-70.) )
+       ELSE IF ( salt>100. ) THEN
          ruppia_salinity = zero_
        ENDIF
 
@@ -844,7 +876,7 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        ENDIF
 
      ELSEIF( TRIM(stage)=="sprout" ) THEN
- 
+
        IF ( depth<=0.01 ) THEN
          ruppia_depth = zero_
        ELSE IF ( depth>0.01 .AND. depth<=0.2 ) THEN
@@ -852,9 +884,9 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        ELSE IF ( depth>0.2 ) THEN
          ruppia_depth = one_
        ENDIF
-     
+
      ELSEIF( TRIM(stage)=="flower" ) THEN
- 
+
        IF ( depth<=0.01 ) THEN
          ruppia_depth = zero_
        ELSE IF ( depth>0.01 .AND. depth<=0.1 ) THEN
@@ -862,7 +894,7 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        ELSE IF ( depth>0.1 ) THEN
          ruppia_depth = one_
        ENDIF
-     
+
      ENDIF
 
   END FUNCTION ruppia_depth
