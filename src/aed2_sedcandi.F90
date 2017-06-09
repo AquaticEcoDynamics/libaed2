@@ -125,7 +125,7 @@
 !           for any particular purpose.  No liability is accepted              !
 !           in any event for any damages, including accidental or              !
 !           consequential damages, lost of profits, costs of lost              !
-!           candi or programming materials, or otherwise in                     !
+!           candi or programming materials, or otherwise in                    !
 !           connection with or arising out of the use of this program.         !
 !                                                                              !
 !                                                                              !
@@ -536,7 +536,7 @@
 !                                                                              !
 !                                                                              !
 !                                                                              !
-!       where:                                                                     !
+!       where:                                                                 !
 !                                                                              !
 !               O2                                                             !
 !     RO2 = --------                                                   (16)    !
@@ -679,7 +679,7 @@
 !     infinite sediment column.  However, a second posibility is               !
 !     that the concentrations are exactly or approximately known               !
 !     at some depth x = L.  This would be the case when modelling              !
-!     candi sets taken over a limited depth-interval.  In this case,            !
+!     candi sets taken over a limited depth-interval.  In this case,           !
 !                                                                              !
 !                      C = C        at   x = L                         (29)    !
 !                           L                                                  !
@@ -707,14 +707,15 @@ MODULE aed2_sedcandi
    USE aed2_gctypes
    USE aed2_gcsolver,   ONLY: nComponents, allComponents
    USE aed2_vode,       ONLY: DVODE
+   USE aed2_util,       ONLY: make_dir_path
 
    IMPLICIT NONE
 
    PRIVATE
    PUBLIC :: ConfigureCANDI,                                                   &
              InitialiseCANDI,                                                  &
-             doCANDI, dfluxes, aed2_sed_candi_t
-!  PUBLIC :: Y,                                                                &
+             doCANDI, dfluxes, aed2_sed_candi_t, ResultsDir
+!  PUBLIC :: candi%y,                                                          &
 !            CANDIVarNames,                                                    &
 !            iSTEADY, SALT, TEMP, PRES,                                        &
 !            fg0, wvel, uvel ,                                                 &
@@ -733,7 +734,7 @@ MODULE aed2_sedcandi
  CHARACTER (LEN=4), PARAMETER :: EX_I="EX_I"  ! Exponential depth depend.      !
 !CHARACTER (LEN=4), PARAMETER :: IN_I="IN_I"  ! Multiple depth linear int.     !
 !CHARACTER (LEN=4), PARAMETER :: FI_I="FI_I"  ! File input                     !
-!CHARACTER (LEN=4), PARAMETER :: D2_I="D2_I"  ! 2D candi input                  !
+!CHARACTER (LEN=4), PARAMETER :: D2_I="D2_I"  ! 2D candi input                 !
 !CHARACTER (LEN=4), PARAMETER :: RI_I="RI_I"  ! Along-river interpolation      !
 
  LOGICAL :: disableWQUpdate=.false. ! Disables WQ update with WQ3F             !
@@ -760,9 +761,11 @@ MODULE aed2_sedcandi
   !-- Number of simulated variables
   INTEGER, PARAMETER :: Mainmod  = 8    ! Compulsory variables
 
+   CHARACTER(len=64) :: ResultsDir = "results/candi_aed/"
+
 !------------------------------------------------------------------------------!
 
- CONTAINS
+CONTAINS
 
 !------------------------------------------------------------------------------!
 ! configureCANDI                                                               !
@@ -773,8 +776,10 @@ MODULE aed2_sedcandi
 ! Sets grid size, simulated variables and allocates necessary space for        !
 ! local arrays                                                                 !
 !------------------------------------------------------------------------------!
- FUNCTION ConfigureCANDI(dia,nSedLayers,nCANDIVarsToSim,Names,VarSolidStatus,nSedCols) RESULT(candi)
-   !-- Incoming                            ! Where do these come in from? - Dan
+SUBROUTINE ConfigureCANDI(candi, dia, nSedLayers, nCANDIVarsToSim, Names,      &
+                          VarSolidStatus, nSedCols)
+   !-- Incoming
+   TYPE(aed2_sed_candi_t),           INTENT(inout) :: candi
    TYPE(AEDConstDiagenesisType),     INTENT(IN) :: dia
    INTEGER,                          INTENT(IN) :: nSedLayers
    INTEGER,                          INTENT(IN) :: nCANDIVarsToSim
@@ -783,7 +788,6 @@ MODULE aed2_sedcandi
    !-- Outgoing
    INTEGER,                          INTENT(OUT):: nSedCols
    !-- Local
-   TYPE(aed2_sed_candi_t),POINTER :: candi
    INTEGER  :: i,j,nNonTracers
    REAL(SEDP) :: v
 
@@ -794,12 +798,12 @@ MODULE aed2_sedcandi
    !  STOP
    !END IF
    IF(nSedLayers > 999) THEN
-     PRINT *,' AED cannot currently configure CANDI to have >999 vertical layers'
-     STOP
+      PRINT *,' AED cannot currently configure CANDI to have >999 vertical layers'
+      STOP
    END IF
 
-   ALLOCATE(candi)
-
+print *,"Allocating ", nCANDIVarsToSim
+print *,"for nSedCols ", nSedCols
    ALLOCATE(candi%bottom(0:nCANDIVarsToSim-1))
    ALLOCATE(candi%FixedBottomConc(0:nCANDIVarsToSim-1))
    ALLOCATE(candi%PartFluxes(0:nCANDIVarsToSim-1))
@@ -824,9 +828,9 @@ MODULE aed2_sedcandi
    !-- Set local "isSolid" array to AED version
    ALLOCATE(candi%isSolid(0:nCANDIVarsToSim-1))
    IF(SIZE(VarSolidStatus) == nCANDIVarsToSim) THEN
-     candi%isSolid = VarSolidStatus
+      candi%isSolid = VarSolidStatus
    ELSE
-     STOP " Size Mismatch in configureCANDI - VarSolidStatus"
+      STOP " Size Mismatch in configureCANDI - VarSolidStatus"
    END IF
 
    !---------------------------------------------------------------------------!
@@ -842,43 +846,43 @@ MODULE aed2_sedcandi
    !dp -- Mainmod
    candi%O2y    = GetAEDColNum(candi,"oxy")
    IF(candi%O2y < 0 .OR. candi%O2y > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: DO. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: DO. STOPPING"
+      STOP
    END IF
    candi%NO3y   = GetAEDColNum(candi,"nit")
    IF(candi%NO3y < 0 .OR. candi%NO3y > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: NO3. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: NO3. STOPPING"
+      STOP
    END IF
    candi%SO4y   = GetAEDColNum(candi,"so4")
    IF(candi%SO4y < 0 .OR. candi%SO4y > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: SO4. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: SO4. STOPPING"
+      STOP
    END IF
    candi%PO4ly  = GetAEDColNum(candi,"frp")
    IF(candi%PO4ly < 0 .OR. candi%PO4ly > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: PO4. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: PO4. STOPPING"
+      STOP
    END IF
    candi%NH4y   = GetAEDColNum(candi,"amm")
    IF(candi%NH4y < 0 .OR. candi%NH4y > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: NH4. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: NH4. STOPPING"
+      STOP
    END IF
    candi%CH4y   = GetAEDColNum(candi,"ch4")
    IF(candi%CH4y < 0 .OR. candi%CH4y > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: CH4. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: CH4. STOPPING"
+      STOP
    END IF
    candi%HSy    = GetAEDColNum(candi,"h2s")
    IF(candi%HSy < 0 .OR. candi%HSy > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: H2S. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: H2S. STOPPING"
+      STOP
    END IF
    candi%HCO3y  = GetAEDColNum(candi,"dic")
    IF(candi%HCO3y < 0 .OR. candi%HCO3y > nCANDIVarsToSim-1) THEN
-     WRITE(*,*) " Compulsory CANDI Variable not simulated: DIC. STOPPING"
-     STOP
+      WRITE(*,*) " Compulsory CANDI Variable not simulated: DIC. STOPPING"
+      STOP
    END IF
 
    !-------- kgmod ------------ OMModel1
@@ -1014,13 +1018,9 @@ MODULE aed2_sedcandi
      candi%POCRy      = -1
      candi%PONRy      = -1
      candi%POPRy      = -1
-
-  !ELSE
-
    END IF ! End if OMModel = 1, 2 or 3
    nNonTracers = Mainmod + candi%kgmod
    !-------- (END COMPULSORY COMPONENTS) ------------
-
 
 
    !---------------------------------------------------------------------------!
@@ -1038,6 +1038,8 @@ MODULE aed2_sedcandi
    candi%MnIVy   = GetAEDColNum(candi,"mniv")
    candi%FeIIy   = GetAEDColNum(candi,"feii")
    candi%FeIIIy  = GetAEDColNum(candi,"feiii")
+   candi%Feadsy  = GetAEDColNum(candi,"Feads")
+   candi%Mnadsy  = GetAEDColNum(candi,"Mnads")
 
    candi%param%simMnFe = .TRUE.
 
@@ -1063,15 +1065,15 @@ MODULE aed2_sedcandi
    !-- FeS and FeS2 (Pyrite)
    candi%param%simFeS = .FALSE.
 
-       ! FeS is simulated
-       candi%param%simFeS = .TRUE.
+   ! FeS is simulated
+   candi%param%simFeS = .TRUE.
 
-       candi%FeSY    = GetAEDColNum(candi,"fes")
-       candi%FeS2Y   = GetAEDColNum(candi,"fes2")
+   candi%FeSY    = GetAEDColNum(candi,"fes")
+   candi%FeS2Y   = GetAEDColNum(candi,"fes2")
 
-       nNonTracers = nNonTracers + 2
+   nNonTracers = nNonTracers + 2
 
-       candi%fesmod = 2
+   candi%fesmod = 2
 
    IF(.NOT. candi%param%simFeS) THEN
      candi%FeSY    =-1
@@ -1099,13 +1101,13 @@ MODULE aed2_sedcandi
    !------------------------------------------
    !-- Calcite
    candi%param%simCaCO3 = .FALSE.
-       ! Calcite is simulated
-       candi%param%simCaCO3 = .TRUE.
-       candi%CaY     = GetAEDColNum(candi,"ca")
-       candi%calY    = GetAEDColNum(candi,"caco3")
-       candi%ARAY    =-1
-       nNonTracers = nNonTracers + 2
-       candi%CaCO3mod = 2
+   ! Calcite is simulated
+   candi%param%simCaCO3 = .TRUE.
+   candi%CaY     = GetAEDColNum(candi,"ca")
+   candi%calY    = GetAEDColNum(candi,"caco3")
+   candi%ARAY    =-1
+   nNonTracers = nNonTracers + 2
+   candi%CaCO3mod = 2
    IF(.NOT. candi%param%simCaCO3) THEN
      candi%CaY       =-1
      candi%ARAY      =-1
@@ -1116,11 +1118,11 @@ MODULE aed2_sedcandi
    !------------------------------------------
    !-- Siderite
    candi%param%simFeCO3 = .FALSE.
-       ! Siderite is simulated
-       candi%param%simFeCO3 = .TRUE.
-       candi%sidY    = GetAEDColNum(candi,"feco3")
-       nNonTracers = nNonTracers + 1
-       candi%FeCO3mod = 1
+   ! Siderite is simulated
+   candi%param%simFeCO3 = .TRUE.
+   candi%sidY    = GetAEDColNum(candi,"feco3")
+   nNonTracers = nNonTracers + 1
+   candi%FeCO3mod = 1
    IF(.NOT. candi%param%simFeCO3) THEN
      candi%sidY      =-1
      candi%FeCO3mod  = 0
@@ -1129,11 +1131,11 @@ MODULE aed2_sedcandi
    !------------------------------------------
    !-- Rhodocrosite
    candi%param%simMnCO3 = .FALSE.
-       ! Siderite is simulated
-       candi%param%simMnCO3 = .TRUE.
-       candi%rodY    = GetAEDColNum(candi,"mnco3")
-       nNonTracers = nNonTracers + 1
-       candi%MnCO3mod = 1
+   ! Siderite is simulated
+   candi%param%simMnCO3 = .TRUE.
+   candi%rodY    = GetAEDColNum(candi,"mnco3")
+   nNonTracers = nNonTracers + 1
+   candi%MnCO3mod = 1
    IF(.NOT. candi%param%simFeCO3) THEN
      candi%rodY      =-1
      candi%MnCO3mod  = 0
@@ -1168,7 +1170,7 @@ MODULE aed2_sedcandi
    !------------------------------------------
    !-- Non-active (tracer) variable definition
    candi%TracerMod = nCANDIVarsToSim - nNonTracers
-   ALLOCATE(candi%TracerY(candi%Tracermod))  ! records tracer col numbers in "Y"
+   ALLOCATE(candi%TracerY(candi%Tracermod))  ! records tracer col numbers in "candi%y"
 
    IF(candi%TracerMod>1) THEN
      candi%simTracer = .TRUE.
@@ -1217,6 +1219,34 @@ MODULE aed2_sedcandi
    ALLOCATE(candi%FOAc(candi%maxnpts))
    ALLOCATE(candi%FH2(candi%maxnpts))
 
+   ALLOCATE(candi%FBMax(candi%maxnpts))
+
+   ALLOCATE(candi%FIN_O2(candi%maxnpts))
+   ALLOCATE(candi%FIN_NO3(candi%maxnpts))
+   ALLOCATE(candi%FIN_MnO2(candi%maxnpts))
+   ALLOCATE(candi%FIN_FeOH(candi%maxnpts))
+   ALLOCATE(candi%FIN_SO4(candi%maxnpts))
+   ALLOCATE(candi%FIN_CH4(candi%maxnpts))
+
+   ALLOCATE(candi%FIN_O2NO3(candi%maxnpts))
+   ALLOCATE(candi%FIN_O2MnO2(candi%maxnpts))
+   ALLOCATE(candi%FIN_O2FeOH(candi%maxnpts))
+   ALLOCATE(candi%FIN_O2SO4(candi%maxnpts))
+   ALLOCATE(candi%FIN_O2CH4(candi%maxnpts))
+
+   ALLOCATE(candi%FTEA_O2(candi%maxnpts))
+   ALLOCATE(candi%FTEA_NO3(candi%maxnpts))
+   ALLOCATE(candi%FTEA_MnO2(candi%maxnpts))
+   ALLOCATE(candi%FTEA_FeOH(candi%maxnpts))
+   ALLOCATE(candi%FTEA_SO4(candi%maxnpts))
+
+   ALLOCATE(candi%FTem_O2(candi%maxnpts))
+   ALLOCATE(candi%FTem_NO3(candi%maxnpts))
+   ALLOCATE(candi%FTem_MnO2(candi%maxnpts))
+   ALLOCATE(candi%FTem_FeOH(candi%maxnpts))
+   ALLOCATE(candi%FTem_SO4(candi%maxnpts))
+   ALLOCATE(candi%FTem_Met(candi%maxnpts))
+
    ALLOCATE(candi%RPOM1(candi%maxnpts))
    ALLOCATE(candi%RPOM2(candi%maxnpts))
    ALLOCATE(candi%RPOM3(candi%maxnpts))
@@ -1231,6 +1261,42 @@ MODULE aed2_sedcandi
    ALLOCATE(candi%RFerDHyd(candi%maxnpts))
    ALLOCATE(candi%RDHyd(candi%maxnpts))
 
+   ALLOCATE(candi%RO2(candi%maxnpts))
+   ALLOCATE(candi%RNO3(candi%maxnpts))
+   ALLOCATE(candi%RMnO2(candi%maxnpts))
+   ALLOCATE(candi%RFeOH(candi%maxnpts))
+   ALLOCATE(candi%RSO4(candi%maxnpts))
+   ALLOCATE(candi%RMet(candi%maxnpts))
+   ALLOCATE(candi%ROMO2(candi%maxnpts))
+   ALLOCATE(candi%ROMNO3(candi%maxnpts))
+   ALLOCATE(candi%ROMMnO2(candi%maxnpts))
+   ALLOCATE(candi%ROMFeOH(candi%maxnpts))
+   ALLOCATE(candi%ROMSO4(candi%maxnpts))
+   ALLOCATE(candi%ROMMet(candi%maxnpts))
+   ALLOCATE(candi%ROMMnii(candi%maxnpts))
+   ALLOCATE(candi%ROMFeii(candi%maxnpts))
+   ALLOCATE(candi%TP(candi%maxnpts))
+   ALLOCATE(candi%TN(candi%maxnpts))
+   ALLOCATE(candi%TOC(candi%maxnpts))
+
+   ALLOCATE(candi%k_iron(candi%maxnpts))
+   ALLOCATE(candi%kp_iron(candi%maxnpts))
+   ALLOCATE(candi%k_manganese(candi%maxnpts))
+   ALLOCATE(candi%kp_manganese(candi%maxnpts))
+   ALLOCATE(candi%l_iron(candi%maxnpts))
+   ALLOCATE(candi%lp_iron(candi%maxnpts))
+   ALLOCATE(candi%l_manganese(candi%maxnpts))
+   ALLOCATE(candi%lp_manganese(candi%maxnpts))
+
+   ALLOCATE(candi%RCO2(candi%maxnpts))
+   ALLOCATE(candi%RCH4(candi%maxnpts))
+   ALLOCATE(candi%TerminalOxidation(candi%maxnpts))
+   ALLOCATE(candi%Nrelease(candi%maxnpts))
+   ALLOCATE(candi%NH4release(candi%maxnpts))
+   ALLOCATE(candi%NO3release(candi%maxnpts))
+   ALLOCATE(candi%Prelease(candi%maxnpts))
+   ALLOCATE(candi%XMetalrelease(candi%maxnpts))
+
    ALLOCATE(candi%dGFerDHyd(candi%maxnpts))
    ALLOCATE(candi%FTFerDHyd(candi%maxnpts))
    ALLOCATE(candi%dGAerOAc(candi%maxnpts))
@@ -1240,7 +1306,9 @@ MODULE aed2_sedcandi
    ALLOCATE(candi%dGDenH2(candi%maxnpts))
    ALLOCATE(candi%FTDenH2(candi%maxnpts))
    ALLOCATE(candi%dGManOAc(candi%maxnpts))
+   ALLOCATE(candi%dGManH2(candi%maxnpts))
    ALLOCATE(candi%FTManOAc(candi%maxnpts))
+   ALLOCATE(candi%FTManH2(candi%maxnpts))
    ALLOCATE(candi%dGIroOAc(candi%maxnpts))
    ALLOCATE(candi%FTIroOAc(candi%maxnpts))
    ALLOCATE(candi%dGIroH2(candi%maxnpts))
@@ -1277,11 +1345,14 @@ MODULE aed2_sedcandi
    ALLOCATE(candi%RMetH2(candi%maxnpts))
    ALLOCATE(candi%RNH4OX(candi%maxnpts))
    ALLOCATE(candi%RMnOX(candi%maxnpts))
+   ALLOCATE(candi%RMnadsOX(candi%maxnpts))
    ALLOCATE(candi%RFeOX(candi%maxnpts))
+   ALLOCATE(candi%RFeadsox(candi%maxnpts))
    ALLOCATE(candi%RTSOX(candi%maxnpts))
    ALLOCATE(candi%RCH4OX(candi%maxnpts))
    ALLOCATE(candi%RFeSOX(candi%maxnpts))
    ALLOCATE(candi%RFeS2OX(candi%maxnpts))
+   ALLOCATE(candi%RXSOx(candi%maxnpts))
 
    ALLOCATE(candi%RNH4NO2(candi%maxnpts))
    ALLOCATE(candi%RMnNO3(candi%maxnpts))
@@ -1314,8 +1385,18 @@ MODULE aed2_sedcandi
    ALLOCATE(candi%RPO4ads(candi%maxnpts))
    ALLOCATE(candi%RNH4ads(candi%maxnpts))
 
+   ALLOCATE(candi%QSid(candi%maxnpts))
+   ALLOCATE(candi%deltaSid(candi%maxnpts))
+   ALLOCATE(candi%deltadisSid(candi%maxnpts))
+   ALLOCATE(candi%QRod(candi%maxnpts))
+   ALLOCATE(candi%deltaRod(candi%maxnpts))
+   ALLOCATE(candi%deltadisRod(candi%maxnpts))
+   ALLOCATE(candi%QFeS(candi%maxnpts))
+   ALLOCATE(candi%deltaFeS(candi%maxnpts))
+   ALLOCATE(candi%deltadisFeS(candi%maxnpts))
+
    ALLOCATE(candi%reac(0:candi%nSPECIES-1,candi%MAXNPTS))
-   ALLOCATE(candi%Y(0:candi%nSPECIES-1,candi%MAXNPTS))
+   ALLOCATE(candi%y(0:candi%nSPECIES-1,candi%MAXNPTS))
    ALLOCATE(candi%Ydot(0:candi%nSPECIES-1,candi%MAXNPTS))
    ALLOCATE(candi%Ytemp(0:candi%nSPECIES-1,candi%MAXNPTS))
    ALLOCATE(candi%IAP(0:candi%nSPECIES-1,candi%MAXNPTS))
@@ -1325,6 +1406,7 @@ MODULE aed2_sedcandi
    ALLOCATE(candi%kg0var(candi%maxnpts))
    ALLOCATE(candi%kgpo4up(candi%maxnpts))
    ALLOCATE(candi%Btot(candi%maxnpts))
+   ALLOCATE(candi%Bsubtot(candi%maxnpts))
    ALLOCATE(candi%pps(candi%maxnpts)    )
    ALLOCATE(candi%psp(candi%maxnpts)    )
    ALLOCATE(candi%poros(candi%maxnpts)  )
@@ -1410,8 +1492,9 @@ MODULE aed2_sedcandi
 
    WRITE(*,"(9X,'Configuration Successful ')")
 
- END FUNCTION ConfigureCANDI
+ END SUBROUTINE ConfigureCANDI
 !------------------------------------------------------------------------------!
+
 
 !------------------------------------------------------------------------------!
 !rl   ****************************************************************
@@ -1425,10 +1508,9 @@ MODULE aed2_sedcandi
 !rl         concentration profiles and model internal parameters.
 !rl   ****************************************************************
 !------------------------------------------------------------------------------!
- SUBROUTINE InitialiseCANDI(candi,bottomConcs,sedimentConcs)
- !SUBROUTINE InitialiseCANDI(bottomwaterConcs,sedimentConcs)
-    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+SUBROUTINE InitialiseCANDI(candi,bottomConcs,sedimentConcs)
+   !-- Incoming
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    REAL(SEDP), DIMENSION(0:candi%nSPECIES-1), INTENT(IN) :: bottomConcs
     !REAL(SEDP), DIMENSION(0:candi%nSPECIES-1), INTENT(IN) :: bottomwaterConcs
    REAL(SEDP), DIMENSION(0:candi%nSPECIES-1), INTENT(IN) :: sedimentConcs
@@ -1464,52 +1546,66 @@ MODULE aed2_sedcandi
      fracfacorg = 1.0
      alpha1 = SQRT(candi%param%docl2dic/candi%param%db0)
 
-     candi%Y(:,:)    = ZERO
+     candi%y(:,:)    = ZERO
      candi%Ydot(:,:) = ZERO
+
+     !# CAB
+!    print *,'sheblamo======================================================'
+!    print*,"sedimentConcs :"
+!    print*,sedimentConcs
+!    print*,"====="
+!    print*,"bottomConcs :"
+!    print*,bottomConcs
+!    print*,"====="
 
      DO i = 0,candi%nSPECIES-1
        ! All layers
-       candi%Y(i,:) = sedimentConcs(i)
+       candi%y(i,:) = sedimentConcs(i)
 
        ! Top layer reserved for bottom water condition
-       candi%Y(i,1) = bottomConcs(i)
-       !Y(i,1) = bottomwaterConcs(i)
-       END DO
+       candi%y(i,1) = bottomConcs(i)
+       !candi%y(i,1) = bottomwaterConcs(i)
+     ENDDO
+!    print*,"Initial"
+!    do i=1,4
+!      print*,candi%y(:,i)
+!      print*,"-----------------------------"
+!    enddo
 
      !##IF(OMImitMethod == "LI_I") THEN
      !##  !-- Exponential decrease
-     !##  CALL SetSedInitialCondition("LI_I",Y(DOCLy,:),sedimentConcs(DOCLy), OM_min*sedimentConcs(DOCLy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(POCLy,:),sedimentConcs(POCLy), OM_min*sedimentConcs(POCLy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(DOCRy,:),sedimentConcs(DOCRy), OM_min*sedimentConcs(DOCRy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(POCRy,:),sedimentConcs(POCRy), OM_min*sedimentConcs(POCRy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(DOCLy,:),sedimentConcs(DOCLy), OM_min*sedimentConcs(DOCLy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(POCLy,:),sedimentConcs(POCLy), OM_min*sedimentConcs(POCLy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(DOCRy,:),sedimentConcs(DOCRy), OM_min*sedimentConcs(DOCRy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(POCRy,:),sedimentConcs(POCRy), OM_min*sedimentConcs(POCRy),InitMinDepth)
      !##
-     !##  CALL SetSedInitialCondition("LI_I",Y(DONLy,:),sedimentConcs(DONLy), OM_min*sedimentConcs(DONLy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(PONLy,:),sedimentConcs(PONLy), OM_min*sedimentConcs(PONLy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(DONRy,:),sedimentConcs(DONRy), OM_min*sedimentConcs(DONRy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(PONRy,:),sedimentConcs(PONRy), OM_min*sedimentConcs(PONRy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(DONLy,:),sedimentConcs(DONLy), OM_min*sedimentConcs(DONLy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(PONLy,:),sedimentConcs(PONLy), OM_min*sedimentConcs(PONLy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(DONRy,:),sedimentConcs(DONRy), OM_min*sedimentConcs(DONRy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(PONRy,:),sedimentConcs(PONRy), OM_min*sedimentConcs(PONRy),InitMinDepth)
      !##
-     !##  CALL SetSedInitialCondition("LI_I",Y(DOPLy,:),sedimentConcs(DOPLy), OM_min*sedimentConcs(DOPLy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(POPLy,:),sedimentConcs(POPLy), OM_min*sedimentConcs(POPLy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(DOPRy,:),sedimentConcs(DOPRy), OM_min*sedimentConcs(DOPRy),InitMinDepth)
-     !##  CALL SetSedInitialCondition("LI_I",Y(POPRy,:),sedimentConcs(POPRy), OM_min*sedimentConcs(POPRy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(DOPLy,:),sedimentConcs(DOPLy), OM_min*sedimentConcs(DOPLy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(POPLy,:),sedimentConcs(POPLy), OM_min*sedimentConcs(POPLy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(DOPRy,:),sedimentConcs(DOPRy), OM_min*sedimentConcs(DOPRy),InitMinDepth)
+     !##  CALL SetSedInitialCondition("LI_I",candi%y(POPRy,:),sedimentConcs(POPRy), OM_min*sedimentConcs(POPRy),InitMinDepth)
      !##
      !##ELSE IF(OMImitMethod == "CO_I" .OR. OMImitMethod == "EX_I" ) THEN
      !##  !-- Constant
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(DOCLy,:),sedimentConcs(DOCLy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(DONLy,:),sedimentConcs(DONLy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(DOPLy,:),sedimentConcs(DOPLy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(DOCLy,:),sedimentConcs(DOCLy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(DONLy,:),sedimentConcs(DONLy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(DOPLy,:),sedimentConcs(DOPLy))
      !##
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(POCLy,:),sedimentConcs(POCLy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(PONLy,:),sedimentConcs(PONLy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(POPLy,:),sedimentConcs(POPLy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(POCLy,:),sedimentConcs(POCLy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(PONLy,:),sedimentConcs(PONLy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(POPLy,:),sedimentConcs(POPLy))
      !##
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(DOCRy,:),sedimentConcs(DOCRy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(DONRy,:),sedimentConcs(DONRy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(DOPRy,:),sedimentConcs(DOPRy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(DOCRy,:),sedimentConcs(DOCRy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(DONRy,:),sedimentConcs(DONRy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(DOPRy,:),sedimentConcs(DOPRy))
      !##
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(POCRy,:),sedimentConcs(POCRy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(PONRy,:),sedimentConcs(PONRy))
-     !##  CALL SetSedInitialCondition(OMImitMethod,Y(POPRy,:),sedimentConcs(POPRy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(POCRy,:),sedimentConcs(POCRy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(PONRy,:),sedimentConcs(PONRy))
+     !##  CALL SetSedInitialCondition(OMImitMethod,candi%y(POPRy,:),sedimentConcs(POPRy))
      !##
      !##END IF
 
@@ -1518,58 +1614,71 @@ MODULE aed2_sedcandi
      !InitMinDepth = 100.0 !cm
 
      IF(candi%param%OMModel ==1) THEN
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%POMRy,:),sedimentConcs(candi%POMRy), candi%BC%OM_minR*sedimentConcs(candi%POMRy),candi%BC%InitMinDepthR)
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POMLy,:),sedimentConcs(candi%POMLy))
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POMspecialy,:),sedimentConcs(candi%POMspecialy))
-
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%POMRy,:),sedimentConcs(candi%POMRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%POMRy),candi%BC%InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POMLy,:),sedimentConcs(candi%POMLy))
+  !    CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POMspecialy,:),sedimentConcs(candi%POMspecialy))
      ELSEIF(candi%param%OMModel ==2) THEN
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%DOCRy,:),sedimentConcs(candi%DOCRy), candi%BC%OM_minR*sedimentConcs(candi%DOCRy),candi%BC%InitMinDepthR)
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%POCRy,:),sedimentConcs(candi%POCRy), candi%BC%OM_minR*sedimentConcs(candi%POCRy),candi%BC%InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%DOCRy,:),sedimentConcs(candi%DOCRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%DOCRy),candi%BC%InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%POCRy,:),sedimentConcs(candi%POCRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%POCRy),candi%BC%InitMinDepthR)
 
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%DONRy,:),sedimentConcs(candi%DONRy), candi%BC%OM_minR*sedimentConcs(candi%DONRy),candi%BC%InitMinDepthR)
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%PONRy,:),sedimentConcs(candi%PONRy), candi%BC%OM_minR*sedimentConcs(candi%PONRy),candi%BC%InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%DONRy,:),sedimentConcs(candi%DONRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%DONRy),candi%BC%InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%PONRy,:),sedimentConcs(candi%PONRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%PONRy),candi%BC%InitMinDepthR)
 
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%DOPRy,:),sedimentConcs(candi%DOPRy), candi%BC%OM_minR*sedimentConcs(candi%DOPRy),candi%BC%InitMinDepthR)
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%POPRy,:),sedimentConcs(candi%POPRy), candi%BC%OM_minR*sedimentConcs(candi%POPRy),candi%BC%InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%DOPRy,:),sedimentConcs(candi%DOPRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%DOPRy),candi%BC%InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%POPRy,:),sedimentConcs(candi%POPRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%POPRy),candi%BC%InitMinDepthR)
 
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%DOCLy,:),sedimentConcs(candi%DOCLy))
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%DONLy,:),sedimentConcs(candi%DONLy))
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%DOPLy,:),sedimentConcs(candi%DOPLy))
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%DOCLy,:),sedimentConcs(candi%DOCLy))
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%DONLy,:),sedimentConcs(candi%DONLy))
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%DOPLy,:),sedimentConcs(candi%DOPLy))
 
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POCLy,:),sedimentConcs(candi%POCLy))
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%PONLy,:),sedimentConcs(candi%PONLy))
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POPLy,:),sedimentConcs(candi%POPLy))
-
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POCLy,:),sedimentConcs(candi%POCLy))
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%PONLy,:),sedimentConcs(candi%PONLy))
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POPLy,:),sedimentConcs(candi%POPLy))
      ELSEIF(candi%param%OMModel ==3) THEN
-       CALL SetSedInitialCondition(candi,"LI_I",candi%Y(candi%POMRy,:),sedimentConcs(candi%POMRy), candi%BC%OM_minR*sedimentConcs(candi%POMRy),candi%BC%InitMinDepthR)
-       !CALL SetSedInitialCondition(candi,"LI_I",Y(DOMRy,:),sedimentConcs(DOMRy), OM_minR*sedimentConcs(DOMRy),InitMinDepthR)
+       CALL SetSedInitialCondition(candi,"LI_I",candi%y(candi%POMRy,:),sedimentConcs(candi%POMRy), &
+                                 candi%BC%OM_minR*sedimentConcs(candi%POMRy),candi%BC%InitMinDepthR)
+       !CALL SetSedInitialCondition(candi,"LI_I",candi%y(DOMRy,:),sedimentConcs(DOMRy), OM_minR*sedimentConcs(DOMRy),InitMinDepthR)
 
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%DHydy,:),sedimentConcs(candi%dhydy))
-       CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POMLy,:),sedimentConcs(candi%POMLy))
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%DHydy,:),sedimentConcs(candi%dhydy))
+       CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POMLy,:),sedimentConcs(candi%POMLy))
 
-       !CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%OAcy,:),sedimentConcs(candi%OAcy))
-       !CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%H2y,:),sedimentConcs(candi%H2y))
-       !CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POM1y,:),sedimentConcs(candi%POM1y))
-       !CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POM2y,:),sedimentConcs(candi%POM2y))
-       !CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POM3y,:),sedimentConcs(candi%POM3y))
-       !CALL SetSedInitialCondition(candi,"EX_I",candi%Y(candi%POM4y,:),sedimentConcs(candi%POM4y))
-
+       !CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%OAcy,:),sedimentConcs(candi%OAcy))
+       !CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%H2y,:),sedimentConcs(candi%H2y))
+       !CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POM1y,:),sedimentConcs(candi%POM1y))
+       !CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POM2y,:),sedimentConcs(candi%POM2y))
+       !CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POM3y,:),sedimentConcs(candi%POM3y))
+       !CALL SetSedInitialCondition(candi,"EX_I",candi%y(candi%POM4y,:),sedimentConcs(candi%POM4y))
      END IF
 
 
-     candi%FixedBottomConc(:) = candi%Y(:,1)
+     candi%FixedBottomConc(:) = candi%y(:,1)
 
 !     DO i = 1,maxnpts
 !       IF(rpar(i) > InitSedDepth) THEN
-!         Y(:,i) = ZERO
+!         candi%y(:,i) = ZERO
 !       END IF
 !     END DO
    ELSE
      !-- Restart
      ! CALL readauf(11)
    END IF
- END SUBROUTINE InitialiseCANDI
+print*,"End InitialiseCANDI"
+!print*," candi%y bounds ",lbound(candi%y,1), ubound(candi%y,1),lbound(candi%y,2), ubound(candi%y,2)
+!do i=1,100
+!print*,candi%y(:,i)
+!print*,"-----------------------------"
+!enddo
+!stop
+END SUBROUTINE InitialiseCANDI
 !------------------------------------------------------------------------------!
+
 
 !------------------------------------------------------------------------------!
 ! SetLocalConstants                                                            !
@@ -1580,7 +1689,7 @@ MODULE aed2_sedcandi
 !------------------------------------------------------------------------------!
  SUBROUTINE SetLocalConstants(candi,dia)
     IMPLICIT NONE
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
 
     TYPE(AEDConstDiagenesisType), INTENT(IN) :: dia
 
@@ -1600,229 +1709,13 @@ MODULE aed2_sedcandi
 !   candi%stcoef%fracPPspecial = dia%stcoef%fracPPspecial         !Dan added
 
     candi%param = dia%param
+    candi%maxnpts = dia%param%maxnpts
     !# now changed those that were different
     candi%kNH4NO2       = ZERO                !dia%param%kNH4NO2
     candi%param%kPO4ads       = dia%param%kapo4
     candi%param%kNH4ads       = dia%param%kanh4
 
-!# This lot can be removed when stuff works
-#if 0
-    candi%param%db0           = dia%param%db0
-    candi%param%imix          = dia%param%imix
-    candi%param%xs            = dia%param%xs
-    candi%param%x1            = dia%param%x1
-    candi%param%x2            = dia%param%x2
-    candi%param%irrg          = dia%param%irrg
-    candi%param%alpha0        = dia%param%alpha0
-    candi%param%xirrig        = dia%param%xirrig
-    candi%param%ventflow      = dia%param%ventflow
-    candi%param%w00           = dia%param%w00
-    candi%param%p0            = dia%param%p0
-    candi%param%p00           = dia%param%p00
-    candi%param%bp            = dia%param%bp
-    candi%param%torteq        = dia%param%torteq
-    candi%param%an            = dia%param%an
-    candi%param%aa            = dia%param%aa
-    candi%param%ab            = dia%param%ab
-    candi%param%xl            = dia%param%xl
-    candi%param%maxnpts       = dia%param%maxnpts  ! Deepest layer of sediment found in fabm.nml, for example, 50
-    candi%param%OMModel       = dia%param%OMModel         ! Dan added
-    candi%param%OMapproach    = dia%param%OMapproach      ! Dan added
-    candi%param%FTemswitch    = dia%param%FTemswitch      ! Dan added
-    candi%param%Bsolidswitch  = dia%param%Bsolidswitch    ! Dan added
-    candi%param%FTswitch      = dia%param%FTswitch        ! Dan added
-    candi%param%FBIOswitch    = dia%param%FBIOswitch      ! Dan added
-    candi%param%FINswitch     = dia%param%FINswitch       ! Dan added
-    candi%param%FInO2OnlySwitch = dia%param%FInO2OnlySwitch       ! Dan added
-    candi%param%FOMswitch     = dia%param%FOMswitch       ! Dan added
-
-    candi%param%pomr2dic       = dia%param%pomr2dic             ! Dan added
-    candi%param%poml2dic       = dia%param%poml2dic             ! Dan added
-    candi%param%pomspecial2dic = dia%param%pomspecial2dic       ! Dan added
-
-    candi%param%docl2dic      = dia%param%docl2dic
-    candi%param%donl2din      = dia%param%donl2din
-    candi%param%dopl2dip      = dia%param%dopl2dip
-    candi%param%pocl2docl     = dia%param%pocl2docl
-    candi%param%ponl2donl     = dia%param%ponl2donl
-    candi%param%popl2dopl     = dia%param%popl2dopl
-    candi%param%docr2docl     = dia%param%docr2docl
-    candi%param%donr2donl     = dia%param%donr2donl
-    candi%param%dopr2dopl     = dia%param%dopr2dopl
-    candi%param%pocr2docr     = dia%param%pocr2docr
-    candi%param%ponr2donr     = dia%param%ponr2donr
-    candi%param%popr2dopr     = dia%param%popr2dopr
-    candi%param%pocvr2docr    = dia%param%pocvr2docr
-    candi%param%ponvr2donr    = dia%param%ponvr2donr
-    candi%param%popvr2dopr    = dia%param%popvr2dopr
-      !OM Model 3 rate constants
-    candi%param%domr2pomr     = dia%param%domr2pomr             !Dan added
-    candi%param%poml2doml     = dia%param%poml2doml             !Dan added
-   !candi%param%pomr2dic      = dia%param%pomr2dic              !Dan added
-    candi%param%domr2dic      = dia%param%domr2dic              !Dan added
-
-    candi%param%fracOAc      = dia%param%fracOAc
-    candi%param%fracH2       = dia%param%fracH2
-    candi%param%e            = dia%param%e
-    candi%param%F            = dia%param%F
-    candi%param%n            = dia%param%n
-    candi%param%dPsi         = dia%param%dPsi
-    candi%param%fuse         = dia%param%fuse
-    candi%param%CellWeight   = dia%param%CellWeight
-    candi%param%Tiny         = dia%param%Tiny
-    candi%param%Temporary_proton = dia%param%Temporary_proton
-    candi%param%KDHyd        = dia%param%KDHyd
-    candi%param%KOAc         = dia%param%KOAc
-    candi%param%KH2          = dia%param%KH2
-    candi%param%kgrowthFer   = dia%param%kgrowthFer
-    candi%param%kgrowthAer   = dia%param%kgrowthAer
-    candi%param%kgrowthDen   = dia%param%kgrowthDen
-    candi%param%kgrowthMan   = dia%param%kgrowthMan
-    candi%param%kgrowthIro   = dia%param%kgrowthIro
-    candi%param%kgrowthSul   = dia%param%kgrowthSul
-    candi%param%kgrowthMet   = dia%param%kgrowthMet
-
-    candi%param%kdeathFer    = dia%param%kdeathFer
-    candi%param%kdeathAer    = dia%param%kdeathAer
-    candi%param%kdeathDen    = dia%param%kdeathDen
-    candi%param%kdeathMan    = dia%param%kdeathMan
-    candi%param%kdeathIro    = dia%param%kdeathIro
-    candi%param%kdeathSul    = dia%param%kdeathSul
-    candi%param%kdeathMet    = dia%param%kdeathMet
-
-    candi%param%kHyd1        = dia%param%kHyd1
-    candi%param%kHyd2        = dia%param%kHyd2
-    candi%param%kHyd3        = dia%param%kHyd3
-    candi%param%kHyd4        = dia%param%kHyd4
-    candi%param%kHydN        = dia%param%kHydN
-
-     ! Stoichiometric coefficients
-      ! OM model 1
-    ! OM model 2
-      !Nothing.
-      ! OM model 3
-    candi%param%FTR           = dia%param%FTR                   !Dan added
-    candi%param%FTT           = dia%param%FTT                   !Dan added
-    candi%param%deltaGATP     = dia%param%deltaGATP             !Dan added
-    candi%param%BMax          = dia%param%BMax
-
-    candi%param%YDHyAer      = dia%param%YDHyAer
-    candi%param%YDHyFer      = dia%param%YDHyFer
-    candi%param%YDenDHy      = dia%param%YDenDHy
-    candi%param%YAerOAc      = dia%param%YAerOAc
-    candi%param%YDenOAc      = dia%param%YDenOAc
-    candi%param%YDenH2       = dia%param%YDenH2
-    candi%param%YManOAc      = dia%param%YManOAc
-    candi%param%YIroOAc      = dia%param%YIroOAc
-    candi%param%YIroH2       = dia%param%YIroH2
-    candi%param%YSulOAc      = dia%param%YSulOAc
-    candi%param%YSulH2       = dia%param%YSulH2
-    candi%param%YMetOAc      = dia%param%YMetOAc
-    candi%param%YMetH2       = dia%param%YMetH2
-
-    candi%param%dG0FerDHyd   = dia%param%dG0FerDHyd
-    candi%param%dG0AerDHy    = dia%param%dG0AerDHy
-    candi%param%dG0AerOAc    = dia%param%dG0AerOAc
-    candi%param%dG0DenDHy    = dia%param%dG0DenDHy
-    candi%param%dG0DenOAc    = dia%param%dG0DenOAc
-    candi%param%dG0DenH2     = dia%param%dG0DenH2
-    candi%param%dG0ManOAc    = dia%param%dG0ManOAc
-    candi%param%dG0IroOAc    = dia%param%dG0IroOAc
-    candi%param%dG0IroH2     = dia%param%dG0IroH2
-    candi%param%dG0SulOAc    = dia%param%dG0SulOAc
-    candi%param%dG0SulH2     = dia%param%dG0SulH2
-    candi%param%dG0MetOAc    = dia%param%dG0MetOAc
-    candi%param%dG0MetH2     = dia%param%dG0MetH2
-
-    candi%stcoef%fracCDHyd    = dia%stcoef%fracCDHyd
-    candi%stcoef%fracNDHyd    = dia%stcoef%fracNDHyd
-    candi%stcoef%fracPDHyd    = dia%stcoef%fracPDHyd
-    candi%stcoef%fracCOAc     = dia%stcoef%fracCOAc
-    candi%stcoef%fracNOAc     = dia%stcoef%fracNOAc
-    candi%stcoef%fracPOAc     = dia%stcoef%fracPOAc
-    candi%stcoef%fracCH2      = dia%stcoef%fracCH2
-    candi%stcoef%fracNH2      = dia%stcoef%fracNH2
-    candi%stcoef%fracPH2      = dia%stcoef%fracPH2
-
-    candi%param%kO2           = dia%param%ko2
-    candi%param%kpO2          = dia%param%kpo2
-    candi%param%lO2           = dia%param%lo2
-    candi%param%lpO2          = dia%param%lpo2
-    candi%param%kNO3          = dia%param%kno3
-    candi%param%kpNO3         = dia%param%kpno3
-    candi%param%lNO3          = dia%param%lno3
-    candi%param%lpNO3         = dia%param%lpno3
-    candi%param%kMnO2         = dia%param%kmn
-    candi%param%kpMnO2        = dia%param%kpmn
-    candi%param%lMnO2         = dia%param%lmn
-    candi%param%lpMnO2        = dia%param%lpmn
-    candi%param%kFeOH         = dia%param%kfe
-    candi%param%kpFeOH        = dia%param%kpfe
-    candi%param%lFeOH         = dia%param%lfe
-    candi%param%lpFeOH        = dia%param%lpfe
-    candi%param%kSO4          = dia%param%kso4
-    candi%param%kpSO4         = dia%param%kpso4
-    candi%param%lSO4          = dia%param%lso4
-    candi%param%lpSO4         = dia%param%lpso4
-
-    candi%param%kNH4OX        = dia%param%knh4ox
-    candi%param%kMnOX         = dia%param%kmnox
-    candi%param%kFeOX         = dia%param%kfeox
-    candi%param%kTSOx         = dia%param%ktsox
-    candi%param%kCH4OX        = dia%param%kch4ox
-    candi%param%kFeSOX        = dia%param%kfesox
-    candi%param%kFeS2OX       = dia%param%kfeS2ox
-
-    candi%kNH4NO2       = ZERO                !dia%param%kNH4NO2
-    candi%param%kMnNO3        = dia%param%kmnno3
-    candi%param%kFeNO3        = dia%param%kfeno3  !dia%param%kFeNO3
-    candi%param%ktsno3        = dia%param%ktsno3
-    candi%param%kmnfe         = dia%param%kmnfe
-    candi%param%ktsmn         = dia%param%ktsmn
-    candi%param%kfesmn        = dia%param%kfesmn
-    candi%param%ktsfe         = dia%param%ktsfe
-    candi%param%kfesfe        = dia%param%kfesfe
-    candi%param%kch4so4       = dia%param%kch4so4
-    candi%param%kMnAge        = dia%param%kMnAge
-!   candi%param%kMnAge        = dia%param%kfe2ox        !dia%param%kMnAge
-    candi%param%kFeOHAppt     = dia%param%kFeOHAppt     !dia%param%kFeOHppt
-    candi%param%kFeOHBppt     = dia%param%kFeOHBppt     !dia%param%kFeOHppt
-    candi%param%kFeAge        = dia%param%kFeAge        !dia%param%kFeAge
-!   candi%param%kFeAge        = dia%param%kfe1no3       !dia%param%kFeAge
-    candi%param%kfesppt       = dia%param%kfesppt
-    candi%param%kpyrite       = dia%param%kpyrite
-    candi%param%kXSppt        = dia%param%kXSppt
-    candi%param%kSidppt       = dia%param%kSidppt
-    candi%param%kCalppt       = dia%param%kCalppt
-    candi%param%kRodppt       = dia%param%kRodppt
-    candi%param%kMnO2Appt     = dia%param%kMnO2Appt
-    candi%param%kMnO2Bppt     = dia%param%kMnO2Bppt
-
-    candi%param%kPO4ads       = dia%param%kapo4
-    candi%param%kNH4ads       = dia%param%kanh4
-
-    candi%param%rxn_mode   = dia%param%rxn_mode
-#endif
-
     candi%BC = dia%BC
-
-!   candi%BC%ibc2          = dia%BC%ibc2
-!   candi%BC%ibbc          = dia%BC%ibbc
-!   candi%BC%startSteady   = dia%BC%startSteady
-!   candi%BC%flux_scale    = dia%BC%flux_scale
-!   candi%BC%POMVR         = dia%BC%POMVR
-!   candi%BC%OMInitMethodL = dia%BC%OMInitMethodL
-!   candi%BC%OM_topL       = dia%BC%OM_topL
-!   candi%BC%OM_minL       = dia%BC%OM_minL
-!   candi%BC%OM_cfL        = dia%BC%OM_cfL
-!   candi%BC%InitMinDepthL = dia%BC%InitMinDepthL
-!   candi%BC%OMInitMethodR = dia%BC%OMInitMethodR
-!   candi%BC%OM_topR       = dia%BC%OM_topR
-!   candi%BC%OM_minR       = dia%BC%OM_minR
-!   candi%BC%OM_cfR        = dia%BC%OM_cfR
-!   candi%BC%InitMinDepthR = dia%BC%InitMinDepthR
-!   candi%BC%InitSedDepth  = dia%BC%InitSedDepth
-!   candi%BC%OutputUnits   = dia%BC%OutputUnits
 
     candi%mk = dia%Xmk   ! Metal X stoichiometry in MnO2
     candi%fl = dia%Xfl   ! Metal X stoichiometry in FeOH
@@ -1836,14 +1729,17 @@ MODULE aed2_sedcandi
     IF(TRIM(candi%BC%OMInitMethodL) == "C") candi%BC%OMInitMethodL = "CO_I"
     IF(TRIM(candi%BC%OMInitMethodR) == "L") candi%BC%OMInitMethodR = "LI_I"
 
-    candi%FilePar     = "results/candi_aed/candi.log"
-    candi%FileRat     = "results/candi_aed/rates.sed"
-    candi%FileRat2    = "results/candi_aed/rates2.sed"
-    candi%FileRatOAc  = "results/candi_aed/OAcrates.sed"
-    candi%FileDanPar  = "results/candi_aed/Dan.sed"
+    candi%FilePar     = TRIM(ResultsDir)//"candi.log"
+    candi%FileRat     = TRIM(ResultsDir)//"rates.sed"
+    candi%FileRat2    = TRIM(ResultsDir)//"rates2.sed"
+    candi%FileRatOAc  = TRIM(ResultsDir)//"OAcrates.sed"
+    candi%FileDanPar  = TRIM(ResultsDir)//"Dan.sed"
+
+    IF ( .NOT. make_dir_path(ResultsDir) ) print*, "Cannot create directory ", ResultsDir
 
     candi%iprint   = 0
-    candi%job      = 1
+!   candi%job      = 1
+    candi%job = candi%param%job
     candi%xldouble = 5.0
     candi%hofmu    = 0
     candi%writestep= 365
@@ -1874,8 +1770,8 @@ MODULE aed2_sedcandi
     candi%usevode = 1
     candi%tout    = 0.5
 
- !   deltat = 1./365.25  !(assumed daily)
- !   deltat = 1./(365.25*24.)  !(assumed hourly)
+!   deltat = 1./365.25  !(assumed daily)
+!   deltat = 1./(365.25*24.)  !(assumed hourly)
 
     candi%deltat = (1./(365.25 * (86400./(candi%time%driverDT *candi%time%substep))))
     print *, 'deltat', candi%deltat
@@ -1903,16 +1799,12 @@ MODULE aed2_sedcandi
     !            AS ZEROS.
     candi%bottom(:) = one
 
-
     candi%BC%POMVR = candi%BC%POMVR * 2650 * 1000 / 1000 * 1000
-
 
     candi%param%Xname =  dia%param%Xname
 
-
     !-- If user defined deposition rates, then load in
     IF (candi%BC%IBC2==2 .OR. candi%BC%IBC2==3) THEN
-!    IF (IBC2==2 .OR. IBC2==3 .OR. IBC2==10) THEN
       PRINT *,'       Prescribed particulate fluxes set from default_vals ... '
 
       IF (candi%BC%IBC2==3) THEN
@@ -1921,22 +1813,21 @@ MODULE aed2_sedcandi
       END IF
 
       candi%PartFluxes = 0.00
-
     END IF
     IF (candi%BC%IBC2==10) THEN
       PRINT *,'       Prescribed bottom water condition / flux varying in time '
       PRINT *,'        ...> read from aed2_sediment_swibc.dat '
     END IF
-
  END SUBROUTINE SetLocalConstants
 !------------------------------------------------------------------------------!
+
 
 !------------------------------------------------------------------------------!
 ! Routine to set the initial vertical profiles for OM                          !
 !------------------------------------------------------------------------------!
  SUBROUTINE SetSedInitialCondition(candi,mode,Ain,t_th,b_th,minDepth)
    !-- Incoming
-    TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+    TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
     CHARACTER (LEN=4), INTENT(IN)       :: mode  !-- Type of profile          ?!
                                                  !  CO_I : constant profile    !
                                                  !  LI_I : linear profile      !
@@ -1950,7 +1841,7 @@ MODULE aed2_sedcandi
     !-- Local
     REAL (SEDP) :: d1
     INTEGER  :: i, min_i
-    !-------------------------------------------------------------------!
+!-------------------------------------------------------------------!
     !-- Linear interpolation between points
     IF(mode == LI_I) THEN
       min_i = MINLOC( ABS(candi%rpar(:)-minDepth),1 )
@@ -1977,6 +1868,7 @@ MODULE aed2_sedcandi
  END SUBROUTINE SetSedInitialCondition
 !------------------------------------------------------------------------------!
 
+
 !------------------------------------------------------------------------------!
 ! ****************************************************************
 ! Early diagenese model C. CANDI from R. Luff (1996-2003), based on
@@ -1996,23 +1888,34 @@ MODULE aed2_sedcandi
 ! related publications.
 ! ****************************************************************
 !------------------------------------------------------------------------------!
- SUBROUTINE doCANDI(candi,steadiness)
-   !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+SUBROUTINE doCANDI(candi,steadiness)
+!ARGUMENTS
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    REAL(SEDP), INTENT(INOUT)         :: steadiness
-   !-- Local
-   REAL(SEDP)   :: startT
-   REAL(SEDP)   :: RWORK(candi%LRW)
-   INTEGER  :: IWORK(candi%LIW)
-   INTEGER  :: ITASK,ISTATE,IOPT,ITOL,IPAR(1)
-   INTEGER  :: i, info, j, mf
-   INTEGER  :: neq
-   REAL(SEDP)   :: endday
-   REAL(SEDP)   :: ssum, RPARfex(candi%maxneq)
-   REAL(SEDP)   :: told, tcrit,RSW
-   REAL(SEDP)   :: v !, dfluxes
-   REAL(SEDP)   :: Yfex(candi%maxneq), Ydotfex(candi%maxneq)
-   REAL(SEDP)   :: cflux(7)
+!LOCALS
+   REAL(SEDP) :: startT
+ ! REAL(SEDP) :: RWORK(candi%LRW)
+ ! INTEGER    :: IWORK(candi%LIW)
+   INTEGER    :: ITASK,ISTATE,IOPT,ITOL,IPAR(1)
+   INTEGER    :: i, info, j, mf
+   INTEGER    :: neq
+   REAL(SEDP) :: endday
+   REAL(SEDP) :: ssum
+   REAL(SEDP) :: told, tcrit,RSW
+   REAL(SEDP) :: v !, dfluxes
+!  REAL(SEDP) :: Yfex(candi%maxneq), Ydotfex(candi%maxneq)
+!  REAL(SEDP) :: RPARfex(candi%maxneq)
+   REAL(SEDP),DIMENSION(:),ALLOCATABLE :: Yfex, Ydotfex, RPARfex
+   REAL(SEDP),DIMENSION(:),ALLOCATABLE :: RWORK
+   INTEGER,DIMENSION(:),ALLOCATABLE    :: IWORK
+   REAL(SEDP) :: cflux(7)
+!----------------------------------------------------------------------
+!BEGIN
+   ALLOCATE(Yfex(candi%maxneq))
+   ALLOCATE(Ydotfex(candi%maxneq))
+   ALLOCATE(RPARfex(candi%maxneq))
+   ALLOCATE(RWORK(candi%LRW))
+   ALLOCATE(IWORK(candi%LIW))
 
    !-- Reset
 !  Ytemp(:,:) = ZERO
@@ -2020,14 +1923,15 @@ MODULE aed2_sedcandi
    startT     = ZERO
 
    !-- Reset top boundary values
-   candi%top_bound(:) = candi%Y(:,1)
+   candi%top_bound(:) = candi%y(:,1)
 
    !-- Get molecular diffusion coefficients for solutes
    CALL difcoef2(V,candi%DF,candi%SALT,candi%TEMP,candi%PRES)
    CALL setdifcoef(candi,candi%DF)
+
    OPEN(15,FILE=TRIM(candi%Filepar),STATUS="UNKNOWN")
 
-   !-- Reformat the 2D Y array into 1D form for the VODE solver
+   !-- Reformat the 2D candi%y array into 1D form for the VODE solver
    neq = candi%npt*candi%nSPECIES
    CALL Copy2Dinto1D(neq,yfex,ydotfex,candi%nSPECIES,candi%y,candi%ydot)
 
@@ -2054,7 +1958,7 @@ MODULE aed2_sedcandi
    MF       = 25
    steadiness   = 9999.0
    !-- main solver loop:
-   1000   CONTINUE
+1000   CONTINUE
    IF (candi%iSTEADY == 0) THEN
      TCRIT    = startT + candi%deltaT
      RWORK(1) = TCRIT
@@ -2081,9 +1985,9 @@ MODULE aed2_sedcandi
    candi%day = startT*365.0
    CALL CheckSteadyStatus(candi,steadiness)
    !CALL mass(steadiness,6)
-   8080     FORMAT(9(f20.10))
+8080     FORMAT(9(f20.10))
    goto 4000
-   3000     continue
+3000     CONTINUE
    !  #ifdef caco3
    !    #ifdef porosvar
    !      !rl finnish calculation when poros is small (0.02)
@@ -2092,25 +1996,26 @@ MODULE aed2_sedcandi
    !  #endif
 
    IF (candi%day <  endday .AND. steadiness >= 0.02) goto 1000
-   4000   continue
+
+4000   continue
    IF(candi%BC%IBC2 == 2 .or. candi%BC%IBC2 == 10) THEN
 
            ! If FLUX: First layer(1) no calculation here
  !    IF(OMModel ==1) THEN
- !      y(POMLy,1)      = y(POMLy,2)
- !      y(POMRy,1)      = y(POMRy,2)
- !      y(POMspecialy,1) = y(POMspecialy,2)
+ !      candi%y(POMLy,1)      = candi%y(POMLy,2)
+ !      candi%y(POMRy,1)      = candi%y(POMRy,2)
+ !      candi%y(POMspecialy,1) = candi%y(POMspecialy,2)
  !    ELSEIF(OMModel ==2) THEN
- !      y(DOCLy,1) = y(DOCLy,2)
- !      y(POCLy,1) = y(POCLy,2)
+ !      candi%y(DOCLy,1) = candi%y(DOCLy,2)
+ !      candi%y(POCLy,1) = candi%y(POCLy,2)
  !      IF(simRefOM) THEN
- !        y(DOCRy,1) = y(DOCRy,2)
- !        y(POCRy,1) = y(POCRy,2)
+ !        candi%y(DOCRy,1) = candi%y(DOCRy,2)
+ !        candi%y(POCRy,1) = candi%y(POCRy,2)
  !      ENDIF
  !    ELSEIF(OMModel ==3) THEN
- !      y(DOMRy,1) = y(DOMRy,2)
- !      y(POMLy,1) = y(POMLy,2)
- !      y(POMRy,1) = y(POMRy,2)
+ !      candi%y(DOMRy,1) = candi%y(DOMRy,2)
+ !      candi%y(POMLy,1) = candi%y(POMLy,2)
+ !      candi%y(POMRy,1) = candi%y(POMRy,2)
  !    ENDIF End if OMModel = 1, 2 or 3
    END IF ! IBC2 = 2 or 10 or End if endday, steadiness
    IF(candi%iSTEADY /= 0) THEN
@@ -2122,9 +2027,16 @@ MODULE aed2_sedcandi
    CLOSE (15)
    CALL WriteOAcRates(candi,15)
    CLOSE (15)
-   RETURN
+
+   DEALLOCATE(Yfex)
+   DEALLOCATE(Ydotfex)
+   DEALLOCATE(RPARfex)
+   DEALLOCATE(RWORK)
+   DEALLOCATE(IWORK)
+
  END SUBROUTINE doCANDI
 !------------------------------------------------------------------------------!
+
 
 !------------------------------------------------------------------------------!
 !rl   ****************************************************************
@@ -2140,7 +2052,7 @@ MODULE aed2_sedcandi
 !rl         of-lines using the integrator VODE.
 !rl   ****************************************************************
 !------------------------------------------------------------------------------!
- SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
+SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
    !-- Incoming
    TYPE(aed2_sed_candi_t),TARGET,INTENT(inout) :: candi_
    INTEGER,    INTENT(IN)                  :: neq
@@ -2160,7 +2072,7 @@ MODULE aed2_sedcandi
    candi => candi_
 
    IF(candi%usevode == 1) THEN
-     !-- Re-populate 2D Y array from 1D array so we can manipulate
+     !-- Re-populate 2D candi%y array from 1D array so we can manipulate
      CALL Copy1Dinto2D(neq,yfex,candi%nSPECIES,candi%y)
    END IF
 
@@ -2177,6 +2089,8 @@ MODULE aed2_sedcandi
 
    !-- Calculate REACTION terms
    CALL REACTION(candi)
+!print*,"--------------- reac ----------------------"
+!print*,candi%reac
 
    !-- Now perform advection, diffusion, irrigation etc.
    DO i = 0,candi%nSPECIES-1
@@ -2204,70 +2118,70 @@ MODULE aed2_sedcandi
    END IF ! End if ibbc=2
    !#ifdef porosvar
      !!rl   calculate dporos/dt for all species
-     !ydot(o2y,:)=ydot(o2y,:)-poros_dot(:)*y(o2y,:)/poros(:)
-     !ydot(no3y,:)=ydot(no3y,:)-poros_dot(:)*y(no3y,:)/poros(:)
-     !ydot(so4y,:)=ydot(so4y,:)-poros_dot(:)*y(so4y,:)/poros(:)
-     !ydot(po4ly,:)=ydot(po4ly,:)-poros_dot(:)*y(po4ly,:)/poros(:)
-     !ydot(nh4y,:)=ydot(nh4y,:)-poros_dot(:)*y(nh4y,:)/poros(:)
-     !ydot(hsy,:)=ydot(hsy,:)-poros_dot(:)*y(hsy,:)/poros(:)
-     !ydot(hco3y,:)=ydot(hco3y,:)-poros_dot(:)*y(hco3y,:)/poros(:)
-     !ydot(ch4y,:)=ydot(ch4y,:)-poros_dot(:)*y(ch4y,:)/poros(:)
-     !ydot(cor0y,:)=ydot(cor0y,:)+poros_dot(:)*y(cor0y,:)/ps(:)
-     !ydot(tbohy,:)=ydot(tbohy,:)-poros_dot(:)*y(tbohy,:)/poros(:)
+     !ydot(o2y,:)=ydot(o2y,:)-poros_dot(:)*candi%y(o2y,:)/poros(:)
+     !ydot(no3y,:)=ydot(no3y,:)-poros_dot(:)*candi%y(no3y,:)/poros(:)
+     !ydot(so4y,:)=ydot(so4y,:)-poros_dot(:)*candi%y(so4y,:)/poros(:)
+     !ydot(po4ly,:)=ydot(po4ly,:)-poros_dot(:)*candi%y(po4ly,:)/poros(:)
+     !ydot(nh4y,:)=ydot(nh4y,:)-poros_dot(:)*candi%y(nh4y,:)/poros(:)
+     !ydot(hsy,:)=ydot(hsy,:)-poros_dot(:)*candi%y(hsy,:)/poros(:)
+     !ydot(hco3y,:)=ydot(hco3y,:)-poros_dot(:)*candi%y(hco3y,:)/poros(:)
+     !ydot(ch4y,:)=ydot(ch4y,:)-poros_dot(:)*candi%y(ch4y,:)/poros(:)
+     !ydot(cor0y,:)=ydot(cor0y,:)+poros_dot(:)*candi%y(cor0y,:)/ps(:)
+     !ydot(tbohy,:)=ydot(tbohy,:)-poros_dot(:)*candi%y(tbohy,:)/poros(:)
      !#ifdef mnfe
-     !ydot(mno2y,:)=ydot(mno2y,:)+poros_dot(:)*y(mno2y,:)/ps(:)
-     !ydot(feohy,:)=ydot(feohy,:)+poros_dot(:)*y(feohy,:)/ps(:)
-     !ydot(mniiy,:)=ydot(mniiy,:)-poros_dot(:)*y(mniiy,:)/poros(:)
-     !ydot(feiiy,:)=ydot(feiiy,:)-poros_dot(:)*y(feiiy,:)/poros(:)
+     !ydot(mno2y,:)=ydot(mno2y,:)+poros_dot(:)*candi%y(mno2y,:)/ps(:)
+     !ydot(feohy,:)=ydot(feohy,:)+poros_dot(:)*candi%y(feohy,:)/ps(:)
+     !ydot(mniiy,:)=ydot(mniiy,:)-poros_dot(:)*candi%y(mniiy,:)/poros(:)
+     !ydot(feiiy,:)=ydot(feiiy,:)-poros_dot(:)*candi%y(feiiy,:)/poros(:)
      !#endif
      !#ifndef kgvar
-     !ydot(cor1y,:)=ydot(cor1y,:)+poros_dot(:)*y(cor1y,:)/ps(:)
-     !ydot(cor2y,:)=ydot(cor2y,:)+poros_dot(:)*y(cor2y,:)/ps(:)
+     !ydot(cor1y,:)=ydot(cor1y,:)+poros_dot(:)*candi%y(cor1y,:)/ps(:)
+     !ydot(cor2y,:)=ydot(cor2y,:)+poros_dot(:)*candi%y(cor2y,:)/ps(:)
      !#endif
      !#ifndef eqbb
-     !ydot(co2y,:)=ydot(co2y,:)-poros_dot(:)*y(co2y,:)/poros(:)
+     !ydot(co2y,:)=ydot(co2y,:)-poros_dot(:)*candi%y(co2y,:)/poros(:)
      !#endif
      !#ifdef eqrm
-     !ydot(h2sy,:)=ydot(h2sy,:)-poros_dot(:)*y(h2sy,:)/poros(:)
-     !ydot(co3y,:)=ydot(co3y,:)-poros_dot(:)*y(co3y,:)/poros(:)
+     !ydot(h2sy,:)=ydot(h2sy,:)-poros_dot(:)*candi%y(h2sy,:)/poros(:)
+     !ydot(co3y,:)=ydot(co3y,:)-poros_dot(:)*candi%y(co3y,:)/poros(:)
      !#endif
-     !ydot(cay,:)=ydot(cay,:)-poros_dot(:)*y(cay,:)/poros(:)
-     !ydot(caly,:)=ydot(caly,:)+poros_dot(:)*y(caly,:)/ps(:)
-     !ydot(aray,:)=ydot(aray,:)+poros_dot(:)*y(aray,:)/ps(:)
+     !ydot(cay,:)=ydot(cay,:)-poros_dot(:)*candi%y(cay,:)/poros(:)
+     !ydot(caly,:)=ydot(caly,:)+poros_dot(:)*candi%y(caly,:)/ps(:)
+     !ydot(aray,:)=ydot(aray,:)+poros_dot(:)*candi%y(aray,:)/ps(:)
      !#ifdef po4solid
-     !ydot(po4sy,:)=ydot(po4sy,:)+poros_dot(:)*y(po4sy,:)/ps(:)
+     !ydot(po4sy,:)=ydot(po4sy,:)+poros_dot(:)*candi%y(po4sy,:)/ps(:)
      !#endif
      !#ifdef fes
-     !ydot(fesy,:)=ydot(fesy,:)+poros_dot(:)*y(fesy,:)/ps(:)
+     !ydot(fesy,:)=ydot(fesy,:)+poros_dot(:)*candi%y(fesy,:)/ps(:)
      !#endif
      !#ifdef feii
-     !ydot(feii1y,:)=ydot(feii1y,:)+poros_dot(:)*y(feii1y,:)/ps(:)
-     !ydot(feii2y,:)=ydot(feii2y,:)+poros_dot(:)*y(feii2y,:)/ps(:)
+     !ydot(feii1y,:)=ydot(feii1y,:)+poros_dot(:)*candi%y(feii1y,:)/ps(:)
+     !ydot(feii2y,:)=ydot(feii2y,:)+poros_dot(:)*candi%y(feii2y,:)/ps(:)
      !#endif
      !#ifdef tracer
-     !ydot(pby,:)=ydot(pby,:)+poros_dot(:)*y(pby,:)/ps(:)
-     !ydot(ashy,:)=ydot(ashy,:)+poros_dot(:)*y(ashy,:)/ps(:)
-     !ydot(cly,:)=ydot(cly,:)-poros_dot(:)*y(cly,:)/poros(:)
+     !ydot(pby,:)=ydot(pby,:)+poros_dot(:)*candi%y(pby,:)/ps(:)
+     !ydot(ashy,:)=ydot(ashy,:)+poros_dot(:)*candi%y(ashy,:)/ps(:)
+     !ydot(cly,:)=ydot(cly,:)-poros_dot(:)*candi%y(cly,:)/poros(:)
      !#endif
 
      !#ifdef caxco3
-     !ydot(caxmny,:)=ydot(caxmny,:)+poros_dot(:)*y(caxmny,:)/ps(:)
-     !ydot(caxfey,:)=ydot(caxfey,:)+poros_dot(:)*y(caxfey,:)/ps(:)
+     !ydot(caxmny,:)=ydot(caxmny,:)+poros_dot(:)*candi%y(caxmny,:)/ps(:)
+     !ydot(caxfey,:)=ydot(caxfey,:)+poros_dot(:)*candi%y(caxfey,:)/ps(:)
      !#endif
 
      !#ifdef c12
-     !ydot(co2c12y,:)=ydot(co2c12y,:)-poros_dot(:) * y(co2c12y,:)/poros(:)
-     !ydot(co3c12y,:)=ydot(co3c12y,:)-poros_dot(:) * y(co3c12y,:)/poros(:)
-     !ydot(hco3c12y,:)=ydot(hco3c12y,:)-poros_dot(:) * y(hco3c12y,:)/poros(:)
-     !ydot(ch4c12y,:)=ydot(ch4c12y,:)-poros_dot(:) * y(ch4c12y,:)/poros(:)
-     !ydot(org0c12y,:)=ydot(org0c12y,:)+poros_dot(:) * y(org0c12y,:)/ps(:)
-     !ydot(org1c12y,:)=ydot(org1c12y,:)+poros_dot(:) * y(org1c12y,:)/ps(:)
-     !ydot(org2c12y,:)=ydot(org2c12y,:)+poros_dot(:) * y(org2c12y,:)/ps(:)
+     !ydot(co2c12y,:)=ydot(co2c12y,:)-poros_dot(:) * candi%y(co2c12y,:)/poros(:)
+     !ydot(co3c12y,:)=ydot(co3c12y,:)-poros_dot(:) * candi%y(co3c12y,:)/poros(:)
+     !ydot(hco3c12y,:)=ydot(hco3c12y,:)-poros_dot(:) * candi%y(hco3c12y,:)/poros(:)
+     !ydot(ch4c12y,:)=ydot(ch4c12y,:)-poros_dot(:) * candi%y(ch4c12y,:)/poros(:)
+     !ydot(org0c12y,:)=ydot(org0c12y,:)+poros_dot(:) * candi%y(org0c12y,:)/ps(:)
+     !ydot(org1c12y,:)=ydot(org1c12y,:)+poros_dot(:) * candi%y(org1c12y,:)/ps(:)
+     !ydot(org2c12y,:)=ydot(org2c12y,:)+poros_dot(:) * candi%y(org2c12y,:)/ps(:)
      !#endif
 
      !#ifdef caco3c12
-     !ydot(arac12y,:)=ydot(arac12y,:)+poros_dot(:)*y(arac12y,:)/ps(:)
-     !ydot(calc12y,:)=ydot(calc12y,:)+poros_dot(:)*y(calc12y,:)/ps(:)
+     !ydot(arac12y,:)=ydot(arac12y,:)+poros_dot(:)*candi%y(arac12y,:)/ps(:)
+     !ydot(calc12y,:)=ydot(calc12y,:)+poros_dot(:)*candi%y(calc12y,:)/ps(:)
      !#endif
 
    !#endif
@@ -2406,14 +2320,14 @@ MODULE aed2_sedcandi
    END IF
 
 
- !IF(speci==9) print *,'Dumm',speci,ps(2)*wvel(2)*y(speci,2)
+ !IF(speci==9) print *,'Dumm',speci,ps(2)*wvel(2)*candi%y(speci,2)
 
 
    dcdx = (-candi%dh(3)*dumm/(candi%dh(2)*(candi%dh(2)+candi%dh(3)))                                   &
          +(candi%dh(3)-candi%dh(2))*candi%y(speci,2)/(candi%dh(2)*candi%dh(3))                               &
          +candi%dh(2)*candi%y(speci,3)/(candi%dh(3)*(candi%dh(2)+candi%dh(3))))
 
-   !diff = bioturb(2)*(y(speci,3)-two*y(speci,2)+dumm)/dh2(2)
+   !diff = bioturb(2)*(candi%y(speci,3)-two*candi%y(speci,2)+dumm)/dh2(2)
    diff = candi%bioturb(2)*(2.0*dumm/(candi%dh(2)*(candi%dh(2)+candi%dh(3)))                           &
             -2.0*candi%y(speci,2)/(candi%dh(2)*candi%dh(3))                                      &
             +2.0*candi%y(speci,3)/(candi%dh(3)*(candi%dh(2)+candi%dh(3))))
@@ -2440,7 +2354,7 @@ MODULE aed2_sedcandi
                        +2.0*candi%y(speci,i+1)/(candi%dh(i+1)*(candi%dh(i)+candi%dh(i+1))))
      adv  = - candi%wvel(i)*dcdx
      psadv= candi%dpdx(i)*candi%wvel(i)*candi%y(speci,i)/candi%ps(i)
-     !rl   adv  =  Wvel(i)*(y(speci,i-1)-y(speci,i))/dhr(i)
+     !rl   adv  =  Wvel(i)*(candi%y(speci,i-1)-candi%y(speci,i))/dhr(i)
      candi%ydot(speci,i) = diff+adv+psadv+psdiff+dbdiff
    ENDDO
 
@@ -2458,7 +2372,7 @@ MODULE aed2_sedcandi
 !------------------------------------------------------------------------------!
  REAL(SEDP) FUNCTION FIrrig(candi,speci,layer)
    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    INTEGER, INTENT(IN)                  :: speci
    INTEGER, INTENT(IN)                  :: layer
 
@@ -2536,412 +2450,463 @@ MODULE aed2_sedcandi
    !-- Local
    INTEGER  :: i
 
-   candi%reac(:,:) = ZERO
-  ! reac(O2y,2:npt) = -0.9
-  !      RETURN
           ! SUBROUTINE REACTION
    DO i = 2,candi%npt ! Search "Bunyip"
-
      !--------------------------------------
-     ! Estimate stoichiometry based on available OM.
-     IF(candi%Y(candi%DOPLy,i) >1e-8)THEN
-       candi%sc = candi%Y(candi%DOCLy,i)/candi%Y(candi%DOPLy,i)
-       candi%sn = candi%Y(candi%DONLy,i)/candi%Y(candi%DOPLy,i)
-       candi%sp = ONE
-     ELSE
-       candi%sc = 106.0
-       candi%sn = 16.0
-       candi%sp = ONE
-     END IF
-                                                        ! SUBROUTINE REACTION
-     !Dan starts here
+!     ! Estimate stoichiometry based on available OM.
+!     IF(candi%y(DOPLy,i) >1e-8)THEN
+!       sc = candi%y(DOCLy,i)/candi%y(DOPLy,i)
+!       sn = candi%y(DONLy,i)/candi%y(DOPLy,i)
+!       sp = ONE
+!     ELSE
+!       sc = 106.0
+!       sn = 16.0
+!       sp = ONE
+!     END IF
+                                              ! SUBROUTINE REACTION
+!-------------------------------------------------------------------------------------------!
      !--------------------------------------
      IF ( candi%param%OMModel == 1 ) THEN !Simple OM --> CO2              !OM Model 1
-       candi%reac(candi%POMLy,i) = - candi%param%poml2dic*candi%y(candi%POMLy,i) !*rox(i)
-       candi%reac(candi%POMRy,i) = - candi%param%pomr2dic*candi%y(candi%POMRy,i) !*rox(i)
-       candi%reac(candi%POMspecialy,i) = - candi%param%pomspecial2dic*candi%y(candi%POMspecialy,i) !*rox(i)
+        IF(.NOT.(candi%param%VCW))THEN
+       candi%reac(candi%POMLy,i) = - candi%param%poml2dic*candi%y(candi%POMLy,i)
+       candi%reac(candi%POMRy,i) = - candi%param%pomr2dic*candi%y(candi%POMRy,i)
+       candi%reac(candi%POMspecialy,i) = - candi%param%pomspecial2dic*candi%y(candi%POMspecialy,i)
+       ELSE
+       candi%reac(candi%POMLy,i) = - candi%TerminalOxidation(i)
+     !  reac(POMRy,i) = 0.
+      ! reac(POMspecialy,i) = 0.
+       ENDIF ! End if VCW
 ! 20141127 I am removing rox from the reaction just to test it.
-        !Result: yes, rox should be turned off here. Boudreau 1996 p 481 reaction 29 is wrong. - Dan
-     candi%reac(candi%POCLy,i) = 0.0
-     candi%reac(candi%DOCLy,i) = 0.0
-     candi%reac(candi%PONLy,i) = 0.0
-     candi%reac(candi%DONLy,i) = 0.0
-     candi%reac(candi%POPLy,i) = 0.0
-     candi%reac(candi%DOPLy,i) = 0.0
-     candi%reac(candi%POCRy,i) = 0.0
-     candi%reac(candi%DOCRy,i) = 0.0
-     candi%reac(candi%PONRy,i) = 0.0
-     candi%reac(candi%DONRy,i) = 0.0
-     candi%reac(candi%POPRy,i) = 0.0
-     candi%reac(candi%DOPRy,i) = 0.0
-     candi%reac(candi%dhydy,i) = 0.0
+   !Result: yes, rox should be turned off here. Boudreau 1996 p 481 reaction 29 is wrong. - Dan
+!     reac(POCLy,i) = 0.0
+!     reac(DOCLy,i) = 0.0
+!     reac(PONLy,i) = 0.0
+!     reac(DONLy,i) = 0.0
+!     reac(POPLy,i) = 0.0
+!     reac(DOPLy,i) = 0.0
+!     reac(POCRy,i) = 0.0
+!     reac(DOCRy,i) = 0.0
+!     reac(PONRy,i) = 0.0
+!     reac(DONRy,i) = 0.0
+!     reac(POPRy,i) = 0.0
+!     reac(DOPRy,i) = 0.0
+!     reac(dhydy,i) = 0.0
 
-     candi%reac(candi%POMLy,i) = 0.0
-     candi%reac(candi%POMRy,i) = 0.0
-     candi%reac(candi%POMspecialy,i) = 0.0
-     candi%reac(candi%POMRy,i) = 0.0
-     candi%reac(candi%DOMRy,i) = 0.0
-     candi%reac(candi%POM1y,i) =  0.0
-     candi%reac(candi%POM2y,i) =  0.0
-     candi%reac(candi%POM3y,i) =  0.0
-     candi%reac(candi%POM4y,i) =  0.0
-     candi%reac(candi%OAcy,i)  =  0.0
-     candi%reac(candi%H2y,i)   =  0.0
-     candi%reac(candi%BFery,i) =  0.0
-     candi%reac(candi%BAery,i) =  0.0
-     candi%reac(candi%BDeny,i) =  0.0
-     candi%reac(candi%BMany,i) =  0.0
-     candi%reac(candi%BIroy,i) =  0.0
-     candi%reac(candi%BSuly,i) =  0.0
-     candi%reac(candi%BMety,i) =  0.0
-     candi%reac(candi%Necromassy,i) =  0.0
-!       ELSEIF ( OMModel == 2 ) THEN !Laurie Era four pools                   ! OM Model 2
+!     reac(POMLy,i) = 0.0
+!     reac(POMRy,i) = 0.0
+!     reac(POMspecialy,i) = 0.0
+!     reac(POMRy,i) = 0.0
+!     reac(DOMRy,i) = 0.0
+!     reac(POM1y,i) =  0.0
+!     reac(POM2y,i) =  0.0
+!     reac(POM3y,i) =  0.0
+!     reac(POM4y,i) =  0.0
+!     reac(OAcy,i)  =  0.0
+!     reac(H2y,i)   =  0.0
+!     reac(BFery,i) =  0.0
+!     reac(BAery,i) =  0.0
+!     reac(BDeny,i) =  0.0
+!     reac(BMany,i) =  0.0
+!     reac(BIroy,i) =  0.0
+!     reac(BSuly,i) =  0.0
+!     reac(BMety,i) =  0.0
+!     reac(Necromassy,i) =  0.0
+!-------------------------------------------------------------------------------------------!
      ELSEIF ( candi%param%OMModel == 2 ) THEN !Laurie Era four pools
      ! Organic Group #1
      candi%reac(candi%POCLy,i) = - candi%param%pocl2docl*candi%y(candi%POCLy,i)*candi%rox(i)
-     candi%reac(candi%DOCLy,i) = - candi%param%docl2dic*candi%y(candi%DOCLy,i)*candi%rox(i)             &
-                               + candi%param%pocl2docl*candi%y(candi%POCLy,i)*candi%rox(i)            &
-                               + candi%param%docr2docl*candi%y(candi%DOCRy,i)*candi%rox(i)
+     candi%reac(candi%DOCLy,i) = - candi%param%docl2dic*candi%y(candi%DOCLy,i)*candi%rox(i)       &
+                                 + candi%param%pocl2docl*candi%y(candi%POCLy,i)*candi%rox(i)            &
+                                 + candi%param%docr2docl*candi%y(candi%DOCRy,i)*candi%rox(i)
      candi%reac(candi%PONLy,i) = - candi%param%ponl2donl*candi%y(candi%PONLy,i)*candi%rox(i)
-     candi%reac(candi%DONLy,i) = - candi%param%donl2din*candi%y(candi%DONLy,i)*candi%rox(i)             &
-                               + candi%param%ponl2donl*candi%y(candi%PONLy,i)*candi%rox(i)            &
-                               + candi%param%donr2donl*candi%y(candi%DONRy,i)*candi%rox(i)
+     candi%reac(candi%DONLy,i) = - candi%param%donl2din*candi%y(candi%DONLy,i)*candi%rox(i)       &
+                                 + candi%param%ponl2donl*candi%y(candi%PONLy,i)*candi%rox(i)            &
+                                 + candi%param%donr2donl*candi%y(candi%DONRy,i)*candi%rox(i)
      candi%reac(candi%POPLy,i) = - candi%param%popl2dopl*candi%y(candi%POPLy,i)*candi%rox(i)
-     candi%reac(candi%DOPLy,i) = - candi%param%dopl2dip*candi%y(candi%DOPLy,i)*candi%rox(i)             &
-                               + candi%param%popl2dopl*candi%y(candi%POPLy,i)*candi%rox(i)            &
-                               + candi%param%dopr2dopl*candi%y(candi%DOPRy,i)*candi%rox(i)
+     candi%reac(candi%DOPLy,i) = - candi%param%dopl2dip*candi%y(candi%DOPLy,i)*candi%rox(i)       &
+                                 + candi%param%popl2dopl*candi%y(candi%POPLy,i)*candi%rox(i)      &
+                                 + candi%param%dopr2dopl*candi%y(candi%DOPRy,i)*candi%rox(i)
      ! Organic Group #2
      candi%reac(candi%POCRy,i) = - candi%param%pocr2docr*candi%y(candi%POCRy,i)*candi%rox(i)
-     candi%reac(candi%DOCRy,i) = - candi%param%docr2docl*candi%y(candi%DOCRy,i)*candi%rox(i)            &
-                               + candi%param%pocr2docr*candi%y(candi%POCRy,i)*candi%rox(i)            &
-                               + candi%param%pocvr2docr*(candi%BC%POMVR*0.5/12.0)*candi%rox(i)
+     candi%reac(candi%DOCRy,i) = - candi%param%docr2docl*candi%y(candi%DOCRy,i)*candi%rox(i)      &
+                                 + candi%param%pocr2docr*candi%y(candi%POCRy,i)*candi%rox(i)            &
+                                 + candi%param%pocvr2docr*(candi%BC%POMVR*0.5/12.0)*candi%rox(i)
      candi%reac(candi%PONRy,i) = - candi%param%ponr2donr*candi%y(candi%PONRy,i)*candi%rox(i)
-     candi%reac(candi%DONRy,i) = - candi%param%donr2donl*candi%y(candi%DONRy,i)*candi%rox(i)            &
-                               + candi%param%ponr2donr*candi%y(candi%PONRy,i)*candi%rox(i)            &
-                               + candi%param%pocvr2docr*(candi%BC%POMVR*0.075/14.0)*candi%rox(i)
+     candi%reac(candi%DONRy,i) = - candi%param%donr2donl*candi%y(candi%DONRy,i)*candi%rox(i)      &
+                                 + candi%param%ponr2donr*candi%y(candi%PONRy,i)*candi%rox(i)      &
+                                 + candi%param%pocvr2docr*(candi%BC%POMVR*0.075/14.0)*candi%rox(i)
      candi%reac(candi%POPRy,i) = - candi%param%popr2dopr*candi%y(candi%POPRy,i)*candi%rox(i)
-     candi%reac(candi%DOPRy,i) = - candi%param%dopr2dopl*candi%y(candi%DOPRy,i)*candi%rox(i)            &
-                               + candi%param%popr2dopr*candi%y(candi%POPRy,i)*candi%rox(i)            &
-                               + candi%param%pocvr2docr*(candi%BC%POMVR*0.005/30.9)*candi%rox(i)
-
-     candi%reac(candi%POMLy,i) = 0.0
-     candi%reac(candi%POMRy,i) = 0.0
-     candi%reac(candi%POMspecialy,i) = 0.0
-     candi%reac(candi%dhydy,i) = 0.0
-     candi%reac(candi%POMRy,i) = 0.0
-     candi%reac(candi%DOMRy,i) = 0.0
-     candi%reac(candi%POM1y,i) =  0.0
-     candi%reac(candi%POM2y,i) =  0.0
-     candi%reac(candi%POM3y,i) =  0.0
-     candi%reac(candi%POM4y,i) =  0.0
-     candi%reac(candi%OAcy,i)  =  0.0
-     candi%reac(candi%H2y,i)   =  0.0
-     candi%reac(candi%BFery,i) =  0.0
-     candi%reac(candi%BAery,i) =  0.0
-     candi%reac(candi%BDeny,i) =  0.0
-     candi%reac(candi%BMany,i) =  0.0
-     candi%reac(candi%BIroy,i) =  0.0
-     candi%reac(candi%BSuly,i) =  0.0
-     candi%reac(candi%BMety,i) =  0.0
-     candi%reac(candi%Necromassy,i) =  0.0
-
+     candi%reac(candi%DOPRy,i) = - candi%param%dopr2dopl*candi%y(candi%DOPRy,i)*candi%rox(i)      &
+                                 + candi%param%popr2dopr*candi%y(candi%POPRy,i)*candi%rox(i)      &
+                                 + candi%param%pocvr2docr*(candi%BC%POMVR*0.005/30.9)*candi%rox(i)
+!     reac(POMLy,i) = 0.0
+!     reac(POMRy,i) = 0.0
+!     reac(POMspecialy,i) = 0.0
+!     reac(dhydy,i) = 0.0
+!     reac(POMRy,i) = 0.0
+!     reac(DOMRy,i) = 0.0
+!     reac(POM1y,i) =  0.0
+!     reac(POM2y,i) =  0.0
+!     reac(POM3y,i) =  0.0
+!     reac(POM4y,i) =  0.0
+!     reac(OAcy,i)  =  0.0
+!     reac(H2y,i)   =  0.0
+!     reac(BFery,i) =  0.0
+!     reac(BAery,i) =  0.0
+!     reac(BDeny,i) =  0.0
+!     reac(BMany,i) =  0.0
+!     reac(BIroy,i) =  0.0
+!     reac(BSuly,i) =  0.0
+!     reac(BMety,i) =  0.0
+!     reac(Necromassy,i) =  0.0
+!-------------------------------------------------------------------------------------------!
      ELSEIF ( candi%param%OMModel == 3 ) THEN                            ! OM Model 3
-     candi%reac(candi%POM1y,i)       = - candi%RPOM1(i)
-     candi%reac(candi%POM2y,i)       = - candi%RPOM2(i)
-     candi%reac(candi%POM3y,i)       = - candi%RPOM3(i)
-     candi%reac(candi%POM4y,i)       = - candi%RPOM4(i)
-     candi%reac(candi%POMspecialy,i) = - candi%RPOMspecial(i)
-     candi%reac(candi%dhydy,i) = +candi%RPOM1(i)+candi%RPOM2(i)+candi%RPOM3(i)+candi%RPOM4(i)+candi%RNecro(i)&  ! *rox(i)
-                     -candi%RAerDHyd(i)-candi%RDenO2DHyd(i)-candi%RDenNO3DHyd(i)-candi%RFerDHyd(i)
-     candi%reac(candi%OAcy,i)  = + candi%RFerDHyd(i)*candi%stcoef%fracOAc - candi%ROAc(i)
-     candi%reac(candi%H2y,i)   = + candi%RFerDHyd(i)*candi%stcoef%fracH2  - candi%RH2(i)
-     candi%reac(candi%BFery,i)     =candi%RFerDHyd(i)*candi%param%YDHyFer/candi%param%CellWeight -candi%RdeathFer(i)
-     candi%reac(candi%BAery,i)     =candi%RAerDHyd(i)*candi%param%YDHyAer/candi%param%CellWeight+candi%RAerOAc(i)*candi%param%YAerOAc/candi%param%CellWeight-candi%RdeathAer(i)
 
-     !print *,"RAerDHyd",RAerDHyd(:)
-     !print *,"YDHyAer",YDHyAer
-     !print *,"CellWeight",CellWeight
-     !print *,"RAerOAc",RAerOAc(:)
-     !print *,"YAerOAc",YAerOAc
-     !print *,"RdeathAer",RdeathAer
-     candi%reac(candi%BDeny,i)     = candi%RDenO2DHyd(i)*candi%param%YDenDHy/candi%param%CellWeight+candi%RDenNO3DHyd(i)*candi%param%YDenDHy/candi%param%CellWeight  &
-                   + candi%RDenOAc(i)*candi%param%YDenOAc/candi%param%CellWeight+candi%RDenH2(i)*candi%param%YDenH2/candi%param%CellWeight       -candi%RdeathDen(i)
-     candi%reac(candi%BMany,i)     = candi%RManOAc(i)*candi%param%YManOAc/candi%param%CellWeight                               -candi%RdeathMan(i)
-     candi%reac(candi%BIroy,i)     = candi%RIroOAc(i)*candi%param%YIroOAc/candi%param%CellWeight+candi%RIroH2(i)*candi%param%YIroH2/candi%param%CellWeight   -candi%RdeathIro(i)
-     candi%reac(candi%BSuly,i)     = candi%RSulOAc(i)*candi%param%YSulOAc/candi%param%CellWeight+candi%RSulH2(i)*candi%param%YSulH2/candi%param%CellWeight   -candi%RdeathSul(i)
-     candi%reac(candi%BMety,i)     = candi%RMetOAc(i)*candi%param%YMetOAc/candi%param%CellWeight+candi%RMetH2(i)*candi%param%YMetH2/candi%param%CellWeight   -candi%RdeathMet(i)
-     candi%reac(candi%Necromassy,i)= candi%RdeathTot(i)*candi%param%fuse-candi%RNecro(i)
-     candi%reac(candi%protony,i)   = 0. !1. !y(protony,i)
-                                        ! SUBROUTINE REACTION
-     candi%reac(candi%POCLy,i) = 0.0
-     candi%reac(candi%DOCLy,i) = 0.0
-     candi%reac(candi%PONLy,i) = 0.0
-     candi%reac(candi%DONLy,i) = 0.0
-     candi%reac(candi%POPLy,i) = 0.0
-     candi%reac(candi%DOPLy,i) = 0.0
-     candi%reac(candi%POCRy,i) = 0.0
-     candi%reac(candi%DOCRy,i) = 0.0
-     candi%reac(candi%PONRy,i) = 0.0
-     candi%reac(candi%DONRy,i) = 0.0
-     candi%reac(candi%POPRy,i) = 0.0
-     candi%reac(candi%DOPRy,i) = 0.0
-     !candi%reac(candi%POMspecialy,i) = 0.0
+     candi%reac(candi%POM1y,i)       = - candi%RPOM1(i)!*candi%xPOM1
+     candi%reac(candi%POM2y,i)       = - candi%RPOM2(i)!*candi%xPOM2
+     candi%reac(candi%POM3y,i)       = - candi%RPOM3(i)!*candi%xPOM3
+     candi%reac(candi%POM4y,i)       = - candi%RPOM4(i)!*candi%xPOM4
+     candi%reac(candi%POMspecialy,i) = - candi%RPOMspecial(i)!*candi%param%xspecial
+!     reac(dhydy,i) = (+RPOM1(i)*(xPOM1/xDHyd)       &
+!              +RPOM2(i)*(xPOM2/xDHyd)    &
+!              +RPOM3(i)*(xPOM3/xDHyd)    &
+!                 +RPOM4(i)*(xPOM4/xDHyd)    &
+!                 +RNecro(i)                 &
+!!                  -RAerDHyd(i)*(xDHyd/1)     &
+ !                -RDenO2DHyd(i)*(xDHyd/1)   &
+ !                -RDenNO3DHyd(i)*(xDHyd/1)  &
+ !                -RFerDHyd(i)*(xDHyd/1)       )*psp(i) ! %solids candi%y^-1 *psp --> mmol L^-1 candi%y^-1
 
-END IF !End if OMmodel = 3
+     candi%reac(candi%dhydy,i) = (+candi%RPOM1(i)       &
+                 +candi%RPOM2(i)   &
+                 +candi%RPOM3(i)   &
+                 +candi%RPOM4(i)    &
+                 +candi%RNecro(i)                 &
+                  -candi%RAerDHyd(i)     &
+                 -candi%RDenO2DHyd(i)   &
+                 -candi%RDenNO3DHyd(i)  &
+                 -candi%RFerDHyd(i)      )*candi%psp(i) ! %solids candi%y^-1 *psp --> mmol L^-1 candi%y^-1
+
+
+!     reac(OAcy,i)  = + RFerDHyd(i)*2*(xOAc/xDHyd)*psp(i) - 2*ROAc(i) ! %solids candi%y^-1 *psp --> mmol L^-1 candi%y^-1
+     candi%reac(candi%OAcy,i)  = + candi%RFerDHyd(i)*2/3*candi%psp(i) - 2*candi%ROAc(i) !
+     if(candi%ROAc(i)/=candi%ROAc(i))THEN
+              print*,"ROAc = NaN"
+              !PAUSE
+     END IF
+     !reac(H2y,i)   = + RFerDHyd(i)*(xH2/xDHyd)*psp(i) - RH2(i) ! %solids candi%y^-1 *psp --> mmol L^-1 candi%y^-1
+     candi%reac(candi%H2y,i)   = + candi%RFerDHyd(i)*1/3*candi%psp(i) - candi%RH2(i) ! %solids candi%y^-1 *psp --> mmol L^-1 candi%y^-1
+     !reac(BFery,i)     = RFerDHyd(i)*xDHyd*YDHyFer/CellWeight*( 1 - (candi%y(BFery,i)/BMax) ) - RdeathFer(i)
+     candi%reac(candi%BFery,i)     = candi%RFerDHyd(i)*candi%param%YDHyFer/candi%param%CellWeight*( candi%FBMax(i) ) - candi%RdeathFer(i)
+     candi%reac(candi%BAery,i)     = candi%RAerDHyd(i)*candi%param%YDHyAer/candi%param%CellWeight*candi%FBMax(i)   &
+                            + candi%RAerOAc(i)*candi%param%YAerOAc/candi%param%CellWeight*candi%FBMax(i)       -candi%RdeathAer(i)
+     candi%reac(candi%BDeny,i)     = candi%RDenO2DHyd(i)*candi%param%YDenDHy/candi%param%CellWeight*candi%FBMax(i)   &
+                            + candi%RDenNO3DHyd(i)*candi%param%YDenDHy/candi%param%CellWeight*candi%FBMax(i)   &
+                                   + candi%RDenOAc(i)*candi%param%YDenOAc/candi%param%CellWeight*candi%FBMax(i)   &
+                                   + candi%RDenH2(i)*candi%param%YDenH2/candi%param%CellWeight*candi%FBMax(i)         -candi%RdeathDen(i)
+     candi%reac(candi%BMany,i)     = candi%RManOAc(i)*candi%param%YManOAc/candi%param%CellWeight*candi%FBMax(i)    &
+                       + candi%RManH2(i)*candi%param%YManH2/candi%param%CellWeight*candi%FBMax(i)       -candi%RdeathMan(i)
+     candi%reac(candi%BIroy,i)     = candi%RIroOAc(i)*candi%param%YIroOAc/candi%param%CellWeight*candi%FBMax(i)    &
+                            + candi%RIroH2(i)*candi%param%YIroH2/candi%param%CellWeight*candi%FBMax(i)         -candi%RdeathIro(i)
+     candi%reac(candi%BSuly,i)     = candi%RSulOAc(i)*candi%param%YSulOAc/candi%param%CellWeight*candi%FBMax(i) &
+                            + candi%RSulH2(i)*candi%param%YSulH2/candi%param%CellWeight*candi%FBMax(i)           -candi%RdeathSul(i)
+     candi%reac(candi%BMety,i)     = candi%RMetOAc(i)*candi%param%YMetOAc/candi%param%CellWeight*candi%FBMax(i)     &
+                            + candi%RMetH2(i)*candi%param%YMetH2/candi%param%CellWeight*candi%FBMax (i)        -candi%RdeathMet(i)
+     candi%reac(candi%Necromassy,i)= candi%RdeathTot(i)-candi%RNecro(i)*candi%param%fuse
+     !reac(protony,i)   = 0. !1. !candi%y(protony,i)
+                                    ! SUBROUTINE REACTION
+!     reac(POCLy,i) = 0.0
+!     reac(DOCLy,i) = 0.0
+!     reac(PONLy,i) = 0.0
+!     reac(DONLy,i) = 0.0
+!     reac(POPLy,i) = 0.0
+!     reac(DOPLy,i) = 0.0
+!     reac(POCRy,i) = 0.0
+!     reac(DOCRy,i) = 0.0
+!     reac(PONRy,i) = 0.0
+!     reac(DONRy,i) = 0.0
+!     reac(POPRy,i) = 0.0
+!     reac(DOPRy,i) = 0.0
+
+END IF !End if OMmodel = 1, 2 or 3
+!-------------------------------------------------------------------------------------------!
+
 !     !--------------------------------------
-
-!End Dan
      ! Organic X
      IF(candi%param%simX) THEN
       candi%reac(candi%POXy,i)    = - candi%param%pocl2docl*candi%y(candi%POXy,i)*candi%rox(i)
       candi%reac(candi%DOXy,i)    = - candi%param%docl2dic*candi%y(candi%DOXy,i)*candi%rox(i) + candi%param%pocl2docl*candi%y(candi%POXy,i)*candi%rox(i)
       candi%reac(candi%Xy,i)      =   candi%param%docl2dic*candi%y(candi%DOXy,i)*candi%rox(i)
      END IF
-     !--------------------------------------
-     ! O2
-     candi%reac(candi%O2y,i) = - candi%rgC(i)*candi%FO2(i)        &
-                             - TWO*candi%RNH4OX(i)             &
-                             - HALF*candi%RMnOX(i)             &
-                             - 0.25*candi%RFeOX(i)             &
-                             - TWO*candi%RTSOX(i)              &
-                             - candi%RCH4OX(i)                 &
-                             - TWO*candi%psp(i)*candi%RFeSOX(i) &
-                             - 3.5*candi%psp(i)*candi%RFeS2OX(i)
-     !--------------------------------------
-     ! NO3
-     candi%reac(candi%NO3y,i) = - 0.8*candi%rgC(i)*candi%FNO3(i) & !/sc*(-(REAL(0.8,SEDP)*sc+REAL(0.6,SEDP)*sn)*rno3(i)+sn*ro2(i)) &
-                              + candi%rnh4ox(i)           &
-                              - candi%rnh4no2(i)          &
-                              - TWO*candi%rmnno3(i)       &
-                              - candi%rfeno3(i)           &
-                              - candi%rtsno3(i)
-     !--------------------------------------
-     !N2
-     candi%reac(candi%N2y,i) = + 0.4*candi%rgC(i)*candi%FNO3(i)
-
-     !--------------------------------------
-     ! SO4
-     candi%reac(candi%SO4y,i) = - HALF*candi%rgC(i)*candi%FSO4(i)     &
-                              + candi%rtsox(i)                     &
-                              + candi%psp(i)*candi%rfesox(i)        &
-                              + candi%psp(i)*TWO*candi%rfes2ox(i)   &
-                              + candi%psp(i)*candi%rtsmnA(i)        &
-                              + candi%psp(i)*candi%rtsmnB(i)        &
-                              + candi%psp(i)*candi%rtsfeA(i)        &
-                              + candi%psp(i)*candi%rtsfeB(i)        &
-                              - candi%rch4so4(i)                   &
-                              + 2.5*candi%rtsno3(i)                &
-                            ! + candi%rfesno3(i)                   &
-                              + candi%rfesmnA(i) * candi%psp(i)     &
-                              + candi%rfesfeA(i) * candi%psp(i)     &
-                              + candi%rfesmnB(i) * candi%psp(i)     &
-                              + candi%rfesfeB(i) * candi%psp(i)
+                   ! O2
+     candi%reac(candi%O2y,i) = - candi%ROMO2(i)                      &
+                   - TWO*candi%RNH4OX(i)                 &
+                   - HALF*candi%RMnOX(i)                 &
+                   - HALF*candi%RMnadsox(i)*candi%psp(i)       &
+                   - 0.25*candi%RFeadsox(i)*candi%psp(i)       &
+                   - 0.25*candi%RFeOX(i)                 &  ! Originally 1; VCW has 0.25
+                   - TWO*candi%RTSOX(i)                  &
+                   - candi%RCH4OX(i)                     &
+                   - TWO*candi%psp(i)*candi%RFeSOX(i)          &
+                   - 3.5*candi%psp(i)*candi%RFeS2OX(i)         &
+                   - TWO*candi%psp(i)*candi%RXSOx(i)
+                 ! NO3
+     candi%reac(candi%NO3y,i) = - candi%ROMNO3(i)          & !/sc*(-(REAL(0.8,SEDP)*sc+REAL(0.6,SEDP)*sn)*rno3(i)+sn*ro2(i)) &
+                    + candi%rnh4ox(i)                    &
+                    !- candi%rnh4no2(i)                   &
+                    - TWO*candi%rmnno3(i)                & !
+                    - candi%rfeno3(i)                    & !
+                    - 4*candi%rtsno3(i)                  &  !
+                    + candi%NO3release(i)
+                 ! SO4
+     candi%reac(candi%SO4y,i) = - candi%ROMSO4(i) *0.5         &
+                    + 2.5*candi%rtsno3(i)                &
+                    + candi%rtsox(i)                     & !
+                    + candi%psp(i)*candi%rfesox(i)             &  !
+                    + candi%psp(i)*TWO*candi%rfes2ox(i)        &
+                    + candi%psp(i)*candi%rtsmnA(i)             &
+                    + candi%psp(i)*candi%rtsmnB(i)             &
+                    + candi%psp(i)*candi%rtsfeA(i)             &
+                    + candi%psp(i)*candi%rtsfeB(i)             &
+                    - candi%rch4so4(i)                   &
+                  ! + candi%rfesno3(i)                   &
+                    + candi%rfesmnA(i) * candi%psp(i)          &
+                    + candi%rfesfeA(i) * candi%psp(i)          &
+                    + candi%rfesmnB(i) * candi%psp(i)          &
+                    + candi%rfesfeB(i) * candi%psp(i)          &
+                    + candi%RXSOx(i)
                                                           ! SUBROUTINE REACTION
-
+                 ! CH4
+     candi%reac(candi%CH4y,i) = + candi%ROMMet(i)        &
+                    - candi%RCH4OX(i)                    &
+                    - candi%RCH4SO4(i)
+                 !N2
+     candi%reac(candi%N2y,i) = + 0.5*candi%ROMNO3(i)    &
+                !+ candi%RNH4NO2(i)   &
+                + candi%rmnno3(i) &
+                + HALF*candi%rfeno3(i) &
+                + 2*candi%rtsno3(i)
+                ! TCO2
+     candi%reac(candi%HCO3y,i) = + candi%RCO2(i)                     &
+                     + candi%RCH4SO4(i)                  &
+                     - candi%psp(i)*candi%RSidppt(i)           &
+                     - candi%psp(i)*candi%RCalppt(i)           !&
+                     !- candi%psp(i)*candi%rarappt(i)           &
+                     !+ candi%psp(i)*candi%rfeco3dis(i)         &
+                     !+ candi%psp(i)*candi%rcaldis(i)           &
+                     !+ candi%psp(i)*candi%raradis(i)
+                              ! SUBROUTINE REACTION
      !--------------------------------------
      ! TPO4
-     candi%reac(candi%PO4ly,i) = + candi%rgP(i) & !*candi%ROX(i) & I'm turning these off because I think Boudreau is wrong - Dan 20141127
-                     !- candi%psp(i)*candi%RPO4ads(i)     &
+     candi%reac(candi%PO4ly,i) = + candi%Prelease(i)        & !*ROX(i)
+                     !- candi%psp(i)*candi%RPO4ads(i)          &
                      - candi%psp(i)*candi%RPO4ads(i)
 
-     candi%reac(candi%PO4sy,i) = candi%RPO4ads(i)  !       &
+     candi%reac(candi%PO4sy,i) = candi%RPO4ads(i)  !        &
                      !- candi%psp(i)*candi%po4sdis(i)
 
      !--------------------------------------
      ! TNH4
-     candi%reac(candi%NH4y,i) = + candi%rgN(i) & !*rox(i)  &I'm turning these off because I think Boudreau is wrong - Dan 20141127
-                    - candi%rnh4ox(i)                    &
-                    - candi%rnh4no2(i)                   &
-                    !- candi%psp(i)*candi%nh4sppt(i)      &
-                    - candi%psp(i)*candi%RNH4ads(i)
-
-     candi%reac(candi%NH4sy,i)= candi%RNH4ads(i)           !&
-                    !- candi%psp(i)*candi%nh4sdis(i)
-
+     candi%reac(candi%NH4y,i) = + candi%NH4release(i)       & !*rox(i)
+                    - candi%rnh4ox(i)
+                    !- candi%rnh4no2(i)
+                    !- candi%psp(i)*candi%nh4sppt(i)        &
+                    !- candi%psp(i)*candi%RNH4ads(i)
+                     !- candi%RNH4ads(i)
+     candi%reac(candi%NH4sy,i)= 0.0 !+RNH4ads(i)           !&
+     !               !- psp(i)*nh4sdis(i)
      !--------------------------------------
-     ! CH4
-     candi%reac(candi%CH4y,i) = + candi%rgC(i)*HALF*candi%FMet(i)  &
-                    - candi%RCH4OX(i)                           &
-                    - candi%RCH4SO4(i)
 
      !--------------------------------------
      ! TH2S
-     candi%reac(candi%HSy,i)  = + candi%rgC(i)*candi%FSO4(i)*HALF  &
-                              - candi%RTSOX(i)                  &
-                              - candi%psp(i)*candi%RTSMnA(i)     &
-                              - candi%psp(i)*candi%RTSMnB(i)     &
-                              - candi%psp(i)*candi%RTSFeA(i)     &
-                              - candi%psp(i)*candi%RTSFeB(i)     &
-                              + candi%RCH4SO4(i)                &
-                              - candi%RFeSppt(i)                &
-                              - candi%RPyrite(i)                &
-                              - 2.5*candi%RTSNO3(i)             &
-                              - candi%RXSppt(i)
+     candi%reac(candi%HSy,i)  = + candi%ROMSO4(i)        &
+                    - candi%RTSOX(i)                     &
+                    - candi%psp(i)*candi%RTSMnA(i)       &
+                    - candi%psp(i)*candi%RTSMnB(i)       &
+                    - candi%psp(i)*candi%RTSFeA(i)       &
+                    - candi%psp(i)*candi%RTSFeB(i)       &
+                    + candi%RCH4SO4(i)                   &
+                    - candi%RFeSppt(i)                   &
+                    - candi%RPyrite(i)                   &
+                    - 2.5*candi%RTSNO3(i)                &
+                    - candi%RXSppt(i)
 
                     ! SUBROUTINE REACTION
      !--------------------------------------
-     ! TCO2
-     candi%reac(candi%HCO3y,i) = + candi%rgC(i)*(candi%FO2(i)+candi%FNO3(i)+candi%FMnO2(i)+candi%FFeOH(i)+candi%FSO4(i)) &
-                     + candi%rgC(i)*HALF*candi%FMet(i)    &
-                     + candi%RCH4OX(i)                   &
-                     + candi%RCH4SO4(i)                  &
-                     - candi%psp(i)*candi%RSidppt(i)      &
-                     - candi%psp(i)*candi%RCalppt(i)     !&
-                     !- candi%psp(i)*candi%rarappt(i)     &
-                     !+ candi%psp(i)*candi%rfeco3dis(i)   &
-                     !+ candi%psp(i)*candi%rcaldis(i)     &
-                     !+ candi%psp(i)*candi%raradis(i)
-                             ! SUBROUTINE REACTION
+
      !--------------------------------------
      ! TX
      IF(candi%param%simX) THEN
-      candi%reac(candi%Xy,i) = + candi%rgX(i)*candi%ROX(i)                             &
-                             + candi%psp(i)*TWO*candi%rgC(i)*candi%mk*candi%FMnO2(i)   &
-                             + candi%psp(i)*FOUR*candi%rgC(i)*candi%fl*candi%FFeOH(i)  &
-                             - candi%mk*candi%RMnOX(i)                               &
-                      !      - candi%fl*candi%RFeOHppt(i)                            &
-                             + candi%fm*candi%RFeSOX(i)                              &
-                             + candi%fm*candi%RFeS2OX(i)                             &
-                             - candi%psp(i)*(TWO*candi%fl-candi%mk)*candi%RFeMnA(i)    &
-                             - candi%psp(i)*(TWO*candi%fl-candi%mk)*candi%RFeMnB(i)    &
-                             + candi%mk*candi%RMnNO3(i)                              &
-                             + FOUR*candi%mk*candi%RTSMnA(i)                         &
-                             + FOUR*candi%mk*candi%RTSMnB(i)                         &
-                             + candi%psp(i)*(candi%fm+FOUR*candi%mk)*candi%RFeSMnA(i)  &
-                             + candi%psp(i)*(candi%fm+FOUR*candi%mk)*candi%RFeSMnB(i)  &
-                             + candi%psp(i)*EIGHT*candi%fl*candi%RTSFeA(i)            &
-                             + candi%psp(i)*EIGHT*candi%fl*candi%RTSFeB(i)            &
-                             + candi%psp(i)*(candi%fm+EIGHT*candi%fl)*candi%RFeSFeA(i) &
-                             + candi%psp(i)*(candi%fm+EIGHT*candi%fl)*candi%RFeSFeB(i) &
-                             - candi%fm*candi%RFeSppt(i)                             &
-                             - candi%RXSppt(i)
-     END IF
-                                                          ! SUBROUTINE REACTION
+      !reac(Xy,i)   = + rgX(i)*ROX(i)                         & ! Release of X from organic matter oxidation
+      candi%reac(candi%Xy,i)   = + candi%XMetalrelease(i)*( candi%FO2(i)+candi%FNO3(i)+candi%FSO4(i)+candi%FMet(i) )      & ! Release of X from organic matter oxidation
+                     + candi%psp(i)*TWO*candi%XMetalrelease(i)*candi%mk*candi%FMnO2(i)      & ! Release of X from MnO2 reduction, in proportion to mk
+                     + candi%psp(i)*FOUR*candi%XMetalrelease(i)*candi%fl*candi%FFeOH(i)     & ! Release of X from FeOH reduction, in proporition ot fl
+                     - candi%mk*candi%RMnOX(i)                           & ! Precipitation of X from Mn2+ oxidation, in proportion to mk      -    need psp?
+             !       - candi%fl*candi%RFeOHppt(i)                    & ! Precipitation of X from Fe2+ oxidation, in proportion to fl
+                     + candi%fm*candi%RFeSOX(i)                          & ! Release of X from FeS oxidation, in proportion to fm
+                     + candi%fm*candi%RFeS2OX(i)                         & ! Release of X from FeS2 oxidation, in proportion to fm
+                     - candi%psp(i)*(TWO*candi%fl-candi%mk)*candi%RFeMnA(i)       & ! Precipitation of X from FeOHA oxidation by MnO2
+                     - candi%psp(i)*(TWO*candi%fl-candi%mk)*candi%RFeMnB(i)       & ! Precipitation of X from FeOHB oxidation by MnO2
+                     + candi%mk*candi%RMnNO3(i)                          & ! Release of X from MnO2 oxidation by NO3-
+                     + FOUR*candi%mk*candi%RTSMnA(i)                     & ! Release of X from MnO2A oxidation of H2S
+                     + FOUR*candi%mk*candi%RTSMnB(i)                     & ! Release of X from MnO2B oxidation of H2S
+                     + candi%psp(i)*(candi%fm+FOUR*candi%mk)*candi%RFeSMnA(i)     & ! Release of X from MnO2A oxidation of FeS
+                     + candi%psp(i)*(candi%fm+FOUR*candi%mk)*candi%RFeSMnB(i)     & ! Release of X from MnO2A oxidation of FeS
+                     + candi%psp(i)*EIGHT*candi%fl*candi%RTSFeA(i)          & ! Release of X from FeOHA oxidation of H2S
+                     + candi%psp(i)*EIGHT*candi%fl*candi%RTSFeB(i)          & ! Release of X from FeOHB oxidation of H2S
+                     + candi%psp(i)*(candi%fm+EIGHT*candi%fl)*candi%RFeSFeA(i)    & ! Release of X from FeOHA oxidation of FeS
+                     + candi%psp(i)*(candi%fm+EIGHT*candi%fl)*candi%RFeSFeB(i)    & ! Release of X from FeOHB oxidation of FeS
+                     - candi%fm*candi%RFeSppt(i)                         & ! Precipitation of X by FeS precipitation
+                     - candi%RXSppt(i)        &                    ! Precipitation of XS
+                     + candi%RXSOx(i)                                   ! Release of X from aerobic XS oxidation
+     END IF   ! End if simX
+
+     !print*,"XName", XName
+
      !--------------------------------------
      ! Ca
      candi%reac(candi%Cay,i)   = - candi%RCalppt(i)
-
-
      !--------------------------------------
      ! MnO2, FeOH3, MnII & FeII
      IF(candi%param%simMnFe) THEN
-
        !--------------------------------------
        ! MnO2(A)
-       candi%reac(candi%MnO2y,i) = - TWO*candi%rgC(i)*candi%FMnO2(i)       &
-                                 + candi%pps(i)*candi%RMnOX(i)           &
-                                 + candi%pps(i)*FIVE*candi%RMnNO3(i)     &
-                                 - candi%RFeMnA(i)                      &
-                                 - FOUR*candi%RTSMnA(i)                 &
-                                 - FOUR*candi%RFeSMnA(i)                &
-                                 - candi%RMnAge(i)                      &
-                                 + candi%psp(i)*candi%RMnO2Appt(i)
-
+       candi%reac(candi%MnO2y,i) = - candi%ROMMnO2(i)       &
+                       + candi%pps(i)*candi%RMnOX(i)           &
+                       + candi%RMnadsOx(i)               &
+                       + candi%pps(i)*FIVE*candi%RMnNO3(i)     &
+                       - candi%RFeMnA(i)                 &
+                       - FOUR*candi%RTSMnA(i)            &
+                       - FOUR*candi%RFeSMnA(i)           &
+                       - candi%RMnAge(i)                 &
+                       + candi%pps(i)*candi%RMnO2Appt(i)   ! psp or pps?
        !--------------------------------------
        ! MnO2(B)
        candi%reac(candi%MnO2By,i)= - candi%RFeMnB(i)                 &
-                                 - FOUR*candi%RTsMnB(i)            &
-                                 - FOUR*candi%RFeSMnB(i)           &
-                                 + candi%RMnAge(i)                 &
-                                 + candi%psp(i)*candi%RMnO2Bppt(i)
+                       - FOUR*candi%RTsMnB(i)            &
+                       - FOUR*candi%RFeSMnB(i)           &
+                       + candi%RMnAge(i)                 &
+                       + candi%pps(i)*candi%RMnO2Bppt(i)
        !--------------------------------------
-       ! FeOH3(A)
-       candi%reac(candi%FeOHy,i) = - FOUR*candi%rgC(i)*candi%FFeOH(i) &
-                              !  + candi%pps(i)*FOUR*candi%RFeOX(i) & ! Moved to Fe3+
-                                 + candi%pps(i)*candi%RFeOHAppt(i)  &
-                                 + candi%RFeMnA(i)                 &
-                                 + candi%RFeMnB(i)                 &
-                                 - EIGHT*candi%RTSFeA(i)           &
-                                 - EIGHT*candi%RFeSFeA(i)          &
-                                 - candi%RFeAge(i)
+
+       !--------------------------------------
+       ! MnII
+       candi%reac(candi%MnIIy,i) = + candi%ROMMnii(i)                &
+                       - candi%RMnOX(i)                  &
+                       + candi%psp(i)*candi%RFeMnA(i)          &
+                       + candi%psp(i)*candi%RFeMnB(i)          &
+                       + candi%psp(i)*FOUR*candi%RTSMnA(i)     &
+                       + candi%psp(i)*FOUR*candi%RTSMnB(i)     &
+                       + candi%psp(i)*FOUR*candi%RFeSMnA(i)    &
+                       + candi%psp(i)*FOUR*candi%RFeSMnB(i)    &
+                       - FIVE*candi%RMnNO3(i)            &
+                       - candi%psp(i)*candi%RMnO2Appt(i)       &
+                       - candi%psp(i)*candi%RMnO2Bppt(i)       &
+                       - candi%psp(i)*candi%RRodppt(i)
+       !--------------------------------------
+                ! FeOH3(A)
+     candi%reac(candi%FeOHy,i) = - candi%ROMFeOH(i)      &
+                    + FIVE*candi%RFeNO3(i)*candi%pps(i)    &
+                    + candi%pps(i)*ONE*candi%RFeOX(i)      & ! VCW has ONE; original had FOUR
+!                    + candi%RFeadsOx(i)               &
+!                    + candi%pps(i)*candi%RFeOHAppt(i)        &  ! pps because solutes to solids
+                    + TWO*candi%RFeMnA(i)                 &!
+                    + TWO*candi%RFeMnB(i)                 &!
+                    - EIGHT*candi%RTSFeA(i)           & ! FeOHA + HS- -> Fe2+ + SO4
+                    - EIGHT*candi%RFeSFeA(i)          & ! FeS + FeOH3A -> Fe2+ + SO4
+                    - candi%RFeAge(i)
+
+                    !print*,"ROMFeOH(7)",ROMFeOH(7)
+                    !print*,"RFeNO3(7)",RFeNO3(7)
+                    !print*,"RFeMnA(7)",RFeMnA(7)
+                    !print*,"RFeMnB(7)",RFeMnB(7)
+                    !print*,"RTSFeA(7)",RTSFeA(7)
+                    !print*,"RFeSFeA(7)",RFeSFeA(7)
+                    !print*,"RTSFeA(7)",RTSFeA(7)
+                    !print*,"RFeAge(7)",RFeAge(7)
 
        !--------------------------------------
        ! FeOH3(B)
        candi%reac(candi%FeOHBy,i)= - EIGHT*candi%RTSFeB(i)           &
                        - EIGHT*candi%RFeSFeB(i)          &
-                   !    + candi%pps(i)*candi%RFeOHAppt(i)       &      ! Check that it should be RFeOHA, not B
+                   !    + pps(i)*RFeOHAppt(i)       &      ! Check that it should be RFeOHA, not B
                        + candi%RFeAge(i)
                                        ! SUBROUTINE REACTION
-       !--------------------------------------
-       ! MnII
-       candi%reac(candi%MnIIy,i) = + TWO*candi%rgC(i)*candi%FMnO2(i)       &
-                                 - candi%RMnOX(i)                       &
-                                 + candi%psp(i)*candi%RFeMnA(i)          &
-                                 + candi%psp(i)*candi%RFeMnB(i)          &
-                                 + candi%psp(i)*FOUR*candi%RTSMnA(i)     &
-                                 + candi%psp(i)*FOUR*candi%RTSMnB(i)     &
-                                 + candi%psp(i)*FOUR*candi%RFeSMnA(i)    &
-                                 + candi%psp(i)*FOUR*candi%RFeSMnB(i)    &
-                                 - FIVE*candi%RMnNO3(i)                 &
-                                 - candi%psp(i)*candi%RMnO2Appt(i)       &
-                                 - candi%psp(i)*candi%RMnO2Bppt(i)
-       !--------------------------------------
+    !--------------
        ! FeII
-       candi%reac(candi%FeIIy,i) = + FOUR *candi%rgC(i)*candi%FFeOH(i)      &
-                       - FOUR*candi%RFeOX(i)                  &
-                       + candi%psp(i)*candi%RFeSOX(i)          &
-                       + candi%psp(i)*candi%RFeS2OX(i)         &
-                       - candi%psp(i)*TWO*candi%RFeMnA(i)      &
-                       - candi%psp(i)*TWO*candi%RFeMnB(i)      &
-                       + candi%psp(i)*EIGHT*candi%RTSFeA(i)    &
-                       + candi%psp(i)*EIGHT*candi%RTSFeB(i)    &
-                       - candi%psp(i)*candi%RFeSppt(i)         &
-                       - candi%psp(i)*candi%RSidppt(i)         &
-                       + FIVE*candi%RFeNO3(i)                 &
-                       + candi%psp(i)*candi%RFeSMnA(i)         &
-                       + candi%psp(i)*NINE*candi%RFeSFeA(i)    &
-                       + candi%psp(i)*candi%RFeSMnB(i)         &
-                       + candi%psp(i)*NINE*candi%RFeSFeB(i)
-
+       candi%reac(candi%FeIIy,i) = + candi%ROMFeii(i)      & ! FeOHA + OM -> Fe2+ + CO2
+                       - ONE*candi%RFeOX(i)              &  !  Fe2+ + O2 -> Fe3+; originally FOUR; VCW ONE
+                       + candi%psp(i)*candi%RFeSOX(i)          &  !  FeS + O2 -> Fe2+ + SO4?
+                       + candi%psp(i)*candi%RFeS2OX(i)         &  !  FeS2 + O2 -> Fe2+ + SO4?
+                       - candi%psp(i)*TWO*candi%RFeMnA(i)      &  ! Fe2+ + MnO2A -> FeOH3 + Mn2+
+                       - candi%psp(i)*TWO*candi%RFeMnB(i)      &  ! Fe2+ + MnO2B -> FeOH3 + Mn2+
+                       + candi%psp(i)*EIGHT*candi%RTSFeA(i)    &  ! FeOHA + HS- -> Fe2+ + SO4
+                       + candi%psp(i)*EIGHT*candi%RTSFeB(i)    &  ! FeOHB + HS- -> Fe2+ + SO4
+                       - candi%psp(i)*candi%RFeSppt(i)         &  ! Fe2+ + S2- -> FeS
+                       - candi%psp(i)*candi%RSidppt(i)         &  ! Fe2+ + CO3 -> FeCO3
+                       - FIVE*candi%RFeNO3(i)            &  ! Fe2+ +NO3 -> Fe3+ + N2
+                       + candi%psp(i)*candi%RFeSMnA(i)         &  ! FeS + MnO2 -> Fe2+ + Mn2+
+                       + candi%psp(i)*NINE*candi%RFeSFeA(i)    &  ! FeS +FeOH3A -> Fe2+ + SO4   ! EIGHT from Fe(OH)3 + ONE from FeS
+                       + candi%psp(i)*candi%RFeSMnB(i)         &  ! FeS + MnO2 -> Fe3+ + Mn2+
+                  + candi%psp(i)*NINE*candi%RFeSFeB(i)       ! FeS +FeOH3A -> Fe2+ + SO4
+       !print*,"reac(FeIIy,7)",reac(FeIIy,7)
+       !print*,"ROMFeii(7)",ROMFeii(7)
+       !print*,"ROMFeOH(7)", ROMFeOH(7)
+       !print*,"pps(7)",pps(7)
        !--------------------------------------
        ! FeIII
-       candi%reac(candi%FeIIIy,i) = + FOUR*candi%RFeOX(i)
-                                                                 ! SUBROUTINE REACTION
+  !     reac(FeIIIy,i) =  &
+    !                 + ONE*RFeOX(i)   &
+                      !+ FIVE*RFeNO3(i)          &
+                      !+ RFeMnA(i)             & ! Equations go straight to particulate FeOH
+                      !+ RFeMnB(i)             & ! Equations go straight to particulate FeOH
+     !                 - RFeOHAppt(i)!*psp(i)
+                                                   ! SUBROUTINE REACTION
+       !--------------------------------------
+       ! Feads
+ !      reac(Feadsy,i) = -RFeadsOX(i)
+
+       !--------------------------------------
+       ! Mnads
+       candi%reac(candi%Mnadsy,i) = -candi%RMnadsOX(i)
+
        !--------------------------------------
        ! FeS & FeS2
        IF(candi%param%simFeS) THEN
-         candi%reac(candi%FeSy,i) = + candi%pps(i)*candi%RFeSppt(i)   &
-                                  - candi%RFeSFeA(i)               &
-                                  - candi%RFeSMnA(i)               &
-                                  - candi%RFeSFeB(i)               &
-                                  - candi%RFeSMnB(i)               &
-                                  - candi%RFeSOx(i)                &
-                                  - candi%RPyrite(i)
+         candi%reac(candi%FeSy,i) = + candi%pps(i)*candi%RFeSppt(i)        &
+                        - candi%RFeSOx(i)                &
+                        - candi%RFeSMnA(i)               &
+                        - candi%RFeSMnB(i)               &
+                        - candi%RFeSFeA(i)               &
+                        - candi%RFeSFeB(i)               &
+                        - candi%RPyrite(i)
 
          candi%reac(candi%FeS2y,i)= + candi%RPyrite(i)               &
                         - candi%RFeS2OX(i)
 
-         IF(candi%simXS) candi%reac(candi%XSy,i)  = + candi%pps(i)*candi%RXSppt(i)
+         IF(candi%simXS) candi%reac(candi%XSy,i)  = + candi%pps(i)*candi%RXSppt(i)   &
+                     - candi%pps(i)*candi%RXSOx(i)
 
-       END IF
-
-
+       END IF !End if simFeS
        !--------------------------------------
        ! FeCO3 (Siderite)
        IF(candi%param%simFeCO3) THEN
          candi%reac(candi%Sidy,i) = + candi%pps(i)*candi%RSidppt(i)
-
        END IF
-
        !--------------------------------------
        ! MnCO3 (Rhodcrosite)
        IF(candi%param%simMnCO3) THEN
          candi%reac(candi%rody,i) = + candi%pps(i)*candi%RRodppt(i)
-
        END IF
-
-     END IF
-                                                          ! SUBROUTINE REACTION
+     END IF !END IF SimMnFe
+                                                       ! SUBROUTINE REACTION
      !--------------------------------------
      ! CaCO3 (Calcite)
      IF(candi%param%simCaCO3) THEN
        candi%reac(candi%caly,i) =  candi%pps(i)*candi%RCalppt(i) !      &
                       !+ candi%psp(i)*candi%rcalppt(i)
-     END IF
-
+     END IF !END IF SimCaCO3
    END DO ! Search "Bunyip"
-!print*, 'OK so far'
-!            pause
 
    RETURN
  END SUBROUTINE REACTION
@@ -2969,37 +2934,63 @@ END IF !End if OMmodel = 3
 !dp   * rg C:N:P, rox
 !------------------------------------------------------------------------------!
  SUBROUTINE RATES(candi)
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    !-- Local
-   INTEGER        :: i, j
+   INTEGER          :: i, j
    !INTEGER (Sedp) :: FTemswitch, FBIOswitch, FTSwitch
-   REAL (Sedp)    :: FBIO_O2, FBIO_NO3, FBIO_MnO2, FBIO_FeOH, FBIO_SO4, FBIO_CH4
-   REAL (Sedp)    :: FTem_O2, FTem_NO3, FTem_MnO2, FTem_FeOH, FTem_SO4, FTem_Met
-   REAL (Sedp)    :: FTEA_O2, FTEA_NO3, FTEA_MnO2, FTEA_FeOH, FTEA_SO4, FTEA_CH4                         ! Dan added
-   REAL (Sedp)    :: FIN_O2, FIN_NO3, FIN_MnO2, FIN_FeOH, FIN_SO4, FIN_CH4                               ! Dan added
+   REAL (Sedp)       :: FBIO_O2, FBIO_NO3, FBIO_MnO2, FBIO_FeOH, FBIO_SO4, FBIO_CH4
+    REAL (Sedp)       :: FTem_O2, FTem_NO3, FTem_MnO2, FTem_FeOH, FTem_SO4, FTem_Met
+!   REAL (Sedp)    :: FTEA_O2, FTEA_NO3, FTEA_MnO2, FTEA_FeOH, FTEA_SO4, FTEA_CH4                         ! Dan added
+!   REAL (Sedp)    :: FIN_O2, FIN_NO3, FIN_MnO2, FIN_FeOH, FIN_SO4, FIN_CH4                               ! Dan added
    REAL (Sedp)    :: FTterm
+   INTEGER(Sedp)  :: openStatus
    !REAL (Sedp)    :: FTMetOAc, FTMetH2, FTSulOAc, FTSulH2, FTIroOAc, FTIroH2, FTManOAc, FTManH2
    !REAL (Sedp)    :: FTDenOAc, FTDenH2, FTAerOAc, FTAerH2, FTFerOAc, FTFerH2
    !REAL (Sedp)    :: FDHyd, FH2, FOAc, FBHyd
+   REAL(Sedp) :: density
    !-----------------------------
    !--- PRIMARY REDOX REACTIONS - SUBROUTINE RATES
+   density = candi%param%density
 !Dan starts here
 !Firstly, make the limiting Factors
 !FOM (Substrate limitation)
-
-!pause
 DO i=1, candi%npt !
+    IF (candi%param%SolidInitialUnit=="umolg")THEN
+    candi%k_iron(i)         = candi%param%kFeOH*density ! umol g^-1 * density: g cm^-3 s
+    candi%kp_iron(i)        = candi%param%kpFeOH*density! umol g^-2 *
+    candi%k_manganese(i)    = candi%param%kMnO2*density
+    candi%kp_manganese(i)   = candi%param%kpMnO2*density
+    candi%l_manganese(i)    = candi%param%lMnO2*density
+    candi%lp_manganese(i)   = candi%param%lpMnO2*density
+    candi%l_iron(i)         = candi%param%lFeOH*density
+    candi%lp_iron(i)        = candi%param%lpFeOH*density
+    ELSEIF(candi%param%SolidInitialUnit=="mmolLsolid")THEN
+    candi%k_iron(i)         = candi%param%kFeOH
+    candi%kp_iron(i)        = candi%param%kpFeOH
+    candi%k_manganese(i)    = candi%param%kMnO2
+    candi%kp_manganese(i)   = candi%param%kpMnO2
+    candi%l_manganese(i)    = candi%param%lMnO2
+    candi%lp_manganese(i)   = candi%param%lpMnO2
+    candi%l_iron(i)         = candi%param%lFeOH
+    candi%lp_iron(i)        = candi%param%lpFeOH
+    ELSEIF(candi%param%SolidInitialUnit/="umolg".AND.candi%param%SolidInitialUnit/="mmolLsolid")THEN
+    print*,"Check solid initial concentration units please."
+    STOP
+    ENDIF ! End if SolidInitialUnit
+ENDDO
+
+DO i=1, candi%npt
       IF (candi%param%FOMswitch == 1) THEN
-          candi%FDHyd = 1.00
-          candi%FOAc  = 1.00
-          candi%FH2   = 1.00
+            candi%FDHyd(i) = 1.00
+            candi%FOAc(i)  = 1.00
+            candi%FH2(i)   = 1.00
+
       ELSE IF (candi%param%FOMswitch == 2) THEN
-          candi%FDHyd = candi%y(candi%dhydy,i)/( candi%y(candi%dhydy,i) + candi%param%KDHyd  )
-          candi%FOAc  = candi%y(candi%OAcy, i)/( candi%y(candi%OAcy, i) + candi%param%KOAc   )
-          candi%FH2   = candi%y(candi%H2y,  i)/( candi%y(candi%H2y,  i) + candi%param%KH2    )
+            candi%FDHyd(i) = candi%y(candi%dhydy,i)/( candi%y(candi%dhydy,i) + candi%param%KDHyd  )
+            candi%FOAc(i)  = candi%y(candi%OAcy, i)/( candi%y(candi%OAcy, i) + candi%param%KOAc   )
+            candi%FH2(i)   = candi%y(candi%H2y,  i)/( candi%y(candi%H2y,  i) + candi%param%KH2    )
       END IF ! End if FDOMswitch
 END DO
-
 !FTem (Temperature factor) - SUBROUTINE RATES
       IF (candi%param%FTemswitch == 1) THEN
           FTem_O2   = 1.000000000000000
@@ -3012,188 +3003,253 @@ END DO
       ELSE IF (candi%param%FTemswitch == 2) THEN
           FTem_O2  = 1.000000000000000
           FTem_NO3 = 1.000000000000000
-          FTem_MnO2= 1.000000000000000
-          FTem_FeOH= 1.000000000000000
+          FTem_MnO2 = 1.000000000000000
+          FTem_FeOH = 1.000000000000000
           FTem_SO4 = 1.000000000000000
           FTem_Met = 1.000000000000000
 !          print *, 'Tem switch = 2'
       END IF !End if Temperature switch = 1 or 2
+
 !---------------------------------------------------------------
 !----------        Thermodynamic limit on Rox
-!          If FTswitch = 1, FT switch is effectively off         - SUBROUTINE RATES
+!       If FTswitch = 1, FT switch is effectively off     - SUBROUTINE RATES
       IF (candi%param%FTswitch == 1) THEN
-              candi%FTMetOAc  = 1
-              candi%FTMetH2   = 1
-              candi%FTSulOAc  = 1
-              candi%FTSulH2   = 1
-              candi%FTIroOAc  = 1
-              candi%FTIroH2   = 1
-              candi%FTManOAc  = 1
-              candi%FTDenOAc  = 1
-              candi%FTDenH2   = 1
-              candi%FTAerOAc  = 1
-              candi%FTFerDHyd = 1
-!          If FTswitch = 1, FT switch is effectively off         - SUBROUTINE RATES
-        ELSEIF (candi%param%FTswitch == 2 .AND. candi%param%OMModel < 3) THEN
-              print*,'Error: Switch OMModel to 3 or FTSwitch to 1, please'
-              STOP
+                candi%FTMetOAc  = 1.
+                candi%FTMetH2   = 1.
+                candi%FTSulOAc  = 1.
+                candi%FTSulH2   = 1.
+                candi%FTIroOAc  = 1.
+                candi%FTIroH2   = 1.
+                candi%FTManOAc  = 1.
+                candi%FTManH2   = 1.
+                candi%FTDenOAc  = 1.
+                candi%FTDenH2   = 1.
+                candi%FTAerOAc  = 1.
+               candi%FTFerDHyd = 1.
+!       If FTswitch = 1, FT switch is effectively off     - SUBROUTINE RATES
+    ELSEIF (candi%param%FTswitch == 2 .AND. candi%param%OMModel < 3) THEN
+                print*,'Error: Switch OMModel to 3 or FTSwitch to 1, please'
+                STOP
       ELSEIF (candi%param%FTswitch == 2 .AND. candi%param%OMModel == 3) THEN
-         candi%dGmp         =  candi%param%n*candi%param%F*candi%param%dPsi
-         !---------- FT_Fer start ---------------------
-         DO i= 1, candi%npt ! Search "Shark"
-            candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
-            IF (candi%y(candi%DHydy,i)<candi%param%Tiny) THEN
-                  candi%FTFerDHyd = 0.
-            ELSE
-               IF (candi%y(candi%hco3y,i)<candi%param%Tiny .OR. candi%y(candi%OAcy,i)<candi%param%Tiny .OR. candi%y(candi%H2y,i)<candi%param%Tiny) THEN
-                  candi%FTFerDHyd = 1.
-               ELSE
-                  candi%dGFerDHyd = candi%param%dG0FerDHyd + candi%param%FTR*candi%param%FTT*log( (candi%y(candi%hco3y,i)**2)*(candi%param%Temporary_proton**4)*(candi%y(candi%OAcy,i)**2)*(candi%y(candi%H2y,i)**4) / ((candi%y(candi%DHydy,i)**1) ) )
-                  candi%FTFerDHyd = 1/( candi%param%e** ((candi%dGAerOAc+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+           candi%dGmp         =  candi%param%n*candi%param%F*candi%param%dPsi
+!---------- FT_Fer start ---------------------
+DO i= 1, candi%npt ! Search "Shark"
+candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
+! IF (candi%y(DHydy,i)<Tiny) THEN
+!      FTFerDHyd(i) = 0.
+!      ELSE
+! IF (candi%y(hco3y,i)<Tiny .OR. candi%y(OAcy,i)<Tiny .OR. candi%y(H2y,i)<Tiny) THEN
+!      FTFerDHyd(i) = 1.
+!      ELSE
+ candi%dGFerDHyd(i) = candi%param%dG0FerDHyd + candi%param%FTR*candi%param%FTT*log( (candi%y(candi%hco3y,i)**2)*(candi%param%Temporary_proton**4)*(candi%y(candi%OAcy,i)**2)*(candi%y(candi%H2y,i)**4) / ((candi%y(candi%DHydy,i)**1) ) )
+ candi%FTFerDHyd(i) = 1/( candi%param%e** ((candi%dGFerDHyd(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
 
-               END IF
-            END IF
-         END DO ! Shark
+!END IF
+!END IF
+IF(candi%dGFerDHyd(i)/=candi%dGFerDHyd(i))THEN
+      candi%FTFerDHyd(i)=0.0000
+ENDIF
+
+ END DO ! Shark
 !---------- FT_Fer end ---------------------
-
 !---------- FT_O2 start ---------------------
 DO i= 1, candi%npt ! Search "Albatross"
 candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
- IF (candi%y(candi%OAcy,i)<candi%param%Tiny .OR. candi%y(candi%O2y,i)<candi%param%Tiny) THEN
- candi%FTAerOAc = 0.
- ELSE
- IF (candi%y(candi%hco3y,i)<candi%param%Tiny)THEN
- candi%FTAerOAc = 1.
- ELSE
- candi%dGAerOAc = candi%param%dG0AerOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%hco3y,i)**2) * (candi%param%Temporary_proton**1) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%O2y,i)**2) ) )
- !print*,"dGAerOAc",dGAerOAc
- candi%FTAerOAc = 1/( candi%param%e** ((candi%dGAerOAc+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
+! IF (candi%y(OAcy,i)<Tiny .OR. candi%y(O2y,i)<Tiny) THEN
+! FTAerOAc(i) = 0.
+! ELSE
+ !IF (candi%y(hco3y,i)<Tiny)THEN
+ !FTAerOAc(i) = 1.
+ !ELSE
+ candi%dGAerOAc(i) = candi%param%dG0AerOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%hco3y,i)**2) * (candi%param%Temporary_proton**1) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%O2y,i)**2) ) )
+ candi%FTAerOAc(i) = 1/( candi%param%e** ((candi%dGAerOAc(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ IF(candi%FTAerOAc(i)/=candi%FTAerOAc(i))THEN
+      candi%FTAerOAc(i)=0.0000
+      ENDIF
+ !END IF
+ !END IF
 END DO ! Albatross
 !---------- FT_O2 end ---------------------
 
 !---------- FT_NO3 start ---------------------
-!print*,"N2",y(N2y,:)
 DO i = 1, candi%npt ! Fruit bat
 candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
- IF (candi%y(candi%OAcy,i)<candi%param%Tiny .OR. candi%y(candi%NO3y,i)<candi%param%Tiny)THEN
-         candi%FTDenOAc = 0.
- ELSE
- IF (candi%y(candi%N2y,i)<candi%param%Tiny)THEN
-         candi%FTDenOAc = 1.
- ELSE
- candi%dGDenOAc = candi%param%dG0DenOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%N2y,i)**0.8) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%NO3y,i)**1.6) * (candi%param%Temporary_proton**0.6) ) )
- candi%FTDenOAc = 1/( candi%param%e** ((candi%dGDenOAc+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
- IF (candi%y(candi%H2y,i)<candi%param%Tiny .OR. candi%y(candi%NO3y,i)<candi%param%Tiny)THEN
-         candi%FTDenH2 = 0.
-         ELSE
- IF (candi%y(candi%N2y,i)<candi%param%Tiny)THEN
-        candi%FTDenH2 = 1.
-        ELSE
- candi%dGDenH2 = candi%param%dG0DenH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%N2y,i)**0.2) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%NO3y,i)**0.25) * (candi%param%Temporary_proton**0.4) ) )
- candi%FTDenH2 = 1/( candi%param%e** ((candi%dGDenH2+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
+! IF (candi%y(NO3y,i)<Tiny)THEN
+!      FTDenOAc(i) = 0.
+! ELSE
+! IF (candi%y(N2y,i)<Tiny)THEN
+      candi%FTDenOAc(i) = 1.
+ !ELSE
+ candi%dGDenOAc(i) = candi%param%dG0DenOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%N2y,i)**0.8) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%NO3y,i)**1.6) * (candi%param%Temporary_proton**0.6) ) )
+ candi%FTDenOAc(i) = 1/( candi%param%e** ((candi%dGDenOAc(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ !END IF
+ !END IF
+ !IF (candi%y(NO3y,i)<Tiny)THEN
+ !     FTDenH2(i) = 0.
+ !     ELSE
+ !IF (candi%y(N2y,i)<Tiny)THEN
+!     FTDenH2(i) = 1.
+ !    ELSE
+ candi%dGDenH2(i) = candi%param%dG0DenH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%N2y,i)**0.2) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%NO3y,i)**0.25) * (candi%param%Temporary_proton**0.4) ) )
+ candi%FTDenH2(i) = 1/( candi%param%e** ((candi%dGDenH2(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+     !END IF
+ !END IF
+IF(candi%FTDenOAc(i)/=candi%FTDenOAc(i))THEN
+      candi%FTDenOAc(i)=0.0000
+ENDIF
+IF(candi%FTDenH2(i)/=candi%FTDenH2(i))THEN
+      candi%FTDenH2(i)=0.0000
+ENDIF
 END DO ! Search "Fruit bat"
 !---------- FT_NO3 end ---------------------
 
 !---------- FT_MnO2 start ---------------------
 DO i = 1, candi%npt ! Search "Yabbies"
 candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
- IF (candi%y(candi%OAcy,i)<candi%param%Tiny.OR.candi%y(candi%MnO2y,i)<candi%param%Tiny) THEN
- candi%FTManOAc = 0.
- ELSE
- IF (candi%y(candi%mniiy,i)<candi%param%Tiny.OR.candi%y(candi%hco3y,i)<candi%param%Tiny) THEN
- candi%FTManOAc = 1.
- ELSE
- candi%dGManOAc = candi%param%dG0ManOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%mniiy,i)**4) * (candi%y(candi%hco3y,i)**2) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%MnO2y,i)**4) * (candi%param%Temporary_proton**7) ) )
- candi%FTManOAc = 1/( candi%param%e** ((candi%dGManOAc+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
+! IF (candi%y(MnO2y,i)<Tiny) THEN
+! FTManOAc(i) = 0.
+! ELSE
+! IF (candi%y(mniiy,i)<Tiny.OR.candi%y(hco3y,i)<Tiny) THEN
+! FTManOAc(i) = 1.
+! ELSE
+ candi%dGManOAc(i) = candi%param%dG0ManOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%mniiy,i)**4) * (candi%y(candi%hco3y,i)**2) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%MnO2y,i)**4) * (candi%param%Temporary_proton**7) ) )
+ candi%FTManOAc(i) = 1/( candi%param%e** ((candi%dGManOAc(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ !END IF
+ !END IF
+ candi%dGManH2(i) = candi%param%dG0ManH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%mniiy,i)**2) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%MnO2y,i)**2) * (candi%param%Temporary_proton**4) ) )
+ candi%FTManH2(i) = 1/( candi%param%e** ((candi%dGManH2(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+
+IF(candi%FTManOAc(i)/=candi%FTManOAc(i))THEN
+      candi%FTManOAc(i)=0.0000
+ENDIF
+
+IF(candi%FTManH2(i)/=candi%FTManH2(i))THEN
+      candi%FTManH2(i)=0.0000
+ENDIF
 END DO ! Search "Yabbies"
 !---------- FT_MnO2 end ---------------------
 
 !---------- FT_FeOH start ---------------------
 DO i = 1, candi%npt ! Search "Emu"
-candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
- IF (candi%y(candi%OAcy,i)<candi%param%Tiny.OR. candi%y(candi%feohy,i)<candi%param%Tiny) THEN
- candi%FTIroOAc = 0.
- ELSE
- IF (candi%y(candi%feiiy,i)<candi%param%Tiny) THEN
- candi%FTIroOAc = 1.
- ELSE
- candi%dGIroOAc = candi%param%dG0IroOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%feiiy,i)**8) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%feohy,i)**2) * (candi%param%Temporary_proton**4) ) )
- candi%FTIroOAc = 1/( candi%param%e** ((candi%dGIroOAc+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
- IF (candi%y(candi%H2y,i)<candi%param%Tiny .OR. candi%y(candi%feohy,i)<candi%param%Tiny) THEN
- candi%FTIroH2 = 0.
- IF (candi%y(candi%feiiy,i)<candi%param%Tiny) THEN
- candi%FTIroH2 = 1.
- ELSE
- candi%dGIroH2 = candi%param%dG0IroH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%feiiy,i)**2) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%feohy,i)**2) * (candi%param%Temporary_proton)**4 ) )
- candi%FTIroH2 = 1/( candi%param%e** ((candi%dGIroH2+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
+ candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
+! IF (candi%y(feohy,i)<Tiny) THEN
+! FTIroOAc(i) = 0.
+! ELSE
+! IF (candi%y(feiiy,i)<Tiny) THEN
+! FTIroOAc(i) = 1.
+! ELSE
+ candi%dGIroOAc(i) = candi%param%dG0IroOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%feiiy,i)**8) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%feohy,i)**2) * (candi%param%Temporary_proton**4) ) )
+ candi%FTIroOAc(i) = 1/( candi%param%e** ((candi%dGIroOAc(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ !END IF
+ !END IF
+ !IF(candi%y(H2y,i)<Tiny)THEN
+ !FTIroH2(i) = 0.
+ !IF(candi%y(feohy,i)<Tiny)THEN
+ !FTIroH2(i) = 0.
+ !ELSE
+ candi%dGIroH2(i) = candi%param%dG0IroH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%feiiy,i)**2) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%feohy,i)**2) * (candi%param%Temporary_proton)**4 ) )
+ candi%FTIroH2(i) = 1/( candi%param%e** ((candi%dGIroH2(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ !ENDIF
+IF(candi%FTIroOAc(i)/=candi%FTIroOAc(i))THEN
+      candi%FTIroOAc(i)=0.0000
+ENDIF
+IF(candi%FTIroH2(i)/=candi%FTIroH2(i))THEN
+      candi%FTIroH2(i)=0.0000
+ENDIF
+IF(candi%FTIroOAc(i)<candi%param%Tiny) candi%FTIroOAc(i)=candi%param%Tiny
+IF(candi%FTIroH2(i) <candi%param%Tiny) candi%FTIroH2 (i)=candi%param%Tiny
  END DO ! Search "Emu"
 !---------- FT_FeOH end ---------------------
 
 !---------- FT_SO4 start ---------------------
-DO i = 1, candi%npt ! Search "Galahs"
+DO i = 2, candi%npt ! Search "Galahs"
 candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
- IF (candi%y(candi%OAcy,i)<candi%param%Tiny.OR.candi%y(candi%so4y,i)<candi%param%Tiny) THEN
- candi%FTSulOAc = 0.
- ELSE
- IF (candi%y(candi%hsy,i)<candi%param%Tiny) THEN
- candi%FTSulOAc = 1.
- ELSE
- candi%dGSulOAc = candi%param%dG0SulOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%hsy,i)**1) * (candi%y(candi%hco3y,i)**2) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%so4y,i)**1)  ) )
- candi%FTSulOAc = 1/( candi%param%e** ((candi%dGSulOAc+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
- IF (candi%y(candi%H2y,i)<candi%param%Tiny.OR.candi%y(candi%so4y,i)<candi%param%Tiny) THEN
- candi%FTSulH2 = 0.
- ELSE
- IF (candi%y(candi%hsy,i)<candi%param%Tiny) THEN
- candi%FTSulH2 = 1.
- ELSE
- candi%dGSulH2 = candi%param%dG0SulH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%hsy,i)**0.25) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%so4y,i)**0.25) * (candi%param%Temporary_proton)**0.25 ) )
- candi%FTSulH2 = 1/( candi%param%e** ((candi%dGSulH2+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
+! IF (candi%y(OAcy,i)<param%Tiny) THEN
+! FTSulOAc(i) = 0.
+! ELSE
+! IF (candi%y(hsy,i)<param%Tiny) THEN
+! FTSulOAc(i) = 1.
+! ELSE
+ candi%dGSulOAc(i) = candi%param%dG0SulOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%hsy,i)**1) * (candi%y(candi%hco3y,i)**2) / ( (candi%y(candi%OAcy,i)**1) * (candi%y(candi%so4y,i)**1)  ) )
+ candi%FTSulOAc(i) = 1/( candi%param%e** ((candi%dGSulOAc(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+
+
+ !print*,"dG0SulOAc",dG0SulOAc
+ !print*,"candi%y(hsy,i)",candi%y(hsy,i)
+ !print*,"candi%y(hco3y,i)",candi%y(hco3y,i)
+ !print*,"candi%y(OAcy,i)",candi%y(OAcy,i)
+ !print*,"candi%y(so4y,i)",candi%y(so4y,i)
+ !print*,""
+ !PAUSE
+ ! END IF
+ !END IF
+ !IF (candi%y(H2y,i)<param%Tiny) THEN
+ !FTSulH2(i) = 0.
+ !ELSE
+! IF (candi%y(hsy,i)<param%Tiny) THEN
+! FTSulH2(i) = 1.
+! ELSE
+ candi%dGSulH2(i) = candi%param%dG0SulH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%hsy,i)**0.25) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%so4y,i)**0.25) * (candi%param%Temporary_proton)**0.25 ) )
+ candi%FTSulH2(i) = 1/( candi%param%e** ((candi%dGSulH2(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ !END IF
+! END IF
+!  print*,"dGSulH2",   dGSulH2
+!  print*,"FTSulH2",   FTSulH2
+!  print*,"candi%y(hsy,i)",  candi%y(hsy,i)
+!  print*,"candi%y(hco3y,i)",candi%y(hco3y,i)
+!  print*,"candi%y(so4y,i)", candi%y(so4y,i)
+!  print*,"H+", candi%param%Temporary_proton
+
+!  PAUSE
+IF(candi%dGSulOAc(i)/=candi%dGSulOAc(i))THEN
+      candi%FTSulOAc(i)=0.0000
+ENDIF
+IF(candi%dGSulH2(i)/=candi%dGSulH2(i))THEN
+      candi%FTSulH2(i)=0.0000
+ENDIF
+IF(candi%FTSulOAc(i)<candi%param%Tiny) candi%FTSulOAc(i)=candi%param%Tiny
+IF(candi%FTSulH2(i) <candi%param%Tiny) candi%FTSulH2 (i)=candi%param%Tiny
 END DO ! Search "Galahs"
 !---------- FT_SO4 end ---------------------
 
 !---------- FT_Met start ---------------------
 DO i = 1, candi%npt ! Search "Donkey"
 candi%param%Temporary_proton = 10**(-(candi%y(candi%protony,i)))
- IF (candi%y(candi%OAcy,i)<candi%param%Tiny) THEN
- candi%FTMetOAc = 0.
- ELSE
- IF (candi%y(candi%CH4y,i)<candi%param%Tiny.OR.candi%y(candi%hco3y,i)<candi%param%Tiny) THEN
- candi%FTMetOAc = 1.
- ELSE
- candi%dGMetOAc = candi%param%dG0MetOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%CH4y,i)**1) * (candi%y(candi%hco3y,i)**1) / ( (candi%y(candi%OAcy,i)**1)  ) )
- candi%FTMetOAc = 1/( candi%param%e** ((candi%dGMetOAc+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
- IF (candi%y(candi%H2y,i)<candi%param%Tiny.OR.candi%y(candi%hco3y,i)<candi%param%Tiny) THEN
- candi%FTMetH2 = 0.
- ELSE
- IF (candi%y(candi%CH4y,i)<candi%param%Tiny) THEN
- candi%FTMetH2 = 1.
- ELSE
- candi%dGMetH2 = candi%param%dG0MetH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%CH4y,i)**0.25) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%hco3y,i)**0.25) * (candi%param%Temporary_proton)**0.25 ) )
- candi%FTMetH2 = 1/( candi%param%e** ((candi%dGMetH2+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
- END IF
- END IF
+ !IF (candi%y(candi%OAcy,i)<candi%param%Tiny) THENf
+ !FTMetOAc(i) = 0.
+ !ELSE
+ !IF (candi%y(CH4y,i)<param%Tiny.OR.candi%y(hco3y,i)<param%Tiny) THEN
+ !FTMetOAc(i) = 1.
+ !ELSE
+ candi%dGMetOAc(i) = candi%param%dG0MetOAc + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%CH4y,i)**1) * (candi%y(candi%hco3y,i)**1) / ( (candi%y(candi%OAcy,i)**1)  ) )
+ candi%FTMetOAc(i) = 1/( candi%param%e** ((candi%dGMetOAc(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ !END IF
+ !END IF
+! IF ( candi%y(hco3y,i)<(param%Tiny/1.0E1) )THEN
+! FTMetH2(i) = 0.
+! print*,"HCO3 is small"
+ !ELSEIF (candi%y(CH4y,i)<param%Tiny) THEN
+ !FTMetH2(i) = 1.
+ !print*,"CH4 is small",i
+! ELSEIF(candi%y(hco3y,i)>Tiny.AND.candi%y(CH4y,i)>Tiny)THEN
+      !print*,"Calculated properly",i
+ candi%dGMetH2(i) = candi%param%dG0MetH2 + candi%param%FTR*candi%param%FTT*log(  (candi%y(candi%CH4y,i)**0.25) / ( (candi%y(candi%H2y,i)**1) * (candi%y(candi%hco3y,i)**0.25) * (candi%param%Temporary_proton)**0.25 ) )
+ candi%FTMetH2(i) = 1/( candi%param%e** ((candi%dGMetH2(i)+candi%dGmp)/(candi%param%FTR*candi%param%FTT) ) + 1 )
+ !END IF !H2<Tiny or HCO3<Tiny
+ !END IF !CH4<Tiny
+
+IF(candi%FTMetOAc(i)/=candi%FTMetOAc(i))THEN
+      candi%FTMetOAc(i)=0.0000
+ENDIF
+IF(candi%FTMetH2(i)/=candi%FTMetH2(i))THEN
+      candi%FTMetH2(i)=0.0000
+ENDIF
+IF(candi%FTMetOAc(i)<candi%param%Tiny) candi%FTMetOAc(i)=candi%param%Tiny
+IF(candi%FTMetH2(i) <candi%param%Tiny) candi%FTMetH2 (i)=candi%param%Tiny
 END DO ! Search "Donkey"
 !---------- FT_Met end ---------------------
 
-        END IF ! End if Thermodynamic switch = 1 or 2
+    END IF ! End if Thermodynamic switch = 1 or 2
 !print *, ('FT_SO4sum'),FT_SO4sum
   !-- Define kinetic factors FTEA and FIN - SUBROUTINE RATES
   !-----------------A1-----------------------A1A1A1A1A1A1A1A1A1A1A1A1 - SUBROUTINE RATES
@@ -3202,48 +3258,86 @@ IF(candi%param%OMapproach < 1 .OR. candi%param%OMapproach > 2) THEN
      PRINT *, ('OMapproach must be 1 or 2. STOPPING')
      STOP
 END IF  ! End if OM approach \= 1 or 2
-
 ! Start Define FIN (Monod inhibition of an oxidation process by another oxidant)
 DO i=1, candi%npt ! Search "Wombat"
-        IF(candi%param%FINswitch ==1) THEN
-          FIN_O2   = 1.0000000000000000
-          FIN_NO3  = 1.0000000000000000
-          FIN_MnO2 = 1.0000000000000000
-          FIN_FeOH = 1.0000000000000000
-          FIN_SO4  = 1.0000000000000000
-        !PRINT *,('FIN 1 Approach 1 or 2 : Wombats')
-          ELSE
-        IF(candi%param%FINswitch == 2 .AND. candi%param%OMapproach == 1) THEN
-           !FIN_O2   = ( candi%param%kpo2  /(candi%param%kpo2+candi%y(candi%o2y,i))     )
-           FIN_NO3  = ( candi%param%kpno3 /(candi%param%kpno3+candi%y(candi%no3y,i))   )
-           FIN_MnO2 = ( candi%param%kpmno2/(candi%param%kpmno2+candi%y(candi%mno2y,i)) )
-           FIN_FeOH = ( candi%param%kpfeoh/(candi%param%kpfeoh+candi%y(candi%feohy,i)) )
-           FIN_SO4  = ( candi%param%kpso4 /(candi%param%kpso4+candi%y(candi%so4y,i))   )
-        !PRINT *,('FIN 2 Approach 1 : Badgers')
-        ELSE
-        IF(candi%param%FINswitch ==2 .AND. candi%param%OMapproach == 2) THEN
-          !FIN_O2   = (1.0 - (candi%y(candi%o2y,i)/candi%param%lpo2)    )
-          FIN_NO3  = (1.0 - (candi%y(candi%NO3y,i)/candi%param%lpNO3)  )
-          FIN_MnO2 = (1.0 - (candi%y(candi%MnO2y,i)/candi%param%lpMnO2))
-          FIN_FeOH = (1.0 - (candi%y(candi%FeOHy,i)/candi%param%lpFeOH))
-          FIN_SO4  = (1.0 - (candi%y(candi%SO4y,i)/candi%param%lpSO4)  )
-        !PRINT *,('FIN 2 Approach 2 : Cows')
-          ELSE
-         STOP
+    IF (candi%y(candi%O2y,i)<0)   candi%y(candi%O2y,i)   = 0.00
+    IF (candi%y(candi%NO3y,i)<0)  candi%y(candi%NO3y,i)  = 0.00
+    IF (candi%y(candi%MnO2y,i)<0) candi%y(candi%MnO2y,i) = 0.00
+    IF (candi%y(candi%FeOHy,i)<0) candi%y(candi%FeOHy,i) = 0.00
+    IF (candi%y(candi%SO4y,i)<0)  candi%y(candi%SO4y,i)  = 0.00
 
-        END IF ! End if FINswitch == 2 and OMapproach == 2
-        END IF ! End if FINswitch == 2 and OMapproach == 1
-        END IF ! End if FINswitch == 1
+    IF(candi%param%FINswitch ==1) THEN
+     ! FIN_O2   = 1.0000000000000000
+      candi%FIN_NO3  = 1.0000000000000000
+      candi%FIN_MnO2 = 1.0000000000000000
+      candi%FIN_FeOH = 1.0000000000000000
+      candi%FIN_SO4  = 1.0000000000000000
+
+      ELSE
+    IF(candi%param%FINswitch == 2 .AND. candi%param%OMapproach == 1) THEN
+       !FIN_O2   = ( kpo2  /(kpo2+candi%y(o2y,i))     )
+       candi%FIN_NO3(i)  = ( candi%param%kpno3 /(candi%param%kpno3+candi%y(candi%no3y,i))   )
+       candi%FIN_MnO2(i) = ( candi%kp_manganese(i)/(candi%kp_manganese(i)+candi%y(candi%mno2y,i)) )
+       candi%FIN_FeOH(i) = ( candi%kp_iron(i)/(candi%kp_iron(i)+candi%y(candi%feohy,i)) )
+       candi%FIN_SO4(i)  = ( candi%param%kpso4 /(candi%param%kpso4+candi%y(candi%so4y,i))   )
+    !PRINT *,('FIN 2 Approach 1 : Badgers')
+    ELSE
+    IF(candi%param%FINswitch ==2 .AND. candi%param%OMapproach == 2) THEN
+      !FIN_O2   = (1.0 - (candi%y(o2y,i)/lpo2)    )
+      candi%FIN_NO3(i)  = (1.0 - (candi%y(candi%NO3y,i)/candi%param%lpNO3)  )
+      candi%FIN_MnO2(i) = (1.0 - (candi%y(candi%MnO2y,i)/candi%lp_manganese(i)) )
+      candi%FIN_FeOH(i) = (1.0 - (candi%y(candi%FeOHy,i)/candi%lp_iron(i)) )
+      candi%FIN_SO4(i)  = (1.0 - (candi%y(candi%SO4y,i)/candi%param%lpSO4)  )
+
+      ELSE
+     STOP
+
+    END IF ! End if FINswitch == 2 and OMapproach == 2
+    END IF ! End if FINswitch == 2 and OMapproach == 1
+      IF(candi%FIN_O2(i)<candi%param%Tiny)   candi%FIN_O2   = 0.000
+          IF(candi%FIN_NO3(i)<candi%param%Tiny)  candi%FIN_NO3  = 0.000
+          IF(candi%FIN_MnO2(i)<candi%param%Tiny) candi%FIN_MnO2 = 0.000
+          IF(candi%FIN_FeOH(i)<candi%param%Tiny) candi%FIN_FeOH = 0.000
+          IF(candi%FIN_NO3(i) <candi%param%Tiny) candi%FIN_NO3  = 0.000
+          IF(candi%FIN_SO4(i) <candi%param%Tiny) candi%FIN_SO4  = 0.000
+    END IF ! End if FINswitch == 1
 !END DO
        IF (candi%param%FInO2OnlySwitch==1)THEN
-               FIN_O2 = 1.000
+                  candi%FIN_O2 = 1.000
+               candi%FIN_O2NO3(i)  = 1.0
+               candi%FIN_O2MnO2(i) = 1.0
+               candi%FIN_O2FeOH(i) = 1.0
+               candi%FIN_O2SO4(i)  = 1.0
+               candi%FIN_O2CH4(i)  = 1.0
+
        ELSE
-       !DO i=1, npt
+       !DO i=1, candi%npt
        IF (candi%param%FInO2OnlySwitch==2)THEN
-               IF(candi%param%OMapproach == 1) THEN
-               FIN_O2 = ( candi%param%kpo2/(candi%param%kpo2+candi%y(candi%o2y,i)) )
-               ELSEIF(candi%param%OMapproach == 1) THEN
-               FIN_O2 = (1.0 - (candi%y(candi%o2y,i)/candi%param%lpo2))
+                  IF(candi%param%OMapproach == 1) THEN
+               !FIN_O2(i) = ( kpo2/(kpo2+candi%y(o2y,i)) )
+
+               candi%FIN_O2NO3(i)  = ( candi%param%kpo2NO3 /(candi%param%kpo2NO3 +candi%y(candi%o2y,i)) )
+               candi%FIN_O2MnO2(i) = ( candi%param%kpo2MnO2/(candi%param%kpo2MnO2+candi%y(candi%o2y,i)) )
+               candi%FIN_O2FeOH(i) = ( candi%param%kpo2FeOH/(candi%param%kpo2FeOH+candi%y(candi%o2y,i)) )
+               candi%FIN_O2SO4(i)  = ( candi%param%kpo2SO4 /(candi%param%kpo2SO4 +candi%y(candi%o2y,i)) )
+               candi%FIN_O2CH4(i)  = ( candi%param%kpo2CH4 /(candi%param%kpo2CH4 +candi%y(candi%o2y,i)) )
+               candi%FIN_O2(i)     = candi%FIN_O2NO3(i) * candi%FIN_O2MnO2(i) *  &
+                                candi%FIN_O2FeOH(i) * candi%FIN_O2SO4(i) * candi%FIN_O2CH4(i)
+
+               ELSEIF(candi%param%OMapproach == 2) THEN
+               candi%FIN_O2NO3(i)  = (1.0 - (candi%y(candi%o2y,i)/candi%param%lpo2no3))
+               candi%FIN_O2MnO2(i) = (1.0 - (candi%y(candi%o2y,i)/candi%param%lpo2mno2))
+               candi%FIN_O2FeOH(i) = (1.0 - (candi%y(candi%o2y,i)/candi%param%lpo2feoh))
+               candi%FIN_O2SO4(i)  = (1.0 - (candi%y(candi%o2y,i)/candi%param%lpo2so4))
+               candi%FIN_O2CH4(i)  = (1.0 - (candi%y(candi%o2y,i)/candi%param%lpo2ch4))
+
+               IF(candi%FIN_O2NO3(i)<0.0)  candi%FIN_O2NO3(i)= 0.0000
+               IF(candi%FIN_O2MnO2(i)<0.0) candi%FIN_O2MnO2(i)= 0.0000
+               IF(candi%FIN_O2FeOH(i)<0.0) candi%FIN_O2FeOH(i)= 0.0000
+               IF(candi%FIN_O2SO4(i)<0.0)  candi%FIN_O2SO4(i)= 0.0000
+               IF(candi%FIN_O2CH4(i)<0.0)  candi%FIN_O2CH4(i)= 0.0000
+               candi%FIN_O2(i)     = candi%FIN_O2NO3(i) * candi%FIN_O2MnO2(i) *  &
+                       candi%FIN_O2FeOH(i) * candi%FIN_O2SO4(i) * candi%FIN_O2CH4(i)
                END IF ! End if OMapproach
        ELSE
        IF (candi%param%FInO2OnlySwitch>2 .OR. candi%param%FInO2OnlySwitch<1)THEN
@@ -3253,167 +3347,172 @@ DO i=1, candi%npt ! Search "Wombat"
        END IF ! End if FInOnlySwitch
        END IF
        END IF
-END DO  ! Search "Wombat"
+    !Factor = '(*)'
 
+END DO  ! Search "Wombat"
 ! End Define FIN (Monod inhibition of an oxidation process by another oxidant)
 
-! Start FTEA and FIN calculations for ROX equations
+    ! Start    FTEA and FIN calculations for ROX equations
 DO i=1, candi%npt  !Search "Elephant"
    IF ( candi%param%OMapproach == 1 ) THEN
-                   FTEA_O2   = ( candi%y(candi%o2y,i)  /(candi%param%kO2+candi%y(candi%o2y,i))      )
-                   FTEA_NO3  = ( candi%y(candi%NO3y,i) /(candi%param%kNO3+candi%y(candi%NO3y,i))   )
-                   FTEA_MnO2 = ( candi%y(candi%MnO2y,i)/(candi%param%kMnO2+candi%y(candi%MnO2y,i)))
-                   FTEA_FeOH = ( candi%y(candi%FeOHy,i)/(candi%param%kFeOH+candi%y(candi%FeOHy,i)))
-                   FTEA_SO4  = ( candi%y(candi%SO4y,i) /(candi%param%kSO4+candi%y(candi%SO4y,i))   )
-  !Rate limiting factors for Approach 1
+               candi%FTEA_O2(i)   = ( candi%y(candi%o2y,i)  /(candi%param%kO2+candi%y(candi%o2y,i))     )
+                 candi%FTEA_NO3(i)  = ( candi%y(candi%NO3y,i) /(candi%param%kNO3+candi%y(candi%NO3y,i))   )
+                 candi%FTEA_MnO2(i) = ( candi%y(candi%MnO2y,i)/(candi%k_manganese(i)+candi%y(candi%MnO2y,i)) )
+                 candi%FTEA_FeOH(i) = ( candi%y(candi%FeOHy,i)/(candi%k_iron(i)+candi%y(candi%FeOHy,i)) )
+                 candi%FTEA_SO4(i)  = ( candi%y(candi%SO4y,i) /(candi%param%kSO4+candi%y(candi%SO4y,i))   )
+
+          IF(candi%FTEA_O2(i)  <candi%param%Tiny)  candi%FTEA_O2(i)   = 0.000
+          IF(candi%FTEA_NO3(i) <candi%param%Tiny)  candi%FTEA_NO3(i)  = 0.000
+          IF(candi%FTEA_MnO2(i)<candi%param%Tiny)  candi%FTEA_MnO2(i) = 0.000
+          IF(candi%FTEA_FeOH(i)<candi%param%Tiny)  candi%FTEA_FeOH(i) = 0.000
+          IF(candi%FTEA_SO4(i) <candi%param%Tiny)  candi%FTEA_SO4(i)  = 0.000
+
+!print *, "FTEA_O2 in rates", FTEA_O2
+                 !Rate limiting factors for Approach 1
   !You multiply these by rgC to get the fraction of the organic matter oxidation that is consuming each TEA
           !-- Aerobic respiration
-          candi%FO2(i)   = FTEA_O2  *FTem_O2  * candi%FTAerOAc(i)
+          candi%FO2(i)   = candi%FTEA_O2(i) *candi%FTem_O2(i)  * candi%FTAerOAc(i)
+          !IF(FO2(i)  <0.000)  candi%FO2   = 0.000
           !-- Denitrification
-          candi%FNO3(i)  = FTEA_NO3 *FTem_NO3 *FIN_O2 * candi%FTDenOAc(i) * candi%FTDenH2(i)
+          candi%FNO3(i)  = candi%FTEA_NO3(i) *candi%FTem_NO3(i) *candi%FIN_O2NO3(i) * MAX(candi%FTDenOAc(i), candi%FTDenH2(i))
+          !IF(FNO3(i) <0.000)  candi%FNO3  = 0.000
           !-- Manganese reduction
-          candi%FMnO2(i) = FTEA_MnO2*FTem_MnO2*FIN_O2*FIN_NO3 * candi%FTManOAc(i)
+          candi%FMnO2(i) = candi%FTEA_MnO2(i)*candi%FTem_MnO2(i)*candi%FIN_O2MnO2(i)*candi%FIN_NO3(i) * MAX(candi%FTManOAc(i), candi%FTManH2(i))
+          !IF(FMnO2(i)<0.000)  candi%FMnO2 = 0.000
           !-- Iron reduction
-          candi%FFeOH(i) = FTEA_FeOH*FTem_FeOH*FIN_O2*FIN_NO3*FIN_MnO2 * candi%FTIroOAc(i) * candi%FTIroH2(i)
+          candi%FFeOH(i) = candi%FTEA_FeOH(i)*candi%FTem_FeOH(i)*candi%FIN_O2FeOH(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i) * MAX(candi%FTIroOAc(i), candi%FTIroH2(i))
+          IF(candi%FFeOH(i)<candi%param%Tiny)  candi%FFeOH(i) = candi%param%Tiny
           !-- Sulfate reduction
-          candi%FSO4(i)  = FTEA_SO4 *FTem_SO4 *FIN_O2*FIN_NO3*FIN_MnO2*FIN_FeOH * candi%FTSulOAc(i) * candi%FTSulH2(i)
+          candi%FSO4(i)  = candi%FTEA_SO4(i) *candi%FTem_SO4(i) *candi%FIN_O2SO4(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)*candi%FIN_FeOH(i) * MAX(candi%FTSulOAc(i), candi%FTSulH2(i))
+          IF(candi%FSO4(i) <candi%param%Tiny)  candi%FSO4(i)  = 0.000
+          !PAUSE
           !-- Methanogenesis
-          candi%FMet(i)  =           FTem_Met *FIN_O2*FIN_NO3*FIN_MnO2*FIN_FeOH*FIN_SO4 * candi%FTMetOAc(i) * candi%FTMetH2(i)
-END IF !End if Approach 1
+          candi%FMet(i)  = candi%FTem_Met(i) *candi%FIN_O2(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)*candi%FIN_FeOH(i)*candi%FIN_SO4(i) * MAX(candi%FTMetOAc(i), candi%FTMetH2(i))
+          IF(candi%FMet(i) <candi%param%Tiny)  candi%FMet(i)  = 0.000
+          END IF !End if Approach 1
 END DO ! Search "Elephant"
 
 !-----------------A2-----------------------A2A2A2A2A2A2A2A2A2A2A2 - SUBROUTINE RATES
 DO i=1,candi%npt ! Search "Tiger"
 IF ( candi%param%OMapproach == 2 ) THEN
-   !DO i=1,npt
+   !DO i=1,candi%npt
       !FTEA (Monod limitation at low concentration of oxidant)
-          FTEA_O2   = candi%y(candi%o2y,i)  /candi%param%lo2
-          FTEA_NO3  = candi%y(candi%no3y,i) /candi%param%lno3
-          FTEA_MnO2 = candi%y(candi%mno2y,i)/candi%param%lmno2
-          FTEA_FeOH = candi%y(candi%feohy,i)/candi%param%lfeoh
-          FTEA_SO4  = candi%y(candi%so4y,i) /candi%param%lso4
+        candi%FTEA_O2(i)   = candi%y(candi%o2y,i)   /candi%param%lo2
+         candi%FTEA_NO3(i)  = candi%y(candi%no3y,i)  /candi%param%lno3
+         candi%FTEA_MnO2(i) = candi%y(candi%mno2y,i) /candi%l_manganese(i)
+         candi%FTEA_FeOH(i) = candi%y(candi%feohy,i) /candi%l_iron(i)
+         candi%FTEA_SO4(i)  = candi%y(candi%so4y,i)  /candi%param%lso4
+
+         IF(candi%FTEA_O2(i)  <0.000) candi%FTEA_O2(i)  = 0.000
+         IF(candi%FTEA_NO3(i) <0.000) candi%FTEA_NO3(i) = 0.000
+         IF(candi%FTEA_MnO2(i)<0.000) candi%FTEA_MnO2(i)= 0.000
+         IF(candi%FTEA_FeOH(i)<0.000) candi%FTEA_FeOH(i)= 0.000
+         IF(candi%FTEA_SO4(i) <0.000) candi%FTEA_SO4(i) = 0.000
+
 !You multiply these by rgC to get the fraction of the organic matter oxidation that is consuming each TEA
 !print *,'i',i
 !PRINT *,'A2 TEST ',lo2,lpo2,lno3,lpno3,lmno2,lpmno2,lfeoh,lpfeoh,lso4,lpso4
 !PRINT *,'FTi     ',FTEA_O2,FIN_O2,FTEA_NO3,FIN_NO3,FTEA_MnO2,FIN_MnO2, FTEA_FeOH,FIN_FeOH,FTEA_SO4,FIN_SO4
       !-- Aerobic respiration
-          IF ( candi%y(candi%o2y,i)>candi%param%lO2 ) THEN ! If O2 concentration is high ...
-           candi%FO2(i)  = 1.0000000000000000*FTem_O2 ! ... then aerobic respiration goes at 1*kOM ...
-           candi%FNO3(i) = 0.0000000000000000 !... and everything else is inhibited by O2.
-           candi%FMnO2(i)= 0.0000000000000000
-           candi%FFeOH(i)= 0.0000000000000000
+         IF ( candi%y(candi%o2y,i)>candi%param%lO2 ) THEN ! If O2 concentration is high ...
+           candi%FO2(i)  = 1.0000000000000000*candi%FTem_O2(i) * candi%FTAerOAc(i) ! ... then aerobic respiration goes at 1*kOM ...
+              candi%FNO3(i) = 0.0000000000000000 !... and everything else is inhibited by O2.
+           candi%FMnO2(i) = 0.0000000000000000
+           candi%FFeOH(i) = 0.0000000000000000
            candi%FSO4(i) = 0.0000000000000000
            candi%FMet(i) = 0.0000000000000000
            ELSE
       !-- Denitrification
           IF ( candi%y(candi%NO3y,i)>candi%param%lNO3 ) THEN ! If NO3 concentration is high and if O2 concentration is low ...
-          candi%FO2(i)  = FTEA_O2*FTem_O2 ! ... 1: then aerobic respiration is O2 limited ...
-          candi%FNO3(i) = 1.0000000000000000*FTem_NO3*FIN_O2 ! ... denitrification goes at 1*kOM ...
+          candi%FO2(i)  = candi%FTEA_O2(i)*candi%FTem_O2(i)  * candi%FTAerOAc(i)! ... then aerobic respiration is O2 limited ...
+          candi%FNO3(i) = 1.0000000000000000*candi%FTem_NO3(i)*candi%FIN_O2NO3(i) * MAX(candi%FTDenOAc(i), candi%FTDenH2(i))! ... denitrification goes at 1*kOM ...
           candi%FMnO2(i)= 0.0000000000000000 !... and everything else is inhibited by NO3.
-          candi%FFeOH(i)= 0.0000000000000000
+          candi%FFeOH(i) = 0.0000000000000000
           candi%FSO4(i) = 0.0000000000000000
           candi%FMet(i) = 0.0000000000000000
           ELSE
       !-- Manganese reduction
-            IF ( candi%y(candi%MnO2y,i)>candi%param%lMnO2  ) THEN       !If Mn concentration is high and if NO3 is low ...
-             candi%FO2(i)  = FTEA_O2*FTem_O2 ! ... monkeys 2: then aerobic respiration is O2 limited ...
-             candi%FNO3(i) = FTem_NO3*FTEA_NO3*FIN_O2 ! ... then denitrification is NO3 limited,
-             candi%FMnO2(i)= 1.0000000000000000*FTem_MnO2*FIN_NO3*FIN_O2 ! ... manganese reduction goes at 1*kOM ...
-             candi%FFeOH(i)= 0.0000000000000000 !... and everything else is inhibited by MnO2.
+            IF ( candi%y(candi%MnO2y,i)>candi%l_manganese(i)  ) THEN    !If Mn concentration is high and if NO3 is low ...
+             candi%FO2(i)  = candi%FTEA_O2(i)*candi%FTem_O2(i) * candi%FTAerOAc(i) ! ... then aerobic respiration is O2 limited ...
+             candi%FNO3(i) = candi%FTem_NO3(i)*candi%FTEA_NO3(i)*candi%FIN_O2NO3(i)* MAX(candi%FTDenOAc(i), candi%FTDenH2(i)) ! ... then denitrification is NO3 limited,
+                candi%FMnO2(i) = 1.0000000000000000*candi%FTem_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2MnO2(i) * MAX(candi%FTManOAc(i), candi%FTManH2(i)) ! ... manganese reduction goes at 1*kOM ...
+             candi%FFeOH(i) = 0.0000000000000000 !... and everything else is inhibited by MnO2.
              candi%FSO4(i) = 0.0000000000000000
              candi%FMet(i) = 0.0000000000000000
             ELSE
       !-- Iron reduction
-               IF ( candi%y(candi%FeOHy,i)>candi%param%lFeOH ) THEN     !If iron concentration is high and MnO2 concentration is low ...
-               candi%FO2(i)  = FTEA_O2*FTem_O2 ! ... monkeys 3: then aerobic respiration is O2 limited ...
-               candi%FNO3(i) = FTem_NO3*FTEA_NO3*FIN_O2 ! ... then denitrification is NO3 limited,
-               candi%FMnO2(i)= FTem_MnO2*FTEA_MnO2*FIN_NO3*FIN_O2 !... then manganese reduction is manganese limited ...
-               candi%FFeOH(i)= 1.0000000000000000*FTem_FeOH*FIN_MnO2*FIN_NO3*FIN_O2! ... iron reduction goes at 1*kOM ...
+               IF ( candi%y(candi%FeOHy,i)>candi%l_iron(i) ) THEN    !If iron concentration is high and MnO2 concentration is low ...
+                  candi%FO2(i)  = candi%FTEA_O2(i)*candi%FTem_O2(i)  * candi%FTAerOAc(i)! ... then aerobic respiration is O2 limited ...
+               candi%FNO3(i) = candi%FTem_NO3(i)*candi%FTEA_NO3(i)*candi%FIN_O2NO3(i) * MAX(candi%FTDenOAc(i), candi%FTDenH2(i))! ... then denitrification is NO3 limited,
+               candi%FMnO2(i) = candi%FTem_MnO2(i)*candi%FTEA_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2MnO2(i) * MAX(candi%FTManOAc(i), candi%FTManH2(i))!... then manganese reduction is manganese limited ...
+                  candi%FFeOH(i) = 1.0000000000000000*candi%FTem_FeOH(i)*candi%FIN_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2FeOH(i) * MAX(candi%FTIroOAc(i), candi%FTIroH2(i))! ... iron reduction goes at 1*kOM ...
                candi%FSO4(i) = 0.0000000000000000 !... and the others are inhibited by FeOH.
                candi%FMet(i) = 0.0000000000000000
+              ! print*,"alpha"
                ELSE
      !-- Sulfate reduction
-                 IF ( candi%y(candi%SO4y,i)>candi%param%lSO4 ) THEN     !If SO4 concentration is high and iron concentration is low ...
-                 candi%FO2(i)  = FTEA_O2*FTem_O2 ! ... monkeys 4: then aerobic respiration is O2 limited ...
-                 candi%FNO3(i) = FTem_NO3*FTEA_NO3*FIN_O2 ! ... then denitrification is NO3 limited,
-                 candi%FMnO2(i)= FTem_MnO2*FTEA_MnO2*FIN_NO3*FIN_O2 !... then manganese reduction is manganese limited ...
-                 candi%FFeOH(i)= FTem_FeOH*FTEA_FeOH*FIN_MnO2*FIN_NO3*FIN_O2 !... then the iron reduction rate is iron limited ...
-                 candi%FSO4(i) = 1.0000000000000000*FTem_SO4*FIN_FeOH*FIN_MnO2*FIN_NO3*FIN_O2 ! ... SO4 reduction goes at 1*kOM ...
+                 IF ( candi%y(candi%SO4y,i)>candi%param%lSO4 ) THEN    !If SO4 concentration is high and iron concentration is low ...
+                    candi%FO2(i)  = candi%FTEA_O2(i)*candi%FTem_O2(i) * candi%FTAerOAc(i) ! ... then aerobic respiration is O2 limited ...
+                 candi%FNO3(i) = candi%FTem_NO3(i)*candi%FTEA_NO3(i)*candi%FIN_O2NO3(i) * MAX(candi%FTDenOAc(i), candi%FTDenH2(i))! ... then denitrification is NO3 limited,
+                 candi%FMnO2(i) = candi%FTem_MnO2(i)*candi%FTEA_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2MnO2(i)* MAX(candi%FTManOAc(i), candi%FTManH2(i)) !... then manganese reduction is manganese limited ...
+                 candi%FFeOH(i) = candi%FTem_FeOH(i)*candi%FTEA_FeOH(i)*candi%FIN_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2FeOH(i) * MAX(candi%FTIroOAc(i), candi%FTIroH2(i))!... then the iron reduction rate is iron limited ...
+                 candi%FSO4(i) = 1.0000000000000000*candi%FTem_SO4(i)*candi%FIN_FeOH(i)*candi%FIN_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2SO4(i)* MAX(candi%FTSulOAc(i), candi%FTSulH2(i)) ! ... SO4 reduction goes at 1*kOM ...
                  candi%FMet(i) = 0.0000000000000000 !... and methanogenesis is inhibited by SO4.
+               !  print*,"bravo"
                  ELSE
       !-- Methanogenesis
                  ! If SO4 concentration is low ...
-                 candi%FO2(i)  = FTEA_O2*FTem_O2 ! ... monkeys 5: then aerobic respiration is O2 limited ...
-                 candi%FNO3(i) = FTem_NO3*FTEA_NO3*FIN_O2 ! ... then denitrification is NO3 limited,
-                 candi%FMnO2(i)= FTem_MnO2*FTEA_MnO2*FIN_NO3*FIN_O2 !... then manganese reduction is manganese limited ...
-                 candi%FFeOH(i)= FTem_FeOH*FTEA_FeOH*FIN_MnO2*FIN_NO3*FIN_O2 !... then the iron reduction rate is iron limited ...
-                 candi%FSO4(i) = FTem_SO4*FTEA_SO4*FIN_FeOH*FIN_MnO2*FIN_NO3*FIN_O2 !... then sulfate reduction is SO4 limited.
-                 candi%FMet(i) = FTem_Met*FIN_SO4*FIN_FeOH*FIN_MnO2*FIN_NO3*FIN_O2 ! If methanogenesis happens at all, it is inhibited by all the other oxidants. If the others are low, then it reacts at close to 1*kOM.
+                    candi%FO2(i) = candi%FTEA_O2(i)*candi%FTem_O2(i) * candi%FTAerOAc(i) ! ...  then aerobic respiration is O2 limited ...
+                 candi%FNO3(i) = candi%FTem_NO3(i)*candi%FTEA_NO3(i)*candi%FIN_O2NO3(i) * MAX(candi%FTDenOAc(i), candi%FTDenH2(i))! ... then denitrification is NO3 limited,
+                 candi%FMnO2(i) = candi%FTem_MnO2(i)*candi%FTEA_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2MnO2(i) * MAX(candi%FTManOAc(i), candi%FTManH2(i))!... then manganese reduction is manganese limited ...
+                 candi%FFeOH(i) = candi%FTem_FeOH(i)*candi%FTEA_FeOH(i)*candi%FIN_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2FeOH(i) * MAX(candi%FTIroOAc(i), candi%FTIroH2(i))!... then the iron reduction rate is iron limited ...
+                    candi%FSO4(i) = candi%FTem_SO4(i)*candi%FTEA_SO4(i)*candi%FIN_FeOH(i)*candi%FIN_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2SO4(i)* MAX(candi%FTSulOAc(i), candi%FTSulH2(i)) !... then sulfate reduction is SO4 limited.
+                 candi%FMet(i) = candi%FTem_Met(i)*candi%FIN_SO4(i)*candi%FIN_FeOH(i)*candi%FIN_MnO2(i)*candi%FIN_NO3(i)*candi%FIN_O2CH4(i)* MAX(candi%FTMetOAc(i), candi%FTMetH2(i)) ! If methanogenesis happens at all, it is inhibited by all the other oxidants. If the others are low, then it reacts at close to 1*kOM.
+                ! print*,"charlie"
                  END IF !-- Sulfate is high
               END IF !-- Iron is high
             END IF ! -- Manganese is high
           END IF ! -- Nitrate is high
         END IF ! -- End if oxygen is high
-!PRINT *,'R ',RO2(i),RNO3(i),RMnO2(i),RFeOH(i),RSO4(i),RCH4(i)
+END IF !End if Approach 2
+!    IF(FO2(i)<0.0 .OR. FNO3(i)<0.0 .OR.FMnO2(i)<0.0 .OR.FFeOH(i)<0.0 .OR.FSO4(i)<0.0 .OR.FMet(i)<0.0)THEN
+
+!        PRINT *, "Nicht gut"
+        !PRINT *,'FFeOH',FFeOH(i), "FTem_FeOH(i)",FTem_FeOH(i),"FIN_O2FeOH",FIN_O2FeOH(i)
+        !PRINT *,"FTIroOAc",FTIroOAc(i),"FTIroH2",FTIroH2(i), "FTEA_FeOH", FTEA_FeOH(i)
+        !PRINT *,"FO2",FO2(i),"FNO3",FNO3(i),"FFeOH",FFeOH(i),"FMnO2",FMnO2(i),"FSO4",FSO4(i)
+                    !    PAUSE
+!        ENDIF
+    IF(candi%FO2(i)/=candi%FO2(i) .OR. candi%FNO3(i)/=candi%FNO3(i) .OR.candi%FMnO2(i)/=candi%FMnO2(i) .OR.candi%FFeOH(i)/=candi%FFeOH(i).OR.candi%FSO4(i)/=candi%FSO4(i) .OR.candi%FMet(i)/=candi%FMet(i))THEN
+        PRINT *,'FNaN'
+        PRINT *,'FO2'    ,candi%FO2(i)
+        PRINT *,'FNO3'    ,candi%FNO3(i)
+        PRINT *,'FMnO2'    ,candi%FMnO2(i)
+        PRINT *,'FFeOH'    ,candi%FFeOH(i)
+        PRINT *,'FSO4'    ,candi%FSO4(i)
+        PRINT *,'FMet'    ,candi%FMet(i)
+        PRINT *,'FSO4'  ,candi%FSO4, "FTem_SO4",candi%FTem_SO4,"FIN_O2SO4",candi%FIN_O2SO4
+        PRINT *,"FTSulOAc",candi%FTSulOAc,"FTSulH2",candi%FTSulH2, "FTEA_SO4", candi%FTEA_SO4
+        PRINT *,"FIN_NO3", candi%FIN_NO3, "FIN_MnO2", candi%FIN_MnO2, "FIN_FeOH",candi%FIN_FeOH
+        PRINT *,"kp_iron",candi%kp_iron, "candi%y(feohy,i)", candi%y(candi%feohy,i)
+!    PAUSE
+
+            ENDIF
 !PAUSE
 !END DO
-END IF !End if Approach 2
+
 END DO ! Search "Tiger"
 ! Make sure the FTEA don't go negative
-DO i=1,candi%npt ! Search "Penguin"
-        IF (FTEA_O2<0.0000000000000000000000000000000000) THEN
-        FTEA_O2 = 1.00000E-20
-        END IF ! End if FTEA_02 <0
-!END DO !
-!DO i=1,candi%npt
-        IF (FTEA_NO3<0.0000000000000000000000000000000000) THEN
-        FTEA_NO3 = 1.00000E-20
-        END IF ! End if FTEA_02 <0
-!END DO !
-!DO i=1,npt
-        IF (FTEA_MnO2<0.0000000000000000000000000000000000) THEN
-        FTEA_MnO2 = 1.00000E-20
-        END IF ! End if FTEA_02 <0
-!END DO !
-!DO i=1,npt
-        IF (FTEA_FeOH<0.0000000000000000000000000000000000) THEN
-        FTEA_FeOH = 1.00000E-20
-        END IF ! End if FTEA_02 <0
-!END DO !
-!DO i=1,npt
-        IF (FTEA_SO4<0.0000000000000000000000000000000000) THEN
-        FTEA_SO4 = 1.00000E-20
-        END IF ! End if FTEA_02 <0
-END DO ! Search "Penguin"
+!DO i=1,candi%npt ! Search "Ferret"
+!    IF (FO2(i)<0.0000)   FO2(i)   = 0.0000
+!    IF (FNO3(i)<0.0000)  FNO3(i)  = 0.0000
+!    IF (FMnO2(i)<0.0000) FMnO2(i) = 0.0000
+!    IF (FFeOH(i)<0.0000) FFeOH(i) = 0.0000
+!    IF (FSO4(i)<0.0000)  FSO4(i)  = 0.0000
+!    IF (FMet(i)<0.0000)  FMet(i)  = 0.0000
+!END DO ! Search "Ferret"
 
-! Make sure the rates don't go negative
-DO i=1,candi%npt ! Search "Ferret"
-        IF (candi%FO2(i)<0.00000000000000000000000000000000000000000) THEN
-        candi%FO2(i) = 1.00000E-20
-        END IF !
-!END DO !
-!DO i=1,npt
-        IF (candi%FNO3(i)<0.00000000000000000000000000000000000000000) THEN
-        candi%FNO3(i) = 1.00000E-20
-        END IF !
-!END DO !
-!DO i=1,npt
-        IF (candi%FMnO2(i)<0.00000000000000000000000000000000000000000) THEN
-        candi%FMnO2(i) = 1.00000E-20
-        END IF !
-!END DO !
-!DO i=1,npt
-        IF (candi%FFeOH(i)<0.00000000000000000000000000000000000000000) THEN
-        candi%FFeOH(i) = 1.00000E-20
-        END IF !
-!END DO !
-!DO i=1,npt
-        IF (candi%FSO4(i)<0.00000000000000000000000000000000000000000) THEN
-        candi%FSO4(i) = 1.00000E-20
-        END IF !
-END DO ! Search "Ferret"
-
-! Start FTEA and FIN calculations for ROX equations
+! Start    FTEA and FIN calculations for ROX equations
    !-----------------------------
    !--- SECONDARY REDOX REACTIONS - SUBROUTINE RATES
 
@@ -3421,139 +3520,146 @@ END DO ! Search "Ferret"
    candi%rnh4ox(:)  = candi%param%knh4ox  * candi%y(candi%o2y,:)*candi%y(candi%nh4y,:)
      DO i=1,candi%npt ! Search keyword "Eagle"
      IF (candi%rnh4ox(i) < 0.000000000000000000000000000000000000000) THEN
-     candi%rnh4ox(i) = 1.000000E-20
+     candi%rnh4ox(i) = 0.0000 !1.000000E-20
      END IF ! End if RNH4Ox<0
      END DO ! Search keyword "Eagle"
+   !-- NH4 adsorption
+       DO i=1,candi%npt ! Search keyword "Snakes"
+       candi%RNH4ads(i) = 0.0 !candi%y(nh4y,i)*kNH4Ads*ps(i)
+       END DO ! Search keyword "Snakes"
+           ! Where 2.7 is an assumed density of g / mL
+               ! I am not sure what the real density is
    !-- H2S oxidation by O2
    candi%rtsox(:)   = candi%param%ktsox   * candi%y(candi%o2y,:)*candi%y(candi%hsy,:)
      DO i=1,candi%npt
      IF (candi%rtsox(i) < 0.000000000000000000000000000000000000000) THEN
-     candi%rtsox(i) = 1.000000E-20
+     candi%rtsox(i) = 0.0000 !1.000000E-20
      END IF
      END DO
    !-- CH4 oxidation by O2
    candi%rch4ox(:)  = candi%param%kch4ox  * candi%y(candi%o2y,:)*candi%y(candi%ch4y,:)
-     !DO i=1,npt !Causes problems
-     !IF (rch4ox(i) < 0.000000) THEN  !Causes problems
-     !rch4ox(i) = 1.000000E-40  !Causes problems
-     !END IF !Causes problems
-     !END DO !Causes problems
+     DO i=1,candi%npt !Causes problems
+     IF (candi%rch4ox(i) < 0.000000) THEN  !Causes problems
+     candi%rch4ox(i) = 0.0000 !1.000000E-20  !Causes problems
+     END IF !Causes problems
+     END DO !Causes problems
    !-- H2S oxidation by NO3
    candi%RTSNO3(:)  = candi%param%kTSNO3  * candi%y(candi%no3y,:)*candi%y(candi%hsy,:)
      DO i=1,candi%npt !
      IF (candi%rtsNO3(i) < 0.000000000000000000000000000000000000000) THEN
-     candi%rtsNO3(i) = 1.000000E-20
+     candi%rtsNO3(i) = 0.0000 !1.000000E-20
      END IF ! End if rtsNO3<0
      END DO
-   !-- NH4 oxidation by NO2
+   !-- NH4 oxidation by NO2 - ---------------------------------Better fix this. Make variable NO2-
    candi%rnh4no2(:) = candi%knh4no2 * candi%y(candi%o2y,:)*candi%y(candi%nh4y,:)
       DO i=1, candi%npt
      IF (candi%rnh4no2(i) < 0.000000000000000000000000000000000000000) THEN
-     candi%rnh4no2(i) = 1.000000E-20
+     candi%rnh4no2(i) = 0.0000 !1.000000E-20
      END IF ! End if rnh4no2<0
      END DO
    !-- CH4 oxidation by SO4
    candi%rch4so4(:) = candi%param%kch4so4 * candi%y(candi%so4y,:)*candi%y(candi%ch4y,:)
      DO i=1, candi%npt
      IF (candi%rch4so4(i) < 0.000000000000000000000000000000000000000) THEN
-     candi%rch4so4(i) = 1.000000E-20
+     candi%rch4so4(i) = 0.0000 !1.000000E-20
      END IF ! End if rnh4no2<0                                         !  - SUBROUTINE RATES
      END DO
-!DO i=1,npt ! Search keyword "Taipan"
+!DO i=1,candi%npt ! Search keyword "Taipan"
    IF(candi%param%simMnFe) THEN
-
      !-- Mn2+ oxidation by O2
      candi%rmnox(:)  = candi%param%kmnox  * candi%y(candi%o2y,:)*candi%y(candi%mniiy,:)
+     candi%rmnadsox(:)  = candi%param%kmnadsox  * candi%y(candi%o2y,:)*candi%y(candi%mnadsy,:)
      DO i=1, candi%npt
      IF (candi%rmnox(i) < 0.0000000000000000000000000000000000000) THEN
-     candi%rmnox(i) = 1.000000E-20
+     candi%rmnox(i) = 0.0000 !1.000000E-20
      END IF
      END DO !
      !-- Fe2+ oxidation by O2
      candi%rfeox(:)  = candi%param%kfeox  * candi%y(candi%o2y,:)*candi%y(candi%feiiy,:)
+     candi%rfeadsox(:)  = candi%param%kfeadsox  * candi%y(candi%o2y,:)*candi%y(candi%feadsy,:)
      DO i=1, candi%npt
      IF (candi%rfeox(i) < 0.0000000000000000000000000000000000000) THEN
-     candi%rfeox(i) = 1.000000E-20
+     candi%rfeox(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
      !-- Fe2+ oxidation by MnO2A & MnO2B
      candi%rfemnA(:)  = candi%param%kmnfe  * candi%y(candi%mno2y,:)*candi%y(candi%feiiy,:)
      DO i=1, candi%npt
      IF (candi%rfemnA(i) < 0.0000000000000000000000000000000000000) THEN
-     candi%rfemnA(i) = 1.000000E-20
+     candi%rfemnA(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
      candi%rfemnB(:)  = candi%param%kmnfe  * candi%y(candi%mno2By,:)*candi%y(candi%feiiy,:)
-!     DO i=1, npt ! Causes problems
-!     IF (rfemnB(i) < 0.0000) THEN ! Causes problems
-!     rfemnB(i) = 1.000000E-40 ! Causes problems
-!     END IF !  ! Causes problems
-!     END DO ! Causes problems
+     DO i=1, candi%npt ! Causes problems
+     IF (candi%rfemnB(i) < 0.0000) THEN ! Causes problems
+     candi%rfemnB(i) = 0.0000 !1.000000E-40 ! Causes problems
+     END IF !  ! Causes problems
+     END DO ! Causes problems
      !-- Fe2+ oxidation by NO3
      candi%rfeno3(:) = candi%param%kfeno3 * candi%y(candi%no3y,:)*candi%y(candi%feiiy,:)
      DO i=1,candi%npt ! Search keyword "Water rat"
      IF (candi%rfeno3(i) < 0.00000000000000000000000000000000000000) THEN
-     candi%rfeno3(i) = 1.000000E-20
+     candi%rfeno3(i) = 0.0000 !1.000000E-20
      END IF ! End if RfeNO3<0
      END DO ! Search keyword "Water rat"
-     !-- H2S oxidation by MnO2A + MnO2B
+     !-- H2S oxidation by MnO2A + MnO2B -> Mn2+ + SO42-
      candi%rtsmnA(:)  = candi%param%ktsmn  * candi%y(candi%mno2y,:)*candi%y(candi%hsy,:)
      DO i=1, candi%npt
      IF (candi%rtsmnA(i) < 0.0000000000000000000000000000000000) THEN
-     candi%rtsmnA(i) = 1.000000E-20
+     candi%rtsmnA(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
      candi%rtsmnB(:)  = candi%param%ktsmn  * candi%y(candi%mno2By,:)*candi%y(candi%hsy,:)
      DO i=1, candi%npt
      IF (candi%rtsmnB(i) < 0.0000000000000000000000000000000000) THEN
-     candi%rtsmnB(i) = 1.000000E-20
+     candi%rtsmnB(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
      !-- Mn2+ oxidation by NO3
      candi%rmnno3(:) = candi%param%kmnno3 * candi%y(candi%no3y,:)*candi%y(candi%mniiy,:)
      DO i=1,candi%npt ! Search keyword "Osprey"
      IF (candi%rmnno3(i) < 0.0000000000000000000000000000000000000) THEN
-     candi%rmnno3(i) = 1.000000E-20
+     candi%rmnno3(i) = 0.0000 !1.000000E-20
      END IF ! End if RMnNO3<0
      END DO !"Osprey"
-     !-- H2S oxidation by Fe(OH)3A & Fe(OH)3B
+     !-- H2S oxidation by Fe(OH)3A & Fe(OH)3B  -> Fe2+  +  SO42-
      candi%rtsfeA(:)  = candi%param%ktsfe  * candi%y(candi%hsy,:)*candi%y(candi%feohy,:)
      DO i=1, candi%npt
      IF (candi%rtsfeA(i) < 0.0000000000000000000000000000000000000) THEN
-     candi%rtsfeA(i) = 1.000000E-20
+     candi%rtsfeA(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
      candi%rtsfeB(:)  = candi%param%ktsfe  * candi%y(candi%hsy,:)*candi%y(candi%feohBy,:)
      DO i=1, candi%npt
      IF (candi%rtsfeB(i) < 0.0000000000000000000000000000000000000) THEN
-     candi%rtsfeB(i) = 1.000000E-20
+     candi%rtsfeB(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
      !-- MnO2A ageing
      candi%rmnage(:) = candi%param%kmnage * candi%y(candi%mno2y,:)
      DO i=1, candi%npt
      IF (candi%rmnage(i) < 0.00000000000000000000000000000000000000000) THEN
-     candi%rmnage(i) = 1.000000E-20
+     candi%rmnage(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
                                           !  - SUBROUTINE RATES
-                                          !  - If sim Mn Fe
+                                        !  - If sim Mn Fe
      !-- Fe(OH)3A ageing
      candi%rfeage(:) = candi%param%kfeage * candi%y(candi%feohy,:)
      DO i=1, candi%npt
      IF (candi%rfeage(i) < 0.00000000000000000000000000000000000000000) THEN
-     candi%rfeage(i) = 1.000000E-20
+     candi%rfeage(i) = 0.0000 !1.000000E-20
      END IF !
      END DO
     !-- Fe(OH)3A precipitation - based on Tufano 2009
      IF(candi%param%rxn_mode==0)THEN
-             candi%RFeOHAppt(:) = 0.00
+              candi%RFeOHAppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1)THEN
-             candi%RFeOHAppt(:) = 0.00
-     ELSEIF(candi%param%rxn_mode==2) THEN
+              candi%RFeOHAppt(:) = 0.00
+     ELSEIF(candi%param%rxn_mode==2.OR.candi%param%rxn_mode==4) THEN
        ! kfeohppt [Fe3+]
        candi%RFeOHAppt(:) = candi%param%kFeOHAppt * candi%y(candi%feiiiy,:)
-       !RFeOHAppt(:) = kFeOHAppt * y(feohy,:)
+       !RFeOHAppt(:) = kFeOHAppt * candi%y(feohy,:)
      ELSEIF(candi%param%rxn_mode==3) THEN
        WHERE (candi%IAP(candi%FeOHy,:)== 0.00)
          candi%RFeOHAppt(:) = candi%param%kFeOHAppt * candi%y(candi%feiiiy,:)
@@ -3562,39 +3668,37 @@ END DO ! Search "Ferret"
          candi%RFeOHAppt(:) = candi%param%kfeohAppt * ( ONE - (ONE / (candi%IAP(candi%FeOHy,:))) )
        ELSEWHERE
          ! Dissolution
-         candi%RFeOHAppt(:) = candi%param%kfeohAppt * (-ONE) * ( ONE - (candi%IAP(candi%FeOHy,:)) )
+         candi%RFeOHAppt(:) = candi%param%kfeohAppt * -ONE * ( ONE - (candi%IAP(candi%FeOHy,:)) )
        END WHERE
-       !  print *, ('FeOHAppt'),RFeOHAppt
-       !  print *, ('IAP FeOHA'),IAP(FeOHy,:)
      END IF ! End if rxn mode = 0, 1, 2 or 3
 
     !-- Fe(OH)3B precipitation
      IF(candi%param%rxn_mode==0)THEN
-             candi%RFeOHBppt(:) = 0.00
+              candi%RFeOHBppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1)THEN
-             candi%RFeOHBppt(:) = 0.00
-     ELSEIF(candi%param%rxn_mode==2) THEN
+              candi%RFeOHBppt(:) = 0.00
+     ELSEIF(candi%param%rxn_mode==2.OR.candi%param%rxn_mode==4) THEN
        ! kfeohbppt [Fe3+]
        candi%RFeOHBppt(:) = candi%param%kFeOHBppt * candi%y(candi%feiiiy,:)
-       !RFeOHBppt(:) = kFeOHBppt * y(feohy,:)
+       !RFeOHBppt(:) = kFeOHBppt * candi%y(feohy,:)
        !RFeOHBppt(:) = 1.
      ELSEIF(candi%param%rxn_mode==3) THEN
-           WHERE (candi%IAP(candi%FeOHBy,:)== 0.00)
-           candi%RFeOHBppt(:) = candi%param%kFeOHBppt * candi%y(candi%feiiiy,:)
+            WHERE (candi%IAP(candi%FeOHBy,:)== 0.00)
+            candi%RFeOHBppt(:) = candi%param%kFeOHBppt * candi%y(candi%feiiiy,:)
        ELSEWHERE ( (ONE / candi%IAP(candi%FeOHBy,:)) < ONE )
          ! Precipitation
          candi%RFeOHBppt(:) = 0.
        ELSEWHERE
          ! Dissolution
-         candi%RFeOHBppt(:) = candi%param%kfeohbppt * (-ONE) * ( ONE - (candi%IAP(candi%FeOHy,:)) )
+         candi%RFeOHBppt(:) = candi%param%kfeohbppt * -ONE * ( ONE - (candi%IAP(candi%FeOHy,:)) )
        END WHERE
           END IF ! End if rxn mode = 0, 1, 2 or 3
      !-- MnO2A precipitation
      IF(candi%param%rxn_mode==0)THEN
-             candi%RMnO2Appt(:) = 0.00
+              candi%RMnO2Appt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1)THEN
-             candi%RMnO2Appt(:) = 0.00
-     ELSEIF(candi%param%rxn_mode==2) THEN
+              candi%RMnO2Appt(:) = 0.00
+     ELSEIF(candi%param%rxn_mode==2.OR.candi%param%rxn_mode==4) THEN
              candi%RMnO2Appt(:) = candi%param%kMnO2Appt * candi%y(candi%mniiy,:)
      ELSEIF(candi%param%rxn_mode==3) THEN
       !kMnO2Appt [Mn2+]?
@@ -3605,18 +3709,18 @@ END DO ! Search "Ferret"
          candi%RMnO2Appt(:) = candi%param%kMnO2Appt * ( ONE - (ONE / (candi%IAP(candi%MnO2y,:))) )
        ELSEWHERE
          ! Dissolution
-         candi%RMnO2Appt(:) = candi%param%kMnO2Appt * (-ONE) * ( ONE - (candi%IAP(candi%MnO2y,:)) )
+         candi%RMnO2Appt(:) = candi%param%kMnO2Appt * -ONE * ( ONE - (candi%IAP(candi%MnO2y,:)) )
        END WHERE
         ! print *, ('MnO2Appt'),RMnO2Appt
-        ! print *, ('IAP MnO2A'),IAP(MnO2y,:)
+        ! print *, ('IAP MnO2A'),candi%IAP(candi%MnO2y,:)
      END IF ! End if rxn mode = 0, 1, 2 or 3
 
           !-- MnO2B precipitation
      IF(candi%param%rxn_mode==0)THEN
-             candi%RMnO2Bppt(:) = 0.00
+              candi%RMnO2Bppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1)THEN
-             candi%RMnO2Bppt(:) = 0.00
-     ELSEIF(candi%param%rxn_mode==2) THEN
+              candi%RMnO2Bppt(:) = 0.00
+     ELSEIF(candi%param%rxn_mode==2.OR.candi%param%rxn_mode==4) THEN
        candi%RMnO2Bppt(:) = candi%param%kMnO2Bppt * candi%y(candi%mniiy,:)
      ELSEIF(candi%param%rxn_mode==3) THEN
       WHERE (candi%IAP(candi%MnO2By,:)==0.00)
@@ -3626,54 +3730,111 @@ END DO ! Search "Ferret"
          candi%RMnO2Bppt(:) = candi%param%kMnO2Bppt * ( ONE - (ONE / (candi%IAP(candi%MnO2By,:))) )
        ELSEWHERE
          ! Dissolution
-         candi%RMnO2Bppt(:) = candi%param%kMnO2Bppt * (-ONE) * ( ONE - (candi%IAP(candi%MnO2By,:)) )
+         candi%RMnO2Bppt(:) = candi%param%kMnO2Bppt * -ONE * ( ONE - (candi%IAP(candi%MnO2By,:)) )
        END WHERE
 
      END IF ! End if rxn mode = 0, 1, 2 or 3
-                                          !  - SUBROUTINE RATES
-                                          !  - If sim Mn Fe
+                                   !  - SUBROUTINE RATES
+
      !-- FeCO3 precipitation
      IF(candi%param%rxn_mode==0)THEN
-             candi%RSidppt(:) = 0.00
+              candi%RSidppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1)THEN
-             candi%RSidppt(:) = 0.00
+              candi%RSidppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==2) THEN
-             ! kSidppt [Fe2+][CO3]
+              ! kSidppt [Fe2+][CO3]
        candi%RSidppt(:) = candi%param%kSidppt * candi%y(candi%feiiy,:)*candi%y(candi%hco3y,:)
-        !       RSidppt(:) = 1.
+           !       candi%RSidppt(:) = 1.
      ELSEIF(candi%param%rxn_mode==3) THEN
        WHERE (candi%IAP(candi%Sidy,:)==0.00)
-             candi%RSidppt(:) = candi%param%kSidppt * candi%y(candi%feiiy,:)*candi%y(candi%hco3y,:)
+              candi%RSidppt(:) = candi%param%kSidppt * candi%y(candi%feiiy,:)*candi%y(candi%hco3y,:)
        ELSEWHERE ( (ONE / candi%IAP(candi%Sidy,:)) < ONE )
          ! Precipitation
          candi%RSidppt(:) = candi%param%kSidppt * ( ONE - (ONE / (candi%IAP(candi%Sidy,:))) )
        ELSEWHERE
          ! Dissolution
-         candi%RSidppt(:) = candi%param%kSidppt * (-ONE) * ( ONE - (candi%IAP(candi%Sidy,:)) )
+         candi%RSidppt(:) = candi%param%kSidppt * -ONE * ( ONE - (candi%IAP(candi%Sidy,:)) )
        END WHERE
+     ELSEIF(candi%param%rxn_mode==4) THEN
+    !      DO i = 1, candi%npt
+   !           IF (candi%y(feiiy,i)< 0.0) candi%y(feiiy,i) = 0.0
+    !      END DO
 
-       END IF ! End if rxn mode = 0, 1, 2 or 3
+          candi%QSid(:)=( candi%y(candi%feiiy,:)*candi%y(candi%hco3y,:) ) / (10**candi%param%KPSid)
+!          print*, "feii", candi%y(feiiy,:)
+!          print*, "dic" , candi%y(hco3y,:)
+!          print*,QSid
+            DO i = 1, candi%npt
+
+!           IF(QSid(i)<0)       QSid(i)=0
+!           IF(QSid(i)>1.1E0) QSid(i)=1.1E0
+
+            IF(candi%QSid(i)>1)THEN ! Precipitation ***
+            candi%deltaSid(i)=1     ! allow precipitation
+            candi%deltadisSid(i)=0  ! disallow dissolution
+            !ENDIF
+            ELSEIF(candi%QSid(i)<=1)THEN! Dissolution +++
+            candi%deltaSid(i)=0     ! disallow precipitation
+            candi%deltadisSid(i)=1  ! allow dissolution
+            ENDIF
+
+  !      RSidppt(i) = kSidppt*density*1e3*1e3*deltaSid(i)*( QSid(i)-1 )   &   ! deltaSid    1 -> precipitation ***
+  !                  -  kSiddis*deltadisSid(i)*candi%y(Sidy,i)   *( 1-QSid(i) )       ! deltadisSid 1 -> dissolution   +++
+
+            ENDDO
+            ! Precipitation + dissolution
+!         print*,"deltaSid",deltaSid(:)
+!         print*,"deltadisSid",deltadisSid(:)
+        !print*,"RSidppt(:)",RSidppt(:)
+         candi%RSidppt(:) = candi%param%kSidppt*density*1e3*1e3*candi%deltaSid(:)*(candi%QSid(:)-1)   &
+               -   candi%param%kSiddis*candi%deltadisSid(:)*candi%y(candi%Sidy,:)*(1-candi%QSid(:))
+       END IF ! End if rxn mode = 0, 1, 2, 3 or 4
                                           !  - SUBROUTINE RATES
                                           !  - If sim Mn Fe
     !-- MnCO3 precipitation
      IF(candi%param%rxn_mode==0)THEN
-             candi%RRodppt(:) = 0.00
+              candi%RRodppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1)THEN
-             candi%RRodppt(:) = 0.00
+              candi%RRodppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==2) THEN
            candi%RRodppt(:) = candi%param%kRodppt * candi%y(candi%mniiy,:)*candi%y(candi%hco3y,:)
-       !               RRodppt(:) = 1.
+       !           RRodppt(:) = 1.
      ELSEIF(candi%param%rxn_mode==3) THEN
        WHERE (candi%IAP(candi%Rody,:)==0.00)
-             candi%RRodppt(:) = candi%param%kRodppt * candi%y(candi%mniiy,:)*candi%y(candi%hco3y,:)
+              candi%RRodppt(:) = candi%param%kRodppt * candi%y(candi%mniiy,:)*candi%y(candi%hco3y,:)
        ELSEWHERE ( (ONE / candi%IAP(candi%Rody,:)) < ONE )
          ! Precipitation
          candi%RRodppt(:) = candi%param%kRodppt * ( ONE - (ONE / (candi%IAP(candi%Rody,:))) )
        ELSEWHERE
          ! Dissolution
-         candi%RRodppt(:) = candi%param%kRodppt * (-ONE) * ( ONE - (candi%IAP(candi%Rody,:)) )
+         candi%RRodppt(:) = candi%param%kRodppt * -ONE * ( ONE - (candi%IAP(candi%Rody,:)) )
        END WHERE
-     END IF ! End if rxn mode = 0, 1, 2 or 3
+     ELSEIF(candi%param%rxn_mode==4) THEN
+     !     DO i = 1, candi%npt
+    !      IF( candi%y(mniiy,i)<0.0 ) candi%y(mniiy,i)=0
+     !     END DO
+
+            candi%QRod(:)=( candi%y(candi%mniiy,:)*candi%y(candi%hco3y,:) )/(10**candi%param%KPRod)
+            DO i = 1, candi%npt
+            !IF(QRod(i)<0)QRod(i)=0
+            !IF(QRod(i)>1.1E0)QRod(i)=1.1E0
+            IF(candi%QRod(i)>1)THEN
+            candi%deltaRod(i)=1
+            candi%deltadisRod(i)=0
+            ENDIF
+            IF(candi%QRod(i)<=1)THEN
+            candi%deltaRod(i)=0
+            candi%deltadisRod(i)=1
+            ENDIF
+ !                    RRodppt(i) = kRodppt*density*1e3*1e3*deltaRod(i)*(QRod(i)-1)   &
+ !              -   kRoddis*deltadisRod(i)*candi%y(Rody,i)            *(1-QRod(i))
+
+            ENDDO
+
+            ! Precipitation + dissolution
+         candi%RRodppt(:) = candi%param%kRodppt*density*1e3*1e3*candi%deltaRod(:)*(candi%QRod(:)-1)   &
+               -   candi%param%kRoddis*candi%deltadisRod(:)*candi%y(candi%Rody,:)*(1-candi%QRod(:))
+     END IF ! End if rxn mode = 0, 1, 2 or 3 or 4
    ELSE                 !  - Else if not Sim Mn Fe
                         !  - SUBROUTINE RATES
      candi%rmnox(:)     = 0.0
@@ -3698,7 +3859,6 @@ END DO ! Search "Ferret"
    END IF               !  - End if Sim Mn Fe
                         !  - SUBROUTINE RATES
    IF(candi%param%simFeS .AND. candi%param%simMnFe) THEN
-
      !-- FeS oxidation by O2
      candi%rfesox(:)  = candi%param%kfesox  * candi%y(candi%o2y,:)*candi%y(candi%fesy,:)
      DO i=1, candi%npt
@@ -3713,7 +3873,7 @@ END DO ! Search "Ferret"
      candi%rfes2ox(i) = 0.00 ! 1.0000000E-14
      END IF !
      END DO
-     !-- FeS oxidation by Fe(OH)3
+     !-- FeS oxidation by Fe(OH)3  ->  Fe2+  +  SO42-
      candi%rfesfeA(:)  = candi%param%kfesfe * candi%y(candi%fesy,:)*candi%y(candi%feohy,:)
      DO i=1, candi%npt
      IF (candi%rfesfeA(i) < 0.0) THEN
@@ -3743,49 +3903,85 @@ END DO ! Search "Ferret"
      !-- FeS precipitation
      IF(candi%param%rxn_mode==0) THEN
        ! kFeSppt [Fe2+][H2S]
-       !RFeSppt(:) = kFeSppt * y(feiiy,:)*y(hsy,:)
-               candi%RFeSppt(:) = 0.00
+       !RFeSppt(:) = kFeSppt * candi%y(feiiy,:)*candi%y(hsy,:)
+                  candi%RFeSppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1) THEN
-               candi%RFeSppt(:) = 0.00
+                candi%RFeSppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==2) THEN
-            candi%RFeSppt(:) = candi%param%kFeSppt * candi%y(candi%feiiy,:)*candi%y(candi%hsy,:)
+             candi%RFeSppt(:) = candi%param%kFeSppt * candi%y(candi%feiiy,:)*candi%y(candi%hsy,:)
      ELSEIF(candi%param%rxn_mode==3) THEN
        WHERE (candi%IAP(candi%FeSy,:)==0.00)
            candi%RFeSppt(:) = candi%param%kFeSppt * candi%y(candi%feiiy,:)*candi%y(candi%hsy,:)
        ELSEWHERE ( (ONE / candi%IAP(candi%FeSy,:)) < ONE )
          ! Precipitation
-                 ! kFeSppt (IAP/Ksp -1), where IAP = [Fe2+][H2S]/[H]
+              ! kFeSppt (candi%IAP/Ksp -1), where candi%IAP = [Fe2+][H2S]/[H]
          candi%RFeSppt(:) = candi%param%kFeSppt * ( ONE - (ONE / (candi%IAP(candi%FeSy,:))) )
        ELSEWHERE
          ! Dissolution
-         candi%RFeSppt(:) = candi%param%kFeSppt * (-ONE) * ( ONE - (candi%IAP(candi%FeSy,:)) )
-
+         candi%RFeSppt(:) = candi%param%kFeSppt * -ONE * ( ONE - (candi%IAP(candi%FeSy,:)) )
        END WHERE
+     ELSEIF(candi%param%rxn_mode==4) THEN
+     !     DO i = 1, candi%npt
+         ! IF( candi%y(feiiy,i)<0.0 ) candi%y(feiiy,i)=0
+     !     END DO
 
+            candi%QFeS(:)=( candi%y(candi%feiiy,:)*candi%y(candi%hsy,:) )/(10**candi%param%KPFeS)
+            !print*,"QSid",QSid
+            !print*,"QRod",QRod
+            !print*,"QFeS",QFeS
+            DO i = 1, candi%npt
+            !IF(QFeS(i)<0)QFeS(i)=0
+            !IF(QFeS(i)>1.1E0)QFeS(i)=1.1E0
+            IF(candi%QFeS(i)>1)THEN
+            candi%deltaFeS(i)=1
+            candi%deltadisFeS(i)=0
+            ENDIF
+            IF(candi%QFeS(i)<=1)THEN
+            candi%deltaFeS(i)=0
+            candi%deltadisFeS(i)=1
+            ENDIF
+
+  !        RFeSppt(i) = kFeSppt*density*1e3*1e3*deltaFeS(i)*(QFeS(i)-1)   &
+  !            -   kFeSdis*deltadisFeS(i)*candi%y(FeSy,i)*(1-QFeS(i))
+
+
+            ENDDO
+            ! Precipitation + dissolution
+         candi%RFeSppt(:) = candi%param%kFeSppt*density*1e3*1e3*candi%deltaFeS(:)*(candi%QFeS(:)-1)   &
+               -   candi%param%kFeSdis*candi%deltadisFeS(:)*candi%y(candi%FeSy,:)*(1-candi%QFeS(:))
+         !print*, "RFeSppt(:)",RFeSppt(:)
+         !print*, "QFeS",QFeS
+         !print*, "deltaFeS",deltaFeS
+         !print*, "deltadisFeS",deltadisFeS
+        ! PAUSE
      END IF ! If rxn mode = 0, 1, 2 or 3
 
      !-- FeS transformation to FeS2
      candi%RPyrite(:)   = candi%param%kPyrite * candi%y(candi%fesy,:) *candi%y(candi%hsy,:) !??
 
      !!-- S0 dispropoertionation
-     !rsdispro(:)   = rksdispro * y(s0y,:) * (1. - (y(hsy,:)/H2Sstop))
+     !rsdispro(:)   = rksdispro * candi%y(s0y,:) * (1. - (candi%y(hsy,:)/H2Sstop))
 !                                    !  - simFeS .AND. simMnFe
                                      !  - SUBROUTINE RATES
      IF (candi%param%simX) THEN
 
 !       !-- XS precipitation
-!       IF(param%rxn_mode==1) THEN
+!       IF(candi%param%rxn_mode==1) THEN
          ! kxsppt [X][H2S]
          candi%RXSppt(:)   = candi%param%kxsppt * candi%y(candi%xy,:) *candi%y(candi%hsy,:)
-!       ELSEIF(param%rxn_mode==2)THEN
-!         ! kxsppt (IAP/Ksp -1), where IAP = [X][H2S]/[H]^2
-!         WHERE (IAP(:,xsy+1) > ONE)
-!           RXSppt(:) = kxsppt * ( IAP(:,xsy+1)-ONE )
+         candi%RXSOx(:)    = candi%param%kfesox * candi%y(candi%xsy,:)*candi%y(candi%o2y,:)
+!print*,"yxy",candi%y(xy,:)
+!print*,"yZny",candi%y(Xy,:)
+!print*,"kxsppt",kxsppt
+!       ELSEIF(candi%param%rxn_mode==2)THEN
+!         ! kxsppt (candi%IAP/Ksp -1), where candi%IAP = [X][H2S]/[H]^2
+!         WHERE (candi%IAP(:,xsy+1) > ONE)
+!           RXSppt(:) = kxsppt * ( candi%IAP(:,xsy+1)-ONE )
 !         ELSEWHERE
 !           RXSppt(:) = ZERO
 !         END WHERE
-!       ELSEIF(param%rxn_mode==0) THEN
-!               RXSppt(:) = 1.00000E-20
+!    ELSEIF(candi%param%rxn_mode==0) THEN
+!        RXSppt(:) = 1.00000E-20
 !      END IF !End if rxn mode = 0, 1 or 2
 
      END IF ! End if SimX
@@ -3801,10 +3997,10 @@ END DO ! Search "Ferret"
      candi%RFeSppt(:) = 0.0
      candi%RPyrite(:) = 0.0
      candi%RXSppt(:)  = 0.0
-     !candi%rsdispro(:)= 0.0
+     candi%RXSOx(:)   = 0.0
+     !rsdispro(:)= 0.0
 
    END IF ! End if simFeS .AND. simMnFe
-                        !  - SUBROUTINE RATES
    ! CaCO3 (Calcite)
    IF(candi%param%simCaCO3) THEN
     !-- CaCO3 precipitation
@@ -3812,19 +4008,19 @@ END DO ! Search "Ferret"
      candi%RCalppt(:) = 0.00
      ELSEIF(candi%param%rxn_mode==1)THEN
      candi%RCalppt(:) = 0.00
-     ELSEIF(candi%param%rxn_mode==2) THEN
+     ELSEIF(candi%param%rxn_mode==2.OR.candi%param%rxn_mode==4) THEN
        ! kCalppt [Ca2+][CO3]
        candi%RCalppt(:) = candi%param%kcalppt * candi%y(candi%cay,:)*candi%y(candi%hco3y,:)
-        !       RCalppt(:) = 1.
+           !       RCalppt(:) = 1.
      ELSEIF(candi%param%rxn_mode==3) THEN
-        WHERE (candi%IAP(candi%Caly,:)==0.00)
-        candi%RCalppt(:) = candi%param%kcalppt * candi%y(candi%cay,:)*candi%y(candi%hco3y,:)
-        ELSEWHERE ( (ONE / candi%IAP(candi%Caly,:)) < ONE )
+         WHERE (candi%IAP(candi%Caly,:)==0.00)
+         candi%RCalppt(:) = candi%param%kcalppt * candi%y(candi%cay,:)*candi%y(candi%hco3y,:)
+         ELSEWHERE ( (ONE / candi%IAP(candi%Caly,:)) < ONE )
          ! Precipitation
          candi%RCalppt(:) = candi%param%kCalppt * ( ONE - (ONE / (candi%IAP(candi%Caly,:))) )
        ELSEWHERE
          ! Dissolution
-         candi%RCalppt(:) = candi%param%kCalppt * (-ONE) * ( ONE - (candi%IAP(candi%Caly,:)) )
+         candi%RCalppt(:) = candi%param%kCalppt * -ONE * ( ONE - (candi%IAP(candi%Caly,:)) )
        END WHERE
      END IF ! End if rxn mode = 0, 1 2 or 3
    END IF ! End if simulate CaCO3
@@ -3832,100 +4028,298 @@ END DO ! Search "Ferret"
 !END DO ! Search keyword "Taipan"
    !-- C. CANDI ---
    !IF(simC12) THEN
-   !  rch4ox(:) = kch4ox*y(o2y,:)*(y(ch4y,:)+y(ch4c12y,:))
+   !  rch4ox(:) = kch4ox*candi%y(o2y,:)*(candi%y(ch4y,:)+candi%y(ch4c12y,:))
    !ELSE
-   !  rch4ox(:) = kch4ox*y(o2y,:)*y(ch4y,:)
+   !  rch4ox(:) = kch4ox*candi%y(o2y,:)*candi%y(ch4y,:)
    !END IF
    !IF(simC12) THEN
-   !  rch4so4(:) = kch4so4*y(so4y,:)*(y(ch4y,:)+y(ch4c12y,:))
+   !  rch4so4(:) = kch4so4*candi%y(so4y,:)*(candi%y(ch4y,:)+candi%y(ch4c12y,:))
    !ELSE
-   !  rch4so4(:) = kch4so4*y(so4y,:)*y(ch4y,:)
+   !  rch4so4(:) = kch4so4*candi%y(so4y,:)*candi%y(ch4y,:)
    !END IF
    !
    !IF(simFeII) THEN
-   !  rfe1ox(:)  = kfe1ox*y(o2y,:)*y(feii1y,:)
-   !  rfe2ox(:)  = kfe2ox*y(o2y,:)*y(feii2y,:)
-   !  rfe1no3(:) = kfe1no3*y(no3y,:)*y(feii1y,:)
-   !  rfe2no3(:) = kfe2no3*y(no3y,:)*y(feii2y,:)
+   !  rfe1ox(:)  = kfe1ox*candi%y(o2y,:)*candi%y(feii1y,:)
+   !  rfe2ox(:)  = kfe2ox*candi%y(o2y,:)*candi%y(feii2y,:)
+   !  rfe1no3(:) = kfe1no3*candi%y(no3y,:)*candi%y(feii1y,:)
+   !  rfe2no3(:) = kfe2no3*candi%y(no3y,:)*candi%y(feii2y,:)
    !END IF
    !
-   !rg(:) = kg0*y(cor0y,:) + kg1*y(cor1y,:) + kg2*y(cor2y,:)
+   !rg(:) = kg0*candi%y(cor0y,:) + kg1*candi%y(cor1y,:) + kg2*candi%y(cor2y,:)
    !------------
 !Dan adding another thing here                        !  - SUBROUTINE RATES
 !Set the rates of organic matter oxidation
-IF (candi%param%OMModel == 1) THEN
-   candi%rgC(:) = candi%param%poml2dic*candi%y(candi%POMLy,:)*candi%stcoef%fracCPL &
-   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*candi%stcoef%fracCPR + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*candi%stcoef%fracCPspecial
-   candi%rgN(:) = candi%param%poml2dic*candi%y(candi%POMLy,:)*candi%stcoef%fracNPL &
-   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*candi%stcoef%fracNPR + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*candi%stcoef%fracNPspecial
-   candi%rgP(:) = candi%param%poml2dic*candi%y(candi%POMLy,:)*candi%stcoef%fracPPL &
-   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*candi%stcoef%fracPPR + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*candi%stcoef%fracPPspecial
-   !print *, 'rgC', rgC(1:4)
-  ! print  *, 'fracCPL', fracCPL
-  ! print  *, 'fracCPR', fracCPR
-  ! print  *, 'fracCPspecial', fracCPspecial
-   !print  *, 'fracCP', fracCPL
-   !print  *, 'fracCPL', fracCPL
-   !print  *, 'fracCPL', fracCPL
+   IF (candi%param%OMModel == 1) THEN                              ! This is for a ~1G model
+      IF(.NOT. candi%param%VCW)THEN
+         !These stoichiometry ratios are from Van Cappellen and Wang 1996
+           !because I wanted to calibrate to their data.
+         !Canavan et al 2006 use different stoichiometry.
+         !These are written from the point of view of the oxidants, normalised to 1 carbon.
+         candi%TerminalOxidation(:) = candi%param%poml2dic*candi%y(candi%POMLy,:)*(candi%param%xlab/candi%param%xlab) &
+               + candi%param%pomr2dic*candi%y(candi%POMRy,:)*(candi%param%xref/candi%param%xref) &
+               + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*(candi%param%xspecial/candi%param%xspecial)
+         candi%NH4release(:) = candi%param%poml2dic*candi%y(candi%POMLy,:)*(candi%param%ylab/candi%param%xlab) &
+               + candi%param%pomr2dic*candi%y(candi%POMRy,:)*(candi%param%yref/candi%param%xref) &
+               + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*(candi%param%yspecial/candi%param%xspecial)
+         candi%Prelease(:) = candi%param%poml2dic*candi%y(candi%POMLy,:)*(candi%param%zlab/candi%param%xlab) &
+               + candi%param%pomr2dic*candi%y(candi%POMRy,:)*(candi%param%zref/candi%param%xref) &
+               + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*(candi%param%zspecial/candi%param%xspecial)
+         candi%XMetalrelease(:)  =   candi%param%poml2dic*candi%y(candi%POMLy,:)*(candi%param%XMetal_lab/candi%param%xlab) &
+               + candi%param%pomr2dic*candi%y(candi%POMRy,:)*(candi%param%XMetal_ref/candi%param%xref) &
+               + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*(candi%param%XMetal_special/candi%param%xspecial)
+         candi%RO2(:)        = candi%FO2(:)*(   candi%param%poml2dic*candi%y(candi%POMLy,:)*((candi%param%xlab+2*candi%param%ylab)/candi%param%xlab) &
+               + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((candi%param%xref+2*candi%param%yref)/candi%param%xref)     &
+               + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((candi%param%xspecial+2*candi%param%yspecial)/candi%param%xspecial)  )
+         candi%RNO3(:)       = candi%FNO3(:)*(candi%param%poml2dic*candi%y(candi%POMLy,:)*((4*candi%param%xlab+3*candi%param%ylab)/(5*candi%param%xlab)) &
+               + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((4*candi%param%xref+3*candi%param%yref)/(5*candi%param%xref))     &
+               + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((4*candi%param%xspecial+3*candi%param%yspecial)/(5*candi%param%xspecial))  )
+         candi%RMnO2(:)      = candi%TerminalOxidation(:)*candi%FMnO2(:)
+         candi%RFeOH(:)      = candi%TerminalOxidation(:)*candi%FFeoH(:)
+         candi%RSO4(:)       = candi%TerminalOxidation(:)*candi%FSO4(:)
+         candi%RMet(:)       = candi%TerminalOxidation(:)*candi%FMet(:)
 
-  ELSEIF (candi%param%OMModel == 2) THEN
-     candi%rgC(:) = candi%param%docl2dic*candi%y(candi%DOCLy,:)
-     candi%rgN(:) = candi%param%donl2din*candi%y(candi%DONLy,:)
-     candi%rgP(:) = candi%param%dopl2dip*candi%y(candi%DOPLy,:)
-    ELSEIF (candi%param%OMModel == 3) THEN
-DO i = 1, candi%npt
-     candi%Btot(i)     = candi%y(candi%BAery,i)+candi%y(candi%BDeny,i)+candi%y(candi%BMany,i)+candi%y(candi%BIroy,i)+candi%y(candi%BSuly,i)+candi%y(candi%BMety,i)+candi%y(candi%BFery,i)
-     candi%FBHyd       = candi%Btot / ( candi%Btot + candi%param%BMax )
-     candi%RPOM1       = candi%param%kHyd1*candi%y(candi%POM1y,i)*candi%FBHyd
-     candi%RPOM2       = candi%param%kHyd2*candi%y(candi%POM2y,i)*candi%FBHyd
-     candi%RPOM3       = candi%param%kHyd3*candi%y(candi%POM3y,i)*candi%FBHyd
-     candi%RPOM4       = candi%param%kHyd4*candi%y(candi%POM4y,i)*candi%FBHyd
-     candi%RNecro      = candi%param%kHydN*candi%y(candi%Necromassy,i)
-     candi%RPOMspecial = candi%param%pomspecial2dic*candi%y(candi%POMspecialy,i)*candi%FBHyd
-     candi%RAerDHyd    = candi%param%kgrowthAer*candi%y(candi%BAery,i)*candi%FDHyd(i)*FTEA_O2
-     candi%RDenO2DHyd  = candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FDHyd(i)*FTEA_O2
-     candi%RDenNO3DHyd = candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FDHyd(i)*FTEA_NO3          *FIN_O2
-     candi%RFerDHyd    = candi%param%kgrowthFer*candi%y(candi%BFery,i)*candi%FDHyd(i)                   *FIN_O2*candi%FTFerDHyd
-     candi%RAerOAc     = candi%param%kgrowthAer*candi%y(candi%BAery,i)*candi%FOAc    *FTEA_O2 * candi%FTAerOAc
-     candi%RDenOAc     = candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FOAc    *FTEA_NO3* candi%FTDenOAc*FIN_O2
-     candi%RDenH2      = candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FH2     *FTEA_NO3* candi%FTDenH2 *FIN_O2
-     candi%RManOAc     = candi%param%kgrowthMan*candi%y(candi%BMany,i)*candi%FOAc    *FTEA_MnO2*candi%FTManOAc*FIN_O2*FIN_NO3
-     candi%RIroOAc     = candi%param%kgrowthIro*candi%y(candi%BIroy,i)*candi%FOAc    *FTEA_FeOH*candi%FTIroOAc*FIN_O2*FIN_NO3*FIN_MnO2
-     candi%RIroH2      = candi%param%kgrowthIro*candi%y(candi%BIroy,i)*candi%FH2     *FTEA_FeOH*candi%FTIroH2 *FIN_O2*FIN_NO3*FIN_MnO2
-     candi%RSulOAc     = candi%param%kgrowthSul*candi%y(candi%BSuly,i)*candi%FOAc    *FTEA_SO4 *candi%FTSulOAc*FIN_O2*FIN_NO3*FIN_MnO2*FIN_FeOH
-     candi%RSulH2      = candi%param%kgrowthSul*candi%y(candi%BSuly,i)*candi%FH2     *FTEA_SO4 *candi%FTSulH2 *FIN_O2*FIN_NO3*FIN_MnO2*FIN_FeOH
-     candi%RMetOAc     = candi%param%kgrowthMet*candi%y(candi%BMety,i)*candi%FOAc              *candi%FTMetOAc*FIN_O2*FIN_NO3*FIN_MnO2*FIN_FeOH*FIN_SO4
-     candi%RMetH2      = candi%param%kgrowthMet*candi%y(candi%BMety,i)*candi%FH2               *candi%FTMetH2 *FIN_O2*FIN_NO3*FIN_MnO2*FIN_FeOH*FIN_SO4
-     candi%RDHyd       = candi%RAerDHyd(i)+candi%RDenO2DHyd(i)+candi%RDenNO3DHyd(i)+candi%RFerDHyd(i)
-     candi%ROAc        = candi%RAerOAc(i) +candi%RDenOAc(i)+candi%RManOAc(i)+candi%RIroOAc(i)+candi%RSulOAc(i)+candi%RMetOAc(i)
-     candi%RH2         =            +candi%RDenH2(i)            +candi%RIroH2(i) +candi%RSulH2(i) +candi%RMetH2(i)
-     candi%RdeathFer(i)   = candi%param%kdeathFer * candi%y(candi%BFery,i)
-     candi%RdeathAer(i)   = candi%param%kdeathAer * candi%y(candi%BAery,i)
-     candi%RdeathDen(i)   = candi%param%kdeathDen * candi%y(candi%BDeny,i)
-     candi%RdeathMan(i)   = candi%param%kdeathMan * candi%y(candi%BMany,i)
-     candi%RdeathIro(i)   = candi%param%kdeathIro * candi%y(candi%BIroy,i)
-     candi%RdeathSul(i)   = candi%param%kdeathSul * candi%y(candi%BSuly,i)
-     candi%RdeathMet(i)   = candi%param%kdeathMet * candi%y(candi%BMety,i)
-     candi%RdeathTot(i)   = candi%RdeathAer(i)+candi%RdeathDen(i)+candi%RdeathMan(i)+candi%RdeathIro(i)+candi%RdeathSul(i)+candi%RdeathMet(i)+candi%RdeathFer(i)
-END DO !
-     candi%rgC(:) = candi%RDHyd(:)*candi%stcoef%fracCDHyd + candi%ROAc(:)*candi%stcoef%fracCOAc + candi%RH2(:)*candi%stcoef%fracCH2
-     candi%rgN(:) = candi%RDHyd(:)*candi%stcoef%fracNDHyd + candi%ROAc(:)*candi%stcoef%fracNOAc + candi%RH2(:)*candi%stcoef%fracNH2
-     candi%rgP(:) = candi%RDHyd(:)*candi%stcoef%fracPDHyd + candi%ROAc(:)*candi%stcoef%fracPOAc + candi%RH2(:)*candi%stcoef%fracPH2
-     !END IF ! End if OMmodel = 3
+         candi%ROMO2(:)      = candi%RO2(:)                        *candi%psp(:)
+         candi%ROMNO3(:)     = candi%RNO3(:)                       *candi%psp(:)
+         candi%ROMMnO2(:)    = candi%RMnO2(:)*2
+         candi%ROMFeOH(:)    = candi%RFeOH(:)*4
+         candi%ROMSO4(:)     = candi%RSO4(:)*0.5                   *candi%psp(:)
+         candi%ROMMet(:)     = candi%RMet(:)*0.5                   *candi%psp(:)
+         candi%ROMMnii(:)    = candi%ROMMnO2(:)                     *candi%psp(:)
+         candi%ROMFeii(:)    = candi%ROMFeOH(:)                    *candi%psp(:)
+
+         candi%TOC(:)        = candi%y(candi%pomly,:)*(candi%param%xlab/candi%param%xlab) &
+                   + candi%y(candi%pomry,:)*(candi%param%xref/candi%param%xref) &
+                   + candi%y(candi%pomspecialy,:)*(candi%param%xspecial/candi%param%xspecial)
+         candi%TN(:)         = candi%y(candi%NH4y,:)  + candi%y(candi%NH4sy,:) &
+                   + candi%y(candi%pomly,:)*(candi%param%ylab/candi%param%xlab) &
+                   + candi%y(candi%pomry,:)*(candi%param%yref/candi%param%xref) &
+                   + candi%y(candi%pomspecialy,:)*(candi%param%yspecial/candi%param%xspecial)
+         candi%TP(:)         = candi%y(candi%PO4sy,:) + candi%y(candi%PO4ly,:) &
+                   + candi%y(candi%pomly,:)*(candi%param%zlab/candi%param%xlab) &
+                   + candi%y(candi%pomry,:)*(candi%param%zref/candi%param%xref) &
+                   + candi%y(candi%pomspecialy,:)*(candi%param%zspecial/candi%param%xspecial)
+
+         candi%RCO2(:)       = candi%psp(i)*                     &
+            (+candi%FO2(:) * (candi%param%poml2dic*candi%y(candi%POMLy,:)*((candi%param%ylab+2*candi%param%zlab)/candi%param%xlab) &
+                   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((candi%param%yref+2*candi%param%zref)/candi%param%xref)     &
+                   + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((candi%param%yspecial+2*candi%param%zspecial)/candi%param%xspecial)  )  &
+               +candi%FNO3(:) * (candi%param%poml2dic*candi%y(candi%POMLy,:)*((4*candi%param%xlab+3*candi%param%ylab-10*candi%param%zlab)/(5*candi%param%xlab)) &
+                   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((4*candi%param%xref+3*candi%param%yref-10*candi%param%zref)/(5*candi%param%xref))     &
+                   + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((4*candi%param%xspecial+3*candi%param%yspecial-10*candi%param%zspecial)/(5*candi%param%xspecial))  )  &
+               +candi%FMnO2(:) * (candi%param%poml2dic*candi%y(candi%POMLy,:)*((4*candi%param%xlab+candi%param%ylab-2*candi%param%zlab)/candi%param%xlab) &
+                   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((4*candi%param%xref+candi%param%yref-2*candi%param%zref)/candi%param%xref)     &
+                   + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((4*candi%param%xspecial+candi%param%yspecial-2*candi%param%zspecial)/candi%param%xspecial)  )   &
+               +candi%FFeoH(:) * (candi%param%poml2dic*candi%y(candi%POMLy,:)*((8*candi%param%xlab+candi%param%ylab-2*candi%param%zlab)/candi%param%xlab) &
+                   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((8*candi%param%xref+candi%param%yref-2*candi%param%zref)/candi%param%xref)     &
+                   + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((8*candi%param%xspecial+candi%param%yspecial-2*candi%param%zspecial)/candi%param%xspecial)  )  &   &
+               +candi%FSO4(:) * (candi%param%poml2dic*candi%y(candi%POMLy,:)*((candi%param%xlab+candi%param%ylab-2*candi%param%zlab)/candi%param%xlab) &
+                   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((candi%param%xref+candi%param%yref-2*candi%param%zref)/candi%param%xref)     &
+                   + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((candi%param%xspecial+candi%param%yspecial-2*candi%param%zspecial)/candi%param%xspecial)  )  &  &
+               +candi%FMet(:)* (candi%param%poml2dic*candi%y(candi%POMLy,:)*((candi%param%ylab-2*candi%param%zlab)/candi%param%xlab) &
+                   + candi%param%pomr2dic*candi%y(candi%POMRy,:)*((candi%param%yref-2*candi%param%zref)/candi%param%xref)     &
+                   + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*((candi%param%yspecial-2*candi%param%zspecial)/candi%param%xspecial)  ) )
+      ELSEIF(candi%param%VCW)THEN           !Here you can fix the rate of organic matter oxidation by depth
+         candi%TerminalOxidation(:) = candi%param%R0*exp(-1.0*candi%param%VCWBeta*candi%rpar(:)) ! mmol C L^-1 candi%y-^1
+         !candi%Nrelease(:) = TerminalOxidation(:)*(candi%param%ylab/candi%param%xlab) ! mmol C L^-1 candi%y-^1 * mmol N * mmol C^-1
+         candi%Prelease(:) = candi%TerminalOxidation(:)*(candi%param%zlab/candi%param%xlab) ! mmol L^-1 candi%y-^1
+         candi%RO2(:)        = candi%TerminalOxidation(:)*candi%FO2(:) ! mmol C L^-1 candi%y-^1
+         candi%RNO3(:)       = candi%TerminalOxidation(:)*candi%FNO3(:) ! mmol C L^-1 candi%y-^1
+         candi%RMnO2(:)      = candi%TerminalOxidation(:)*candi%FMnO2(:) ! mmol C L^-1 candi%y-^1
+         candi%RFeOH(:)      = candi%TerminalOxidation(:)*candi%FFeOH(:) ! mmol C L^-1 candi%y-^1
+         candi%RSO4(:)       = candi%TerminalOxidation(:)*candi%FSO4(:) ! mmol C L^-1 candi%y-^1
+         candi%RMet(:)       = candi%TerminalOxidation(:)*candi%FMet(:) ! mmol C L^-1 candi%y-^1
+         candi%RCO2(:)       = ((candi%param%ylab+2*candi%param%zlab)/candi%param%xlab)           *candi%RO2(:)    &
+               +((4*candi%param%xlab+3*candi%param%ylab-10*candi%param%zlab)/candi%param%xlab)*candi%RNO3(:)    &
+               +((4*candi%param%xlab+3*candi%param%ylab-2*candi%param%zlab)/candi%param%xlab) *candi%RMnO2(:)   &
+               +((8*candi%param%xlab+candi%param%ylab-2*candi%param%zlab)/candi%param%xlab)   *candi%RFeOH(:)   &
+               +((candi%param%xlab+candi%param%ylab-2*candi%param%zlab)/candi%param%xlab)     *candi%RSO4(:)    &
+               +((candi%param%ylab-2*candi%param%zlab)/candi%param%xlab)          *candi%RMet(:)
+         candi%ROMO2(:)      = candi%RO2(:) *((candi%param%xlab+2*candi%param%ylab)/candi%param%xlab)        ! mmol O2 L^-1 candi%y-^1
+         candi%ROMNO3(:)     = candi%RNO3(:)*((4*candi%param%xlab+3*candi%param%ylab)/(5*candi%param%xlab))  ! mmol NO3 L^-1 candi%y-^1
+         candi%ROMMnO2(:)    = candi%RMnO2(:)*2           * candi%pps(:)       ! % MnO2 solids candi%y-^1
+         candi%ROMFeOH(:)    = candi%RFeOH(:)*4           * candi%pps(:)       ! % FeOH solids candi%y-^1
+         candi%ROMSO4(:)     = candi%RSO4(:)*0.5                         ! mmol SO4 L^-1 candi%y-^1
+         candi%ROMMet(:)     = candi%RMet(:)*0.5                         ! mmol CH4 C L^-1 candi%y-^1
+         candi%ROMMnii(:)    = candi%ROMMnO2(:)           /candi%pps(:)        ! mmol Mnii L^-1 candi%y-^1
+         candi%ROMFeii(:)    = candi%ROMFeOH(:)           /candi%pps(:)        ! mmol Feii L^-1 candi%y-^1
+
+         candi%NH4release(:) = ( candi%RMnO2(:)+candi%RFeOH(:)+candi%RSO4(:)+candi%RMet(:) )*(candi%param%ylab/candi%param%xlab) ! mmol C L^-1 candi%y-^1 * mmol N * mmol C^-1
+         candi%NO3release(:) = candi%RO2(:)*(candi%param%ylab/candi%param%xlab)  - candi%RNO3(:)*( (4*candi%param%xlab+3*candi%param%ylab)/(5*candi%param%xlab) )
+         candi%XMetalrelease(:)  =   candi%param%poml2dic*candi%y(candi%POMLy,:)*(candi%param%XMetal_lab/candi%param%xlab) &
+              + candi%param%pomr2dic*candi%y(candi%POMRy,:)*(candi%param%XMetal_ref/candi%param%xref) &
+              + candi%param%pomspecial2dic*candi%y(candi%POMspecialy,:)*(candi%param%XMetal_special/candi%param%xspecial)
+      ENDIF ! End if VCW is true or false
+   ELSEIF (candi%param%OMModel == 2) THEN
+      candi%TerminalOxidation(:) = candi%param%docl2dic*candi%y(candi%DOCLy,:)
+      candi%Nrelease(:) = candi%param%donl2din*candi%y(candi%DONLy,:)
+      candi%Prelease(:) = candi%param%dopl2dip*candi%y(candi%DOPLy,:)
+
+
+      candi%RO2(:)        = candi%TerminalOxidation(:)*candi%FO2(:)
+      candi%RNO3(:)       = candi%TerminalOxidation(:)*candi%FNO3(:)
+      candi%RMnO2(:)      = candi%TerminalOxidation(:)*candi%FMnO2(:)
+      candi%RFeOH(:)      = candi%TerminalOxidation(:)*candi%FFeOH(:)
+      candi%RSO4(:)       = candi%TerminalOxidation(:)*candi%FSO4(:)
+      candi%RMet(:)       = candi%TerminalOxidation(:)*candi%FMet(:)
+      candi%RCO2(:)       = ((candi%param%ylab+2*candi%param%zlab)/candi%param%xlab)         *candi%RO2(:)      &
+               +((4*candi%param%xlab+3*candi%param%ylab-10*candi%param%zlab)/candi%param%xlab)*candi%RNO3(:)    &
+               +((4*candi%param%xlab+3*candi%param%ylab-2*candi%param%zlab)/candi%param%xlab) *candi%RMnO2(:)   &
+               +((8*candi%param%xlab+candi%param%ylab-2*candi%param%zlab)/candi%param%xlab)   *candi%RFeOH(:)   &
+               +((candi%param%xlab+candi%param%ylab-2*candi%param%zlab)/candi%param%xlab)     *candi%RSO4(:)    &
+               +((candi%param%ylab-2*candi%param%zlab)/candi%param%xlab)                      *candi%RMet(:)
+      candi%ROMO2(:)      = candi%RO2(:) *((candi%param%xlab+2*candi%param%ylab)/candi%param%xlab) *candi%psp(:)
+      candi%ROMNO3(:)     = candi%RNO3(:)*((4*candi%param%xlab+3*candi%param%ylab)/(5*candi%param%xlab))*candi%psp(:)
+      candi%ROMMnO2(:)    = candi%RMnO2(:)*2
+      candi%ROMFeOH(:)    = candi%RFeOH(:)*4
+      candi%ROMSO4(:)     = candi%RSO4(:)*0.5                       *candi%psp(:)
+      candi%ROMMet(:)     = candi%RMet(:)*0.5                       *candi%psp(:)
+      candi%ROMMnii(:)    = candi%ROMMnO2(:)                      *candi%psp(:)
+      candi%ROMFeii(:)    = candi%ROMFeOH(:)                     *candi%psp(:)
+   ELSEIF (candi%param%OMModel == 3) THEN
+DO i = 1, candi%npt  !Great dane
+     candi%Btot(i)       = candi%y(candi%BAery,i)+candi%y(candi%BDeny,i)+candi%y(candi%BMany,i)+candi%y(candi%BIroy,i)+candi%y(candi%BSuly,i)+candi%y(candi%BMety,i)+candi%y(candi%BFery,i)
+     candi%Bsubtot(i)    = candi%y(candi%BAery,i)+candi%y(candi%BDeny,i)+candi%y(candi%BMany,i)+candi%y(candi%BIroy,i)+candi%y(candi%BSuly,i)+candi%y(candi%BMety,i)
+     !candi%Btot(i)       = candi%y(candi%BAery,i)+candi%y(candi%BDeny,i)+candi%y(candi%BMany,i)+candi%y(candi%BIroy,i)+candi%y(candi%BSuly,i)+candi%y(candi%BMety,i)
+     candi%FBHyd(i)      = MIN(1.0, (candi%Btot(i) / candi%param%BMax) ) ! Unitless
+     candi%FBMax(i)      = MIN(1.0, ( 1 - ( candi%Btot(i) / candi%param%BMax )) )! Unitless
+     candi%RPOM1(i)      = candi%param%kHyd1*candi%y(candi%POM1y,i)*candi%FBHyd(i) ! candi%y^-1 * %solids * unitless
+     candi%RPOM2(i)      = candi%param%kHyd2*candi%y(candi%POM2y,i)*candi%FBHyd(i) ! candi%y^-1 * %solids * unitless
+     candi%RPOM3(i)      = candi%param%kHyd3*candi%y(candi%POM3y,i)*candi%FBHyd(i) ! candi%y^-1 * %solids * unitless
+     candi%RPOM4(i)      = candi%param%kHyd4*candi%y(candi%POM4y,i)*candi%FBHyd(i) ! candi%y^-1 * %solids * unitless
+     candi%RNecro(i)     = candi%param%kHydN*candi%y(candi%Necromassy,i)*candi%FBHyd(i) ! candi%y^-1 * %solids
+     candi%RPOMspecial(i)= candi%param%pomspecial2dic*candi%y(candi%POMspecialy,i)*candi%FBHyd(i) ! candi%y^-1 * %solids * unitless
+     candi%RAerDHyd(i)   = candi%param%kgrowthAer*candi%y(candi%BAery,i)*candi%FDHyd(i)*candi%FTEA_O2(i)
+     candi%RDenO2DHyd(i) = candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FDHyd(i)*candi%FTEA_O2(i)
+     candi%RDenNO3DHyd(i)= candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FDHyd(i)*candi%FTEA_NO3(i) &
+                                    * candi%FIN_O2NO3(i)
+     candi%RFerDHyd(i)   = candi%param%kgrowthFer*candi%y(candi%BFery,i)*candi%FDHyd(i)*candi%FTFerDHyd(i)* candi%FIN_O2(i)
+     candi%RAerOAc(i)    = candi%param%kgrowthAer*candi%y(candi%BAery,i)*candi%FOAc(i) *candi%FTEA_O2(i)  * candi%FTAerOAc(i)
+     candi%RDenOAc(i)    = candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FOAc(i) *candi%FTEA_NO3(i) * candi%FTDenOAc(i)*candi%FIN_O2NO3(i)
+     candi%RDenH2(i)     = candi%param%kgrowthDen*candi%y(candi%BDeny,i)*candi%FH2(i)  *candi%FTEA_NO3(i) * candi%FTDenH2(i) *candi%FIN_O2NO3(i)
+     candi%RManOAc(i)    = candi%param%kgrowthMan*candi%y(candi%BMany,i)*candi%FOAc(i) *candi%FTEA_MnO2(i)* candi%FTManOAc(i)*candi%FIN_O2MnO2(i)*candi%FIN_NO3(i)
+     candi%RManH2(i)     = candi%param%kgrowthMan*candi%y(candi%BMany,i)*candi%FH2(i)  *candi%FTEA_MnO2(i)* candi%FTManH2(i) *candi%FIN_O2MnO2(i)*candi%FIN_NO3(i)
+     candi%RIroOAc(i)    = candi%param%kgrowthIro*candi%y(candi%BIroy,i)*candi%FOAc(i) *candi%FTEA_FeOH(i)* candi%FTIroOAc(i)*candi%FIN_O2MnO2(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)
+     candi%RIroH2(i)     = candi%param%kgrowthIro*candi%y(candi%BIroy,i)*candi%FH2(i)  *candi%FTEA_FeOH(i)* candi%FTIroH2(i) *candi%FIN_O2FeOH(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)
+     candi%RSulOAc(i)    = candi%param%kgrowthSul*candi%y(candi%BSuly,i)*candi%FOAc(i) *candi%FTEA_SO4(i) * candi%FTSulOAc(i)*candi%FIN_O2FeOH(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)*candi%FIN_FeOH(i)
+     candi%RSulH2(i)     = candi%param%kgrowthSul*candi%y(candi%BSuly,i)*candi%FH2(i)  *candi%FTEA_SO4(i) &
+                                   * candi%FTSulH2(i) *candi%FIN_O2SO4(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)*candi%FIN_FeOH(i)
+     candi%RMetOAc(i)    = candi%param%kgrowthMet*candi%y(candi%BMety,i)*candi%FOAc(i) *candi%FTMetOAc(i) &
+                                   * candi%FIN_O2CH4(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)*candi%FIN_FeOH(i)*candi%FIN_SO4(i)
+     candi%RMetH2(i)     = candi%param%kgrowthMet*candi%y(candi%BMety,i)*candi%FH2(i)  *candi%FTMetH2(i)  &
+                                   * candi%FIN_O2CH4(i)*candi%FIN_NO3(i)*candi%FIN_MnO2(i)*candi%FIN_FeOH(i)*candi%FIN_SO4(i)
+     candi%RDHyd(i)      = (candi%RAerDHyd(i)+candi%RDenO2DHyd(i)+candi%RDenNO3DHyd(i)+candi%RFerDHyd(i)  )*candi%psp(i)
+     candi%ROAc(i)       = (candi%RAerOAc(i) +candi%RDenOAc(i)+candi%RManOAc(i)+candi%RIroOAc(i)+candi%RSulOAc(i)&
+                                       +candi%RMetOAc(i) )*candi%psp(i) ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%RH2(i)        = (           +candi%RDenH2(i) +candi%RManH2(i) +candi%RIroH2(i) +candi%RSulH2(i) &
+                                       +candi%RMetH2(i)  )*candi%psp(i) ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%TerminalOxidation(i) = candi%RDHyd(i) + candi%ROAc(i) + candi%RH2(i) !-  RFerDHyd(i)*candi%psp(i)!mmol L^-1 candi%y^-1
+     candi%RO2(i)   = (candi%RAerDHyd(i)*1 + candi%RAerOAc(i)*1+candi%RDenO2DHyd(i)*1)*candi%psp(i)
+                                                                          ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%RNO3(i)  = (candi%RDenNO3DHyd(i)*1+candi%RDenOAc(i)*1+candi%RDenH2(i)*1.0)*candi%psp(i)
+                                                                          ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%RMnO2(i) = candi%RManOAc(i)*1 +candi%RManH2(i)*1 ! %solids candi%y^-1
+     candi%RFeOH(i) = candi%RIroH2(i)+candi%RIroOAc(i) ! %solids candi%y^-1
+     candi%RSO4(i)  = (candi%RSulOAc(i)*1+candi%RSulH2(i)*1)*candi%psp(i) ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%RMet(i)  = (candi%RMetOAc(i)+candi%RMetH2(i))*candi%psp(i) ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+!     RCO2(i)     = (RAerDHyd(i)*6 + RAerOAc(i)*2 +RDenO2DHyd(i)*6 &
+!                  + RDenNO3DHyd(i)*6 + RDenOAc(i)*2 + RDenH2(i)*1 &
+!                  + RManOAc(i)*2   &
+!                  + RIroH2(i)*0 + RIroOAc(i)*2   &
+!                  + RSulOAc(i)*2 + RSulH2(i)*0    &
+!                  + RMetOAc(i)*1 + RMetH2(i)*-0.25)*candi%psp(i) ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%RCO2(i)     = (candi%RAerDHyd(i)*1 + candi%RAerOAc(i)*1 +candi%RDenO2DHyd(i)*1 &
+                  + candi%RDenNO3DHyd(i)*1 + candi%RDenOAc(i)*1 + candi%RDenH2(i)*1 &
+                  + candi%RManOAc(i)*1+ candi%RManH2(i)*1   &
+                  + candi%RIroH2(i)*0 + candi%RIroOAc(i)*2   &
+                  + candi%RSulOAc(i)*2 + candi%RSulH2(i)*0    &
+                  + candi%RMetOAc(i)*1 + candi%RMetH2(i)*(-0.25))*candi%psp(i)
+                                                                  ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+
+     candi%RCH4(i)        = (candi%RMetOAc(i)*0.5+candi%RMetH2(i)*0.25)*candi%psp(i)
+                                                                  ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+
+    candi%ROMO2(i)      = (candi%RAerDHyd(i)*4 + candi%RAerOAc(i)*2 + candi%RDenO2DHyd(i)*4 )*candi%psp(i)
+                                                                  ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+    candi%ROMNO3(i)     = (candi%RDenNO3DHyd(i)*4.8 + candi%RDenOAc(i)*1.6 + candi%RDenH2(i)*0.4)*candi%psp(i)
+                                                                  ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+    candi%ROMMnO2(i)    = candi%RManOAc(i)*4+candi%RManH2(i)*2
+    candi%ROMFeOH(i)    = candi%RIroH2(i)*2+candi%RIroOAc(i)*8 ! %solids candi%y^-1
+    candi%ROMSO4(i)     = (candi%RSulOAc(i)*1+candi%RSulH2(i)*0.25)*candi%psp(i)
+                                                                  ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+    candi%ROMMet(i)     = candi%RCH4(i)
+    candi%ROMMnii(:)    = candi%ROMMnO2(:)                      *candi%psp(i)
+    candi%ROMFeii(:)    = candi%ROMFeOH(:)                     *candi%psp(i)
+    IF( candi%FBMax(i)<0. ) THEN
+       candi%FBMax(i) = candi%param%Tiny
+    ENDIF
+    IF(candi%y(candi%OAcy,i)<0.00000) THEN
+       candi%y(candi%OAcy,i) = 0.00000
+    ENDIF
+    IF(candi%y(candi%H2y,i)<0.00000) THEN
+       candi%y(candi%H2y,i) = 0.00000
+    ENDIF
+    IF(candi%y(candi%DHydy,i)<0.00000) THEN
+       candi%y(candi%DHydy,i) = 0.00000
+    ENDIF
+    ! IF(candi%y(CH4y,i)<candi%param%Tiny) THEN
+    ! candi%y(CH4y,i) = 10.*candi%param%Tiny
+    ! ENDIF
+
+     IF((candi%y(candi%BFery,i)+candi%y(candi%BAery,i)+candi%y(candi%BDeny,i)+candi%y(candi%BMany,i)&
+             +candi%y(candi%BIroy,i)+candi%y(candi%BSuly,i)+candi%y(candi%BMety,i))<candi%param%BMin)THEN
+        candi%RdeathFer(i)   = candi%param%kdeathFer * candi%y(candi%BFery,i)
+        candi%RdeathAer(i)   = 0.
+        candi%RdeathDen(i)   = 0.
+        candi%RdeathMan(i)   = 0.
+        candi%RdeathIro(i)   = 0.
+        candi%RdeathSul(i)   = 0.
+        candi%RdeathMet(i)   = 0.
+     ELSEIF((candi%y(candi%BFery,i)+candi%y(candi%BAery,i)+candi%y(candi%BDeny,i)+candi%y(candi%BMany,i)&
+             +candi%y(candi%BIroy,i)+candi%y(candi%BSuly,i)+candi%y(candi%BMety,i))>candi%param%BMin)THEN
+        candi%RdeathFer(i)   = candi%param%kdeathFer * candi%y(candi%BFery,i)
+        candi%RdeathAer(i)   = candi%param%kdeathAer * candi%y(candi%BAery,i)
+        candi%RdeathDen(i)   = candi%param%kdeathDen * candi%y(candi%BDeny,i)
+        candi%RdeathMan(i)   = candi%param%kdeathMan * candi%y(candi%BMany,i)
+        candi%RdeathIro(i)   = candi%param%kdeathIro * candi%y(candi%BIroy,i)
+        candi%RdeathSul(i)   = candi%param%kdeathSul * candi%y(candi%BSuly,i)
+        candi%RdeathMet(i)   = candi%param%kdeathMet * candi%y(candi%BMety,i)
+     ENDIF
+     END DO !  !Great dane
+
+     candi%RdeathTot(:)   = candi%RdeathAer(:)+candi%RdeathDen(:)+candi%RdeathMan(:) &
+                  +candi%RdeathIro(:)+candi%RdeathSul(:)+candi%RdeathMet(:)+candi%RdeathFer(:)
+     candi%NH4release(:) = (candi%RPOM1(:)*(candi%param%yPOM1/candi%param%xPOM1) &
+             + candi%RPOM2(:)*(candi%param%yPOM2/candi%param%xPOM2)              &
+             + candi%RPOM3(:)*(candi%param%yPOM3/candi%param%xPOM3)              &
+             + candi%RPOM4(:)*(candi%param%yPOM4/candi%param%xPOM4)              &
+             + candi%RDHyd(:)*(candi%param%yDHyd/candi%param%xDHyd)              &
+             + candi%ROAc(:)*(candi%param%yOAc/candi%param%xOAc)                 &
+             + candi%RH2(:)*(candi%param%yH2/candi%param%xH2))*candi%psp(:)
+                        ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%NO3release(:) = 0.0 !TerminalOxidation(i)*(yPOM1/xPOM1)*(-1)
+     !Nrelease(:) = (RPOM1(:)*(yPOM1/xPOM1) + RPOM2(:)*(yPOM2/xPOM2)     &
+    !         + RPOM3(:)*(yPOM3/xPOM3) + RPOM4(:)*(yPOM4/xPOM4)          &
+    !         + RDHyd(:)*(param%yDHyd/param%xDHyd) + ROAc(:)*(yOAc/xOAc) &
+    !         + RH2(:)*(yH2/xH2))*candi%psp(:) ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%Prelease(:) = (candi%RPOM1(:)*(candi%param%zPOM1/candi%param%xPOM1) &
+             + candi%RPOM2(:)*(candi%param%zPOM2/candi%param%xPOM2)            &
+             + candi%RPOM3(:)*(candi%param%zPOM3/candi%param%xPOM3)            &
+             + candi%RPOM4(:)*(candi%param%zPOM4/candi%param%xPOM4)            &
+             + candi%RDHyd(:)*(candi%param%zDHyd/candi%param%xDHyd)            &
+             + candi%ROAc(:)*(candi%param%zOAc/candi%param%xOAc)               &
+             + candi%RH2(:)*(candi%param%zH2/candi%param%xH2))*candi%psp(:)
+                               ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+     candi%XMetalrelease(:) = (   candi%RPOM1(:)*(candi%param%XMetal_POM1/candi%param%xPOM1) &
+             + candi%RPOM2(:)*(candi%param%XMetal_POM2/candi%param%xPOM2)                    &
+             + candi%RPOM3(:)*(candi%param%XMetal_POM3/candi%param%xPOM3)                    &
+             + candi%RPOM4(:)*(candi%param%XMetal_POM4/candi%param%xPOM4)                    &
+             + candi%RDHyd(:)*(candi%param%XMetal_DHyd/candi%param%xDHyd) )*candi%psp(:)
+                               ! %solids candi%y^-1 *candi%psp --> mmol L^-1 candi%y^-1
+
+
+         !END IF ! End if OMmodel = 3
   !END IF ! End if OMmodel = 2
 END IF ! OMmodel = 1, 2 or 3
-
-DO i=1,candi%npt
-IF (candi%rgC(i)<0.00000000000000000000000000000000000000000000) THEN
-        candi%rgC(i)=1.0000E-14
-END IF
-IF (candi%rgN(i)<0.00000000000000000000000000000000000000000000) THEN
-        candi%rgN(i)=1.0000E-14
-END IF
-IF (candi%rgP(i)<0.00000000000000000000000000000000000000000000) THEN
-        candi%rgP(i)=1.0000E-14
-END IF
-END DO
 
    IF(candi%param%simMnFe) THEN
      candi%rox(:) = candi%fo2(:) + candi%fno3(:) + candi%fmno2(:) + candi%ffeoh(:) + candi%fso4(:) + candi%fmet(:)
@@ -3937,21 +4331,16 @@ END DO
    END IF
 !Need to make a few specific reaction rates for the OM Model 3
 IF (candi%param%OMModel ==3) THEN
-        DO i = 1,candi%npt ! Search "Caterpillar"
-        candi%rox(:) = candi%fo2(:) + candi%fno3(:) + candi%fmno2(:) + candi%ffeoh(:) + candi%fso4(:) + candi%fmet(:)
+    DO i = 1,candi%npt ! Search "Caterpillar"
+       candi%rox(:) = candi%fo2(:) + candi%fno3(:) + candi%fmno2(:) + candi%ffeoh(:) + candi%fso4(:) + candi%fmet(:)
  ! END IF ! End if simMnFe
   END DO ! Search "Caterpillar"
 END IF ! End if OMModel == 3
 !End: Need to make a few specific reaction rates for the OM Model 3
 
-
    RETURN
  END SUBROUTINE RATES
 !------------------------------------------------------------------------------!
-
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -4208,7 +4597,7 @@ END IF ! End if OMModel == 3
 !------------------------------------------------------------------------------!
  SUBROUTINE setdifcoef(candi,df)
    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    REAL(SEDP), INTENT(IN) :: df(:)
 
 !  DIFFC(:,:)     = 0.0
@@ -4252,11 +4641,12 @@ END IF ! End if OMModel == 3
 !rl   ****************************************************************
 !------------------------------------------------------------------------------!
  SUBROUTINE SedProperties(candi)
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    !-- Local
    REAL(SEDP) :: pe
    INTEGER  :: i
 
+print*,"######## SedProperties ################"
    !---------------------------------------------------------------------------!
    !-- Set Bioturbation Profile and depth derivatives of bioturb(X)
    IF (candi%param%imix == 0) THEN
@@ -4298,11 +4688,14 @@ END IF ! End if OMModel == 3
 
    !---------------------------------------------------------------------------!
    !-- Set depth derivatives of Porosity(X),
+print*,"bp = ",candi%param%bp
+print*,"p00= ",candi%param%p00
    IF (candi%param%bp == 0.0.OR.(candi%param%p0-candi%param%p00) == 0.0) THEN
      candi%poros(:)= candi%param%p0
    ELSE
      candi%poros(:)= (candi%param%p0-candi%param%p00)*EXP(-candi%param%bp*candi%rpar(:)) + candi%param%p00
    END IF
+print*,"poros=",candi%poros
    !#ifdef porosvar
    !do i=1,npt
    !  poros_bg(i) = poros(i)
@@ -4341,7 +4734,7 @@ END IF ! End if OMModel == 3
 !rl   ****************************************************************
 !------------------------------------------------------------------------------!
  SUBROUTINE porosi(candi)
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    INTEGER  :: i
    REAL(SEDP) :: ventflow1
 
@@ -4380,9 +4773,19 @@ END IF ! End if OMModel == 3
    END IF
    !rl   Ventflow at the basis of the core
    ventflow1 = candi%param%ventflow * (candi%porosmin**3)/((1.0-candi%porosmin)**2)*((1.0-candi%param%p00)**2)/(candi%param%p00**3)
-   candi%ps(:)  = one - candi%poros(:)
-   candi%psp(:) = candi%ps(:)/candi%poros(:)
-   candi%pps(:) = candi%poros(:)/candi%ps(:)
+   candi%ps(1)  = 0.0
+   candi%psp(1) = 0.0
+   candi%pps(1) = 1.0
+
+   DO i = 2,candi%npt
+      candi%ps(i)  = one - candi%poros(i)
+      candi%psp(i) = candi%ps(i)/candi%poros(i)
+      candi%pps(i) = candi%poros(i)/candi%ps(i)
+   ENDDO
+   print*,"p0",candi%param%p0
+   print*,"psp",candi%psp(:)
+   print*,"pps",candi%pps(:)
+   print*,"poros",candi%poros(:)
    !       Burial velocity of solids
    candi%wvel(:) = candi%param%w00*(one - candi%param%p00)/(candi%ps(:))
    !       Porewater velocity du to burial of sediment in case of const.
@@ -4443,7 +4846,7 @@ END IF ! End if OMModel == 3
 !rl   sediment to bottom water
 !------------------------------------------------------------------------------!
  REAL(SEDP) FUNCTION dfluxes(candi,layer,speci)
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    INTEGER, INTENT(IN)                      :: layer
    INTEGER, INTENT(IN)                      :: speci
    INTEGER  :: i
@@ -4469,12 +4872,14 @@ END IF ! End if OMModel == 3
        END DO ! End do i
      END IF !End if irrig = 1
      candi%fluxadv = candi%poros(layer)*candi%uvel(layer)*candi%y(speci,layer)
-     candi%fluxdiff = -candi%DIFFC(speci,layer)/candi%t2(layer)*candi%poros(layer) *(candi%y(speci,layer+1)-surfconz)/(2.0*candi%dh(layer))
-                  !cm2/y          /1        *1              *mmol/L                      / cm
+     candi%fluxdiff = -candi%DIFFC(speci,layer)/candi%t2(layer)*candi%poros(layer) * &
+                      (candi%y(speci,layer+1)-surfconz)/(2.0*candi%dh(layer))
 
+                  !cm2/candi%y          /1        *1              *mmol/L                      / cm
    ELSE
      candi%fluxadv = -candi%poros(candi%npt-1)*candi%uvel(candi%npt-1)*candi%y(speci,candi%npt-1)
-     candi%fluxdiff = candi%DIFFC(speci,candi%npt-1)/candi%t2(candi%npt-1)*candi%poros(candi%npt-1)*(candi%y(speci,candi%npt)-candi%y(speci,candi%npt-2))/(2.0*candi%dh(candi%npt-1))
+     candi%fluxdiff = candi%DIFFC(speci,candi%npt-1)/candi%t2(candi%npt-1)*candi%poros(candi%npt-1)* &
+                      (candi%y(speci,candi%npt)-candi%y(speci,candi%npt-2))/(2.0*candi%dh(candi%npt-1))
    END IF
    dfluxes = candi%fluxadv + candi%fluxdiff + candi%fluxirr
 
@@ -4486,12 +4891,8 @@ END IF ! End if OMModel == 3
 !------------------------------------------------------------------------------!
 
 
-
-
-
-
 !------------------------------------------------------------------------------!
-!--   2D to 1D to solve y / ydot with vode (was yaufyfex)
+!--   2D to 1D to solve candi%y / ydot with vode (was yaufyfex)
 !------------------------------------------------------------------------------!
  SUBROUTINE Copy2Dinto1D(neq,yfex,ydotfex,nSPECIES,y,ydot)
    !-- Incoming
@@ -4499,10 +4900,9 @@ END IF ! End if OMModel == 3
    REAL(SEDP), INTENT(OUT) :: yfex(neq)
    REAL(SEDP), INTENT(OUT) :: ydotfex(neq)
    INTEGER,    INTENT(IN)  :: nSPECIES
-   REAL(SEDP), INTENT(IN) :: y(:,:),ydot(:,:)
+   REAL(SEDP), INTENT(IN) :: y(0:,:),ydot(0:,:)
    !-- Local
    INTEGER  :: ii,i,j,ii1
-
 
    DO ii = 1,neq
      ii1 = ii-1
@@ -4516,15 +4916,16 @@ END IF ! End if OMModel == 3
  END SUBROUTINE Copy2Dinto1D
 !------------------------------------------------------------------------------!
 
+
 !------------------------------------------------------------------------------!
-!--   1D to 2D to solve y / ydot with vode
+!--   1D to 2D to solve candi%y / ydot with vode
 !------------------------------------------------------------------------------!
  SUBROUTINE Copy1Dinto2D(neq,yfex,nSPECIES,y)
    !-- Incoming
    INTEGER,    INTENT(IN)  :: neq
    REAL(SEDP), INTENT(IN)  :: yfex(neq)
    INTEGER,    INTENT(IN)  :: nSPECIES
-   REAL(SEDP), INTENT(OUT) :: y(:,:)
+   REAL(SEDP), INTENT(OUT) :: y(0:,:)
    !-- Local
    INTEGER  :: ii,i,j,ii1
 
@@ -4540,11 +4941,6 @@ END SUBROUTINE Copy1Dinto2D
 !------------------------------------------------------------------------------!
 
 
-
-
-
-
-
 !------------------------------------------------------------------------------!
 ! SetGrid()
 !
@@ -4553,12 +4949,11 @@ END SUBROUTINE Copy1Dinto2D
 !------------------------------------------------------------------------------!
  SUBROUTINE SetGrid(candi,SedDepth)
    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    REAL(SEDP), INTENT(IN)  :: SedDepth
    !-- Local
    INTEGER  :: i
    REAL(SEDP)              :: s, dx
-
 
    IF (candi%job == 0) THEN
      !-- Equal vertical grid
@@ -4567,6 +4962,29 @@ END SUBROUTINE Copy1Dinto2D
      DO i=1,candi%npt
         candi%dh(i)   = s
      END DO
+   ELSEIF( candi%job == 2) THEN
+     !-- Exponential increase of grid size with depth
+     WRITE(*,"(8X,'CANDI set with DANs grid size with depth',/)")
+     s  = 0.0
+     dx = 2 !10.0
+     DO i = 1,candi%npt
+       s = s+1.0/(1.0+EXP((REAL(i,SEDP)-REAL(candi%npt,SEDP)/2.0)/dx))
+     END DO
+
+     s = SedDepth/(REAL(candi%npt,SEDP)-s)
+     !Dan comments this out ...
+     !DO i=1,candi%npt
+     !  dh(i)=s-s/(1.0+exp((REAL(i,SEDP)-REAL(candi%npt,SEDP)/2.0)/dx))
+     !END DO
+     !dh(2) = dh(1)
+     !Dan adds this ...
+     DO i=1,candi%npt
+       candi%dh(i)=s-s/(1.0+exp((REAL(i,SEDP)-REAL(candi%npt,SEDP)/2.0)/dx))
+       IF(candi%dh(i)<0.0250000) candi%dh(i)=0.0250000
+     END DO
+     candi%dh(1)=0.025000 ! cm
+     candi%dh(2)=0.025000 ! cm
+     candi%dh(3)=0.025000 ! cm
    ELSE
      !-- Exponential increase of grid size with depth
      WRITE(*,"(8X,'CANDI set with an exponential increase of grid size with depth',/)")
@@ -4621,7 +5039,7 @@ END SUBROUTINE Copy1Dinto2D
  END SUBROUTINE SetGrid
 !------------------------------------------------------------------------------!
 
-!------------------------------------------------------------------------------!
+
 !------------------------------------------------------------------------------!
 SUBROUTINE myerror(candi,errorcode, layer, text)
 !rl   ****************************************************************
@@ -4642,10 +5060,10 @@ SUBROUTINE myerror(candi,errorcode, layer, text)
 
 !IMPLICIT NONE
 
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
-INTEGER, INTENT(IN)                      :: errorcode
-INTEGER, INTENT(IN)                      :: layer
-CHARACTER (LEN=*), INTENT(IN)       :: text
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
+   INTEGER, INTENT(IN)                  :: errorcode
+   INTEGER, INTENT(IN)                  :: layer
+   CHARACTER (LEN=*), INTENT(IN)        :: text
 
 
 IF (errorcode < 0) THEN
@@ -4810,7 +5228,7 @@ END SUBROUTINE myerror
 !------------------------------------------------------------------------------!
  SUBROUTINE mass(candi,steadiness,fid)
    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    REAL(SEDP), INTENT(IN)         :: steadiness
    INTEGER,    INTENT(IN)         :: fid
    !-- Local
@@ -4824,8 +5242,9 @@ END SUBROUTINE myerror
      reacflux=reacflux+cflux(j)
    END DO
 
-!   fluxout = (y(cor1y,npt)+y(cor2y,npt)+y(cor0y,npt))*wvel(npt)*ps(npt)
-   fluxout = (candi%y(candi%DOCLy,candi%npt)+candi%y(candi%POCLy,candi%npt)+candi%y(candi%DOCRy,candi%npt)+candi%y(candi%POCRy,candi%npt))*candi%wvel(candi%npt)*candi%ps(candi%npt)
+!   fluxout = (candi%y(cor1y,npt)+candi%y(cor2y,npt)+candi%y(cor0y,npt))*wvel(npt)*ps(npt)
+   fluxout = (candi%y(candi%DOCLy,candi%npt)+candi%y(candi%POCLy,candi%npt)   &
+             +candi%y(candi%DOCRy,candi%npt)+candi%y(candi%POCRy,candi%npt))*candi%wvel(candi%npt)*candi%ps(candi%npt)
    ! note: should split to wvel and uvel for solids and liquids
 
 
@@ -4847,7 +5266,8 @@ END SUBROUTINE myerror
    WRITE(fid,'(a60)') 'Definition of the fluxes: out of sediment (-) into it (+)'
    WRITE(fid,'(a25)') 'Units: [umol/cm**2/a]'
    WRITE(fid,'(a20,f20.10)') 'Flux O2         :', dfluxes(candi,2,candi%o2y)
-   WRITE(fid,'(a20,f20.10)') 'Flux O2 Theory  :',((candi%sc+2.0*candi%sn)/candi%sc)* cflux(1)+2.0*candi%srsox+candi%srmnox+candi%srfeox &
+   WRITE(fid,'(a20,f20.10)') 'Flux O2 Theory  :',((candi%sc+2.0*candi%sn)/candi%sc)* cflux(1) &
+                                                 +2.0*candi%srsox+candi%srmnox+candi%srfeox &
      +2.0*candi%srch4ox
    WRITE(fid,'(a20,f20.10)') 'Flux NO3        :',dfluxes(candi,2,candi%no3y)
    WRITE(fid,'(a20,f20.10)') 'Flux SO4        :',dfluxes(candi,2,candi%so4y)
@@ -4873,7 +5293,9 @@ END SUBROUTINE myerror
    END IF
    WRITE(fid,'(a20,f20.10)') 'Flux CH4        :',dfluxes(candi,candi%npt,candi%ch4y)
 
-   WRITE(fid,'(a20,f20.10)') 'Flux OM         :', -(candi%y(candi%DOCLy,candi%npt)+candi%y(candi%POCLy,candi%npt)+candi%y(candi%POCRy,candi%npt)+candi%y(candi%DOCRy,candi%npt) &
+   WRITE(fid,'(a20,f20.10)') 'Flux OM         :', &
+       -(candi%y(candi%DOCLy,candi%npt)+candi%y(candi%POCLy,candi%npt) &
+       +candi%y(candi%POCRy,candi%npt)+candi%y(candi%DOCRy,candi%npt)  &
        )*candi%ps(candi%npt)*candi%wvel(candi%npt)
 
    WRITE(fid,'(a50)') '============================================='
@@ -4931,7 +5353,7 @@ END SUBROUTINE myerror
 !rl   ****************************************************************
 !------------------------------------------------------------------------------!
  SUBROUTINE vertrates(candi,cflux)
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    !-- Outgoing
    REAL(SEDP), INTENT(OUT)            :: cflux(7)
    !-- Local
@@ -5042,8 +5464,6 @@ END SUBROUTINE myerror
 !------------------------------------------------------------------------------!
 
 
-
-
 !------------------------------------------------------------------------------!
 !rl   ****************************************************************
 !rl   Early diagenese model C. CANDI from R. Luff (1996-2003), based on
@@ -5057,7 +5477,7 @@ END SUBROUTINE myerror
 !rl   ****************************************************************
 !------------------------------------------------------------------------------!
 SUBROUTINE CheckSteadyStatus(candi,steadiness)
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    REAL(SEDP), INTENT(OUT)            :: steadiness
    REAL(SEDP)                         :: MAX
    INTEGER  :: j,i,idx
@@ -5094,7 +5514,7 @@ SUBROUTINE CheckSteadyStatus(candi,steadiness)
 !------------------------------------------------------------------------------!
  SUBROUTINE WriteRates (candi,fid)
    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    INTEGER, INTENT(IN) :: fid
    !-- Local
    REAL(SEDP) :: mdummy
@@ -5174,7 +5594,7 @@ SUBROUTINE CheckSteadyStatus(candi,steadiness)
 !------------------------------------------------------------------------------!
  SUBROUTINE WriteRates2 (candi,fid)
    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    INTEGER, INTENT(IN) :: fid
    !-- Local
    REAL(SEDP) :: mdummy
@@ -5211,7 +5631,7 @@ SUBROUTINE CheckSteadyStatus(candi,steadiness)
 !------------------------------------------------------------------------------!
  SUBROUTINE WriteOAcRates (candi,fid)
    !-- Incoming
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    INTEGER, INTENT(IN) :: fid
    !-- Local
    REAL(SEDP) :: mdummy
@@ -5220,7 +5640,7 @@ SUBROUTINE CheckSteadyStatus(candi,steadiness)
    !rl   aviod warnings:
    mdummy = 0.0
    CALL mass(candi,mdummy,fid)
-   1012 FORMAT (100F30.15)
+1012 FORMAT (100F30.15)
    !rl   Get the rates from the last timestep and write it to the file
    OPEN(16,FILE=candi%fileratOAc,STATUS='UNKNOWN')
    CALL RATES(candi)
@@ -5244,7 +5664,7 @@ SUBROUTINE CheckSteadyStatus(candi,steadiness)
 !------------------------------------------------------------------------------!
 FUNCTION GetAEDColNum(candi,iden) RESULT(column)
    !-- Incoming                                                         !
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    CHARACTER (LEN=*) :: iden                                            !
    !-- Outgoing                                                         !
    INTEGER  :: column,i
@@ -5261,12 +5681,8 @@ FUNCTION GetAEDColNum(candi,iden) RESULT(column)
    print *,'candi col ',iden,column
    !print *,'CANDIVarNames',   candi%CANDIVarNames(i)
 
-
-
-
-
 END FUNCTION GetAEDColNum
-
 
 !------------------------------------------------------------------------------!
 END MODULE aed2_sedcandi
+!crap

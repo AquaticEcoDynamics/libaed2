@@ -895,19 +895,19 @@ CONTAINS
          END DO
      END IF
 
-     IF(nPPEqs > 0 .AND. PRESENT(KIAP)) THEN
-        DO iter = 1,nPPEqs
-          KIAP(iter) = CalcIAPforPP2( nComponents - nPPEqs + iter )
-          ! Note: this assumes PPs are the last in the component array
-        END DO
-     END IF
+!    IF(nPPEqs > 0 .AND. PRESENT(KIAP)) THEN
+!       DO iter = 1,nPPEqs
+!         KIAP(iter) = CalcIAPforPP2( nComponents - nPPEqs + iter )
+!         ! Note: this assumes PPs are the last in the component array
+!       END DO
+!    END IF
 
-     IF(nPPEqs > 0 .AND. PRESENT(QIAP)) THEN
-        DO iter = 1,nPPEqs
-          QIAP(iter) = CalcIAPforPP3( nComponents - nPPEqs + iter )
-          ! Note: this assumes PPs are the last in the component array
-        END DO
-     END IF
+!    IF(nPPEqs > 0 .AND. PRESENT(QIAP)) THEN
+!       DO iter = 1,nPPEqs
+!         QIAP(iter) = CalcIAPforPP3( nComponents - nPPEqs + iter )
+!         ! Note: this assumes PPs are the last in the component array
+!       END DO
+!    END IF
 
 
 
@@ -4672,35 +4672,35 @@ END FUNCTION CalcIAPforPP
 ! This is a function that is exactly the same as the one above,                !
 ! but it produces K as a result, for use in equilibrium calculations. -Dan     !
 !------------------------------------------------------------------------------!
-FUNCTION CalcIAPforPP2(PICHMIndex) RESULT(KIAP)                                 !
+!FUNCTION CalcIAPforPP2(PICHMIndex) RESULT(KIAP)                                 !
    !-- Incoming                                                                !
-   INTEGER  :: PICHMIndex                                                   !
+!   INTEGER  :: PICHMIndex                                                   !
    !-- Outgoing                                                                !
-   DOUBLETYPE  :: KIAP                                                       !
-   !-- Local
-   DOUBLETYPE  :: Q,K
+!  DOUBLETYPE  :: KIAP                                                       !
+!  !-- Local
+!  DOUBLETYPE  :: Q,K
 
-   KIAP = -999.
+!  KIAP = -999.
 
-   IF(allComponents(PICHMIndex)%CompType == PUREPHASE) THEN
+!  IF(allComponents(PICHMIndex)%CompType == PUREPHASE) THEN
 
      ! For CANDI-AED we need "IAP/Ksp" to limit rate laws (note in Bethke the
      ! term "Q" (Eq 3.35,p47) is used as ion activity product
      ! In this module, %Value = log(Q)*ln(10) &
      !                 %Total = log(Ksp)*ln(10
-     Q = antiLOG( allComponents(PICHMIndex)%Value / LOG(REAL(10.0,DP)), REAL(10.0,DP) )
-     K = antiLOG( allComponents(PICHMIndex)%ppData%logK, REAL(10.0,DP) )
+!    Q = antiLOG( allComponents(PICHMIndex)%Value / LOG(REAL(10.0,DP)), REAL(10.0,DP) )
+!    K = antiLOG( allComponents(PICHMIndex)%ppData%logK, REAL(10.0,DP) )
      !Q = allComponents(PICHMIndex)%Value / LOG(REAL(10.0,DP))
      !K = allComponents(PICHMIndex)%ppData%logK
 
-     KIAP = K
+!    KIAP = K
 
-   ELSE
-     print *,'CalcIAP error - CalcIAPforPP2 called on a non-PurePhase component'
-   END IF
+!  ELSE
+!    print *,'CalcIAP error - CalcIAPforPP2 called on a non-PurePhase component'
+!  END IF
 
 
-END FUNCTION CalcIAPforPP2
+!END FUNCTION CalcIAPforPP2
 !------------------------------------------------------------------------------!
 
 !------------------------------------------------------------------------------!
@@ -4711,35 +4711,35 @@ END FUNCTION CalcIAPforPP2
 ! Q here is the IAP that you might see in the references, for example
 ! Tufano 2009 p 1008.   -Dan     !
 !------------------------------------------------------------------------------!
-FUNCTION CalcIAPforPP3(PICHMIndex) RESULT(QIAP)                                 !
+!FUNCTION CalcIAPforPP3(PICHMIndex) RESULT(QIAP)                                 !
    !-- Incoming                                                                !
-   INTEGER  :: PICHMIndex                                                   !
+!   INTEGER  :: PICHMIndex                                                   !
    !-- Outgoing                                                                !
-   DOUBLETYPE  :: QIAP                                                       !
+!  DOUBLETYPE  :: QIAP                                                       !
    !-- Local
-   DOUBLETYPE  :: Q,K
+!  DOUBLETYPE  :: Q,K
 
-   QIAP = -999.
+!  QIAP = -999.
 
-   IF(allComponents(PICHMIndex)%CompType == PUREPHASE) THEN
+!  IF(allComponents(PICHMIndex)%CompType == PUREPHASE) THEN
 
      ! For CANDI-AED we need "IAP/Ksp" to limit rate laws (note in Bethke the
      ! term "Q" (Eq 3.35,p47) is used as ion activity product
      ! In this module, %Value = log(Q)*ln(10) &
      !                 %Total = log(Ksp)*ln(10
-     Q = antiLOG( allComponents(PICHMIndex)%Value / LOG(REAL(10.0,DP)), REAL(10.0,DP) )
-     K = antiLOG( allComponents(PICHMIndex)%ppData%logK, REAL(10.0,DP) )
+!    Q = antiLOG( allComponents(PICHMIndex)%Value / LOG(REAL(10.0,DP)), REAL(10.0,DP) )
+!    K = antiLOG( allComponents(PICHMIndex)%ppData%logK, REAL(10.0,DP) )
      !Q = allComponents(PICHMIndex)%Value / LOG(REAL(10.0,DP))
      !K = allComponents(PICHMIndex)%ppData%logK
 
-     QIAP = Q
+!    QIAP = Q
 
-   ELSE
-     print *,'CalcIAP error - CalcIAPforPP3 called on a non-PurePhase component'
-   END IF
+!  ELSE
+!    print *,'CalcIAP error - CalcIAPforPP3 called on a non-PurePhase component'
+!  END IF
 
 
-END FUNCTION CalcIAPforPP3
+!END FUNCTION CalcIAPforPP3
 !------------------------------------------------------------------------------!
 
 

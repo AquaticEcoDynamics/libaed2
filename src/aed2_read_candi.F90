@@ -10,258 +10,364 @@ CONTAINS
 
 
 !###############################################################################
-SUBROUTINE read_sed_candi_params(init_values_file, scp, count)
+SUBROUTINE read_sed_candi_params(sed_parm_file, scp, count)
 !-------------------------------------------------------------------------------
    USE aed2_csv_reader
 !
 !ARGUMENTS
-   CHARACTER(*) :: init_values_file
-   TYPE(aed2_sed_candi_param_t),DIMENSION(:),ALLOCATABLE,INTENT(inout) :: scp
+   CHARACTER(*) :: sed_parm_file
+   TYPE(aed2_sed_candi_param_t),DIMENSION(:),INTENT(inout) :: scp
    INTEGER, INTENT(in) :: count
 !-------------------------------------------------------------------------------
 !LOCALS
    INTEGER :: unit, nccols, ccol
    CHARACTER(len=32),POINTER,DIMENSION(:) :: csvnames
    TYPE(AED_SYMBOL),DIMENSION(:),ALLOCATABLE :: values
-   INTEGER :: idx_col = 0, numv = 0, numd = 0, zon
+   INTEGER :: idx_col = 0, zon
    LOGICAL :: meh
 !
 !BEGIN
 !-------------------------------------------------------------------------------
-   unit = aed_csv_read_header(init_values_file, csvnames, nccols)
-   print *,'benthic vars initialised from file : ', csvnames
+   unit = aed_csv_read_header(sed_parm_file, csvnames, nccols)
+   print *,'candi params read from file : ', sed_parm_file
    IF (unit <= 0) RETURN !# No file found
-   DO ccol=1,nccols
-      IF ( csvnames(ccol) == "zone" ) THEN
-         idx_col = ccol
-         EXIT
-      ENDIF
-   ENDDO
 
-   ALLOCATE(scp(count))
    ALLOCATE(values(nccols))
    CALL default_sed_parm(scp)
 
    zon = 0
-   IF ( idx_col > 0 ) THEN
-      DO WHILE ( aed_csv_read_row(unit, values) )
-         zon = zon + 1
-         DO ccol=1,nccols
-            SELECT CASE (csvnames(ccol))
-                     !-- Sediment Physical Properties --!
-               CASE ('db0')                ; scp(zon)%db0                = extract_double(values(ccol))
-               CASE ('imix')               ; scp(zon)%imix               = extract_integer(values(ccol))
-               CASE ('xs')                 ; scp(zon)%xs                 = extract_double(values(ccol))
-               CASE ('x1')                 ; scp(zon)%x1                 = extract_double(values(ccol))
-               CASE ('x2')                 ; scp(zon)%x2                 = extract_double(values(ccol))
-               CASE ('irrg')               ; scp(zon)%irrg               = extract_integer(values(ccol))
-               CASE ('alpha0')             ; scp(zon)%alpha0             = extract_double(values(ccol))
-               CASE ('xirrig')             ; scp(zon)%xirrig             = extract_double(values(ccol))
-               CASE ('ventflow')           ; scp(zon)%ventflow           = extract_double(values(ccol))
-               CASE ('w00')                ; scp(zon)%w00                = extract_double(values(ccol))
-               CASE ('p0')                 ; scp(zon)%p0                 = extract_double(values(ccol))
-               CASE ('p00')                ; scp(zon)%p00                = extract_double(values(ccol))
-               CASE ('bp')                 ; scp(zon)%bp                 = extract_double(values(ccol))
-               CASE ('torteq')             ; scp(zon)%torteq             = extract_integer(values(ccol))
-               CASE ('an')                 ; scp(zon)%an                 = extract_double(values(ccol))
-               CASE ('aa')                 ; scp(zon)%aa                 = extract_double(values(ccol))
-               CASE ('ab')                 ; scp(zon)%ab                 = extract_double(values(ccol))
-               CASE ('xl')                 ; scp(zon)%xl                 = extract_double(values(ccol))
-               CASE ('maxnpts')            ; scp(zon)%maxnpts            = extract_integer(values(ccol))
+   DO WHILE ( aed_csv_read_row(unit, values) )
+      zon = zon + 1
+      DO ccol=1,nccols
+         SELECT CASE (csvnames(ccol))
+                  !-- Sediment Physical Properties --!
+            CASE ('db0')                ; scp(zon)%db0                = extract_double(values(ccol))
+            CASE ('imix')               ; scp(zon)%imix               = extract_integer(values(ccol))
+            CASE ('xs')                 ; scp(zon)%xs                 = extract_double(values(ccol))
+            CASE ('x1')                 ; scp(zon)%x1                 = extract_double(values(ccol))
+            CASE ('x2')                 ; scp(zon)%x2                 = extract_double(values(ccol))
+            CASE ('irrg')               ; scp(zon)%irrg               = extract_integer(values(ccol))
+            CASE ('alpha0')             ; scp(zon)%alpha0             = extract_double(values(ccol))
+            CASE ('xirrig')             ; scp(zon)%xirrig             = extract_double(values(ccol))
+            CASE ('ventflow')           ; scp(zon)%ventflow           = extract_double(values(ccol))
+            CASE ('w00')                ; scp(zon)%w00                = extract_double(values(ccol))
+            CASE ('p0')                 ; scp(zon)%p0                 = extract_double(values(ccol))
+            CASE ('p00')                ; scp(zon)%p00                = extract_double(values(ccol))
+            CASE ('bp')                 ; scp(zon)%bp                 = extract_double(values(ccol))
+            CASE ('torteq')             ; scp(zon)%torteq             = extract_integer(values(ccol))
+            CASE ('an')                 ; scp(zon)%an                 = extract_double(values(ccol))
+            CASE ('aa')                 ; scp(zon)%aa                 = extract_double(values(ccol))
+            CASE ('ab')                 ; scp(zon)%ab                 = extract_double(values(ccol))
+            CASE ('xl')                 ; scp(zon)%xl                 = extract_double(values(ccol))
+            CASE ('maxnpts')            ; scp(zon)%maxnpts            = extract_integer(values(ccol))
 
-                     !-- Biogeochemical Configuration --!
-               CASE ('numOM')              ; scp(zon)%numOM              = extract_integer(values(ccol))
-               CASE ('simDOM')             ; scp(zon)%simDOM             = extract_logical(values(ccol))
+                  !-- Biogeochemical Configuration --!
+            CASE ('numOM')              ; scp(zon)%numOM              = extract_integer(values(ccol))
+            CASE ('simDOM')             ; scp(zon)%simDOM             = extract_logical(values(ccol))
 
-               CASE ('OMapproach')         ; scp(zon)%OMapproach         = extract_integer(values(ccol))
-               CASE ('OMModel')            ; scp(zon)%OMModel            = extract_integer(values(ccol))  ! Dan added
-               CASE ('FTemswitch')         ; scp(zon)%FTemswitch         = extract_integer(values(ccol))  ! Dan added
-               CASE ('FTswitch')           ; scp(zon)%FTswitch           = extract_integer(values(ccol))  ! Dan added
-               CASE ('FBIOswitch')         ; scp(zon)%FBIOswitch         = extract_integer(values(ccol))  ! Dan added
-               CASE ('FINswitch')          ; scp(zon)%FINswitch          = extract_integer(values(ccol))  ! Dan added
-               CASE ('FInO2OnlySwitch')    ; scp(zon)%FInO2OnlySwitch    = extract_integer(values(ccol))
-               CASE ('FOMswitch')          ; scp(zon)%FOMswitch          = extract_integer(values(ccol))  ! Dan added
-               CASE ('Bsolidswitch')       ; scp(zon)%Bsolidswitch       = extract_integer(values(ccol))  ! Dan added
+            CASE ('OMapproach')         ; scp(zon)%OMapproach         = extract_integer(values(ccol))
+            CASE ('OMModel')            ; scp(zon)%OMModel            = extract_integer(values(ccol))  ! Dan added
+            CASE ('FTemswitch')         ; scp(zon)%FTemswitch         = extract_integer(values(ccol))  ! Dan added
+            CASE ('FTswitch')           ; scp(zon)%FTswitch           = extract_integer(values(ccol))  ! Dan added
+            CASE ('FBIOswitch')         ; scp(zon)%FBIOswitch         = extract_integer(values(ccol))  ! Dan added
+            CASE ('FINswitch')          ; scp(zon)%FINswitch          = extract_integer(values(ccol))  ! Dan added
+            CASE ('FInO2OnlySwitch')    ; scp(zon)%FInO2OnlySwitch    = extract_integer(values(ccol))
+            CASE ('FOMswitch')          ; scp(zon)%FOMswitch          = extract_integer(values(ccol))  ! Dan added
+            CASE ('Bsolidswitch')       ; scp(zon)%Bsolidswitch       = extract_integer(values(ccol))  ! Dan added
 
-               CASE ('simMnFe')            ; scp(zon)%simMnFe            = extract_logical(values(ccol))
-               CASE ('simFeS')             ; scp(zon)%simFeS             = extract_logical(values(ccol))
-               CASE ('simX')               ; scp(zon)%simX               = extract_logical(values(ccol))
-               CASE ('simCaCO3')           ; scp(zon)%simCaCO3           = extract_logical(values(ccol))
-               CASE ('simFeCO3')           ; scp(zon)%simFeCO3           = extract_logical(values(ccol))
-               CASE ('simMnCO3')           ; scp(zon)%simMnCO3           = extract_logical(values(ccol))
-               CASE ('simNPAds')           ; scp(zon)%simNPAds           = extract_logical(values(ccol))
+            CASE ('simMnFe')            ; scp(zon)%simMnFe            = extract_logical(values(ccol))
+            CASE ('simFeS')             ; scp(zon)%simFeS             = extract_logical(values(ccol))
+            CASE ('simX')               ; scp(zon)%simX               = extract_logical(values(ccol))
+            CASE ('simCaCO3')           ; scp(zon)%simCaCO3           = extract_logical(values(ccol))
+            CASE ('simFeCO3')           ; scp(zon)%simFeCO3           = extract_logical(values(ccol))
+            CASE ('simMnCO3')           ; scp(zon)%simMnCO3           = extract_logical(values(ccol))
+            CASE ('simNPAds')           ; scp(zon)%simNPAds           = extract_logical(values(ccol))
 
-                     !-- Reaction Rates --!                              !Rate constants - Dan
-                     !-- Organic matter decomposition
-                     !-- OMModel 1
-               CASE ('poml2dic')           ; scp(zon)%poml2dic           = extract_double(values(ccol))   ! Dan added
-               CASE ('pomr2dic')           ; scp(zon)%pomr2dic           = extract_double(values(ccol))   ! Dan added
-               CASE ('pomspecial2dic')     ; scp(zon)%pomspecial2dic     = extract_double(values(ccol))   ! Dan added
+                  !-- Reaction Rates --!                              !Rate constants - Dan
+                  !-- Organic matter decomposition
+                  !-- OMModel 1
+            CASE ('poml2dic')           ; scp(zon)%poml2dic           = extract_double(values(ccol))   ! Dan added
+            CASE ('pomr2dic')           ; scp(zon)%pomr2dic           = extract_double(values(ccol))   ! Dan added
+            CASE ('pomspecial2dic')     ; scp(zon)%pomspecial2dic     = extract_double(values(ccol))   ! Dan added
 
-                     !-- OMModel 2
-               CASE ('docl2dic')           ; scp(zon)%docl2dic           = extract_double(values(ccol))
-               CASE ('donl2din')           ; scp(zon)%donl2din           = extract_double(values(ccol))
-               CASE ('dopl2dip')           ; scp(zon)%dopl2dip           = extract_double(values(ccol))
-               CASE ('pocl2docl')          ; scp(zon)%pocl2docl          = extract_double(values(ccol))
-               CASE ('ponl2donl')          ; scp(zon)%ponl2donl          = extract_double(values(ccol))
-               CASE ('popl2dopl')          ; scp(zon)%popl2dopl          = extract_double(values(ccol))
-               CASE ('docr2docl')          ; scp(zon)%docr2docl          = extract_double(values(ccol))
-               CASE ('donr2donl')          ; scp(zon)%donr2donl          = extract_double(values(ccol))
-               CASE ('dopr2dopl')          ; scp(zon)%dopr2dopl          = extract_double(values(ccol))
-               CASE ('pocr2docr')          ; scp(zon)%pocr2docr          = extract_double(values(ccol))
-               CASE ('ponr2donr')          ; scp(zon)%ponr2donr          = extract_double(values(ccol))
-               CASE ('popr2dopr')          ; scp(zon)%popr2dopr          = extract_double(values(ccol))
-               CASE ('pocvr2docr')         ; scp(zon)%pocvr2docr         = extract_double(values(ccol))
-               CASE ('ponvr2donr')         ; scp(zon)%ponvr2donr         = extract_double(values(ccol))
-               CASE ('popvr2dopr')         ; scp(zon)%popvr2dopr         = extract_double(values(ccol))
+                  !-- OMModel 2
+            CASE ('docl2dic')           ; scp(zon)%docl2dic           = extract_double(values(ccol))
+            CASE ('donl2din')           ; scp(zon)%donl2din           = extract_double(values(ccol))
+            CASE ('dopl2dip')           ; scp(zon)%dopl2dip           = extract_double(values(ccol))
+            CASE ('pocl2docl')          ; scp(zon)%pocl2docl          = extract_double(values(ccol))
+            CASE ('ponl2donl')          ; scp(zon)%ponl2donl          = extract_double(values(ccol))
+            CASE ('popl2dopl')          ; scp(zon)%popl2dopl          = extract_double(values(ccol))
+            CASE ('docr2docl')          ; scp(zon)%docr2docl          = extract_double(values(ccol))
+            CASE ('donr2donl')          ; scp(zon)%donr2donl          = extract_double(values(ccol))
+            CASE ('dopr2dopl')          ; scp(zon)%dopr2dopl          = extract_double(values(ccol))
+            CASE ('pocr2docr')          ; scp(zon)%pocr2docr          = extract_double(values(ccol))
+            CASE ('ponr2donr')          ; scp(zon)%ponr2donr          = extract_double(values(ccol))
+            CASE ('popr2dopr')          ; scp(zon)%popr2dopr          = extract_double(values(ccol))
+            CASE ('pocvr2docr')         ; scp(zon)%pocvr2docr         = extract_double(values(ccol))
+            CASE ('ponvr2donr')         ; scp(zon)%ponvr2donr         = extract_double(values(ccol))
+            CASE ('popvr2dopr')         ; scp(zon)%popvr2dopr         = extract_double(values(ccol))
 
-                     !-- OMModel 3
- !##           CASE ('dHyd2dic')           ; scp(zon)%dHyd2dic           = extract_double(values(ccol))   ! Dan added
- !##           CASE ('dFer2dic             ; scp(zon)%dFer2dic           = extract_double(values(ccol))   ! Dan added
- !##           CASE ('poml2dic             ; scp(zon)%poml2dic           = extract_double(values(ccol))   ! Dan added
-               CASE ('domr2dic')           ; scp(zon)%domr2dic           = extract_double(values(ccol))   ! Dan added
- !##           CASE ('dHyd2dFer            ; scp(zon)%dHyd2dFer          = extract_double(values(ccol))   ! Dan added
- !##           CASE ('dHyd2domr')          ; scp(zon)%dHyd2domr          = extract_double(values(ccol))   ! Dan added
-               CASE ('domr2pomr')          ; scp(zon)%domr2pomr          = extract_double(values(ccol))   ! Dan added
-               CASE ('poml2doml')          ; scp(zon)%poml2doml          = extract_double(values(ccol))   ! Dan added
- !##           CASE ('dFer2domr            ; scp(zon)%poml2doml          = extract_double(values(ccol))   ! Dan added
+                  !-- OMModel 3
+!##         CASE ('dHyd2dic')           ; scp(zon)%dHyd2dic           = extract_double(values(ccol))   ! Dan added
+!##         CASE ('dFer2dic')           ; scp(zon)%dFer2dic           = extract_double(values(ccol))   ! Dan added
+            CASE ('domr2dic')           ; scp(zon)%domr2dic           = extract_double(values(ccol))   ! Dan added
+!##         CASE ('dHyd2dFer')          ; scp(zon)%dHyd2dFer          = extract_double(values(ccol))   ! Dan added
+!##         CASE ('dHyd2domr')          ; scp(zon)%dHyd2domr          = extract_double(values(ccol))   ! Dan added
+            CASE ('domr2pomr')          ; scp(zon)%domr2pomr          = extract_double(values(ccol))   ! Dan added
+            CASE ('poml2doml')          ; scp(zon)%poml2doml          = extract_double(values(ccol))   ! Dan added
+            CASE ('dFer2domr')          ; scp(zon)%poml2doml          = extract_double(values(ccol))   ! Dan added
 
                      ! Stoichiometric coefficients
                      ! OM model 1
 
-               CASE ('FTR')                ; scp(zon)%FTR                = extract_double(values(ccol))   ! Dan added
-               CASE ('FTT')                ; scp(zon)%FTT                = extract_double(values(ccol))   ! Dan added
-               CASE ('deltaGATP')          ; scp(zon)%deltaGATP          = extract_double(values(ccol))   ! Dan added
-               CASE ('dG0FerDHyd')         ; scp(zon)%dG0FerDHyd         = extract_double(values(ccol))
-               CASE ('dG0AerDHy')          ; scp(zon)%dG0AerDHy          = extract_double(values(ccol))
-               CASE ('dG0AerOAc')          ; scp(zon)%dG0AerOAc          = extract_double(values(ccol))
-               CASE ('dG0DenDHy')          ; scp(zon)%dG0DenDHy          = extract_double(values(ccol))
-               CASE ('dG0DenOAc')          ; scp(zon)%dG0DenOAc          = extract_double(values(ccol))
-               CASE ('dG0DenH2')           ; scp(zon)%dG0DenH2           = extract_double(values(ccol))
-               CASE ('dG0ManOAc')          ; scp(zon)%dG0ManOAc          = extract_double(values(ccol))
-               CASE ('dG0IroOAc')          ; scp(zon)%dG0IroOAc          = extract_double(values(ccol))
-               CASE ('dG0IroH2')           ; scp(zon)%dG0IroH2           = extract_double(values(ccol))
-               CASE ('dG0SulOAc')          ; scp(zon)%dG0SulOAc          = extract_double(values(ccol))
-               CASE ('dG0SulH2')           ; scp(zon)%dG0SulH2           = extract_double(values(ccol))
-               CASE ('dG0MetOAc')          ; scp(zon)%dG0MetOAc          = extract_double(values(ccol))
-               CASE ('dG0MetH2')           ; scp(zon)%dG0MetH2           = extract_double(values(ccol))
+            CASE ('FTR')                ; scp(zon)%FTR                = extract_double(values(ccol))   ! Dan added
+            CASE ('FTT')                ; scp(zon)%FTT                = extract_double(values(ccol))   ! Dan added
+            CASE ('deltaGATP')          ; scp(zon)%deltaGATP          = extract_double(values(ccol))   ! Dan added
+            CASE ('dG0FerDHyd')         ; scp(zon)%dG0FerDHyd         = extract_double(values(ccol))
+            CASE ('dG0AerDHy')          ; scp(zon)%dG0AerDHy          = extract_double(values(ccol))
+            CASE ('dG0AerOAc')          ; scp(zon)%dG0AerOAc          = extract_double(values(ccol))
+            CASE ('dG0DenDHy')          ; scp(zon)%dG0DenDHy          = extract_double(values(ccol))
+            CASE ('dG0DenOAc')          ; scp(zon)%dG0DenOAc          = extract_double(values(ccol))
+            CASE ('dG0DenH2')           ; scp(zon)%dG0DenH2           = extract_double(values(ccol))
+            CASE ('dG0ManOAc')          ; scp(zon)%dG0ManOAc          = extract_double(values(ccol))
+            CASE ('dG0ManH2')           ; scp(zon)%dG0ManH2           = extract_double(values(ccol))
+            CASE ('dG0IroOAc')          ; scp(zon)%dG0IroOAc          = extract_double(values(ccol))
+            CASE ('dG0IroH2')           ; scp(zon)%dG0IroH2           = extract_double(values(ccol))
+            CASE ('dG0SulOAc')          ; scp(zon)%dG0SulOAc          = extract_double(values(ccol))
+            CASE ('dG0SulH2')           ; scp(zon)%dG0SulH2           = extract_double(values(ccol))
+            CASE ('dG0MetOAc')          ; scp(zon)%dG0MetOAc          = extract_double(values(ccol))
+            CASE ('dG0MetH2')           ; scp(zon)%dG0MetH2           = extract_double(values(ccol))
 
-               CASE ('kgrowthFer')         ; scp(zon)%kgrowthFer         = extract_double(values(ccol))
-               CASE ('kgrowthAer')         ; scp(zon)%kgrowthAer         = extract_double(values(ccol))
-               CASE ('kgrowthDen')         ; scp(zon)%kgrowthDen         = extract_double(values(ccol))
-               CASE ('kgrowthMan')         ; scp(zon)%kgrowthMan         = extract_double(values(ccol))
-               CASE ('kgrowthIro')         ; scp(zon)%kgrowthIro         = extract_double(values(ccol))
-               CASE ('kgrowthSul')         ; scp(zon)%kgrowthSul         = extract_double(values(ccol))
-               CASE ('kgrowthMet')         ; scp(zon)%kgrowthMet         = extract_double(values(ccol))
-               CASE ('kdeathFer')          ; scp(zon)%kdeathFer          = extract_double(values(ccol))
-               CASE ('kdeathAer')          ; scp(zon)%kdeathAer          = extract_double(values(ccol))
-               CASE ('kdeathDen')          ; scp(zon)%kdeathDen          = extract_double(values(ccol))
-               CASE ('kdeathMan')          ; scp(zon)%kdeathMan          = extract_double(values(ccol))
-               CASE ('kdeathIro')          ; scp(zon)%kdeathIro          = extract_double(values(ccol))
-               CASE ('kdeathSul')          ; scp(zon)%kdeathSul          = extract_double(values(ccol))
-               CASE ('kdeathMet')          ; scp(zon)%kdeathMet          = extract_double(values(ccol))
+            CASE ('kgrowthFer')         ; scp(zon)%kgrowthFer         = extract_double(values(ccol))
+            CASE ('kgrowthAer')         ; scp(zon)%kgrowthAer         = extract_double(values(ccol))
+            CASE ('kgrowthDen')         ; scp(zon)%kgrowthDen         = extract_double(values(ccol))
+            CASE ('kgrowthMan')         ; scp(zon)%kgrowthMan         = extract_double(values(ccol))
+            CASE ('kgrowthIro')         ; scp(zon)%kgrowthIro         = extract_double(values(ccol))
+            CASE ('kgrowthSul')         ; scp(zon)%kgrowthSul         = extract_double(values(ccol))
+            CASE ('kgrowthMet')         ; scp(zon)%kgrowthMet         = extract_double(values(ccol))
+            CASE ('kdeathFer')          ; scp(zon)%kdeathFer          = extract_double(values(ccol))
+            CASE ('kdeathAer')          ; scp(zon)%kdeathAer          = extract_double(values(ccol))
+            CASE ('kdeathDen')          ; scp(zon)%kdeathDen          = extract_double(values(ccol))
+            CASE ('kdeathMan')          ; scp(zon)%kdeathMan          = extract_double(values(ccol))
+            CASE ('kdeathIro')          ; scp(zon)%kdeathIro          = extract_double(values(ccol))
+            CASE ('kdeathSul')          ; scp(zon)%kdeathSul          = extract_double(values(ccol))
+            CASE ('kdeathMet')          ; scp(zon)%kdeathMet          = extract_double(values(ccol))
 
-               CASE ('kHyd1')              ; scp(zon)%kHyd1              = extract_double(values(ccol))
-               CASE ('kHyd2')              ; scp(zon)%kHyd2              = extract_double(values(ccol))
-               CASE ('kHyd3')              ; scp(zon)%kHyd3              = extract_double(values(ccol))
-               CASE ('kHyd4')              ; scp(zon)%kHyd4              = extract_double(values(ccol))
-               CASE ('kHydN')              ; scp(zon)%kHydN              = extract_double(values(ccol))
-               CASE ('CellWeight')         ; scp(zon)%CellWeight         = extract_double(values(ccol))
-               CASE ('fuse')               ; scp(zon)%fuse               = extract_double(values(ccol))
-               CASE ('Tiny')               ; scp(zon)%Tiny               = extract_double(values(ccol))
-               CASE ('Temporary_proton')   ; scp(zon)%Temporary_proton   = extract_double(values(ccol))
-               CASE ('BMax')               ; scp(zon)%BMax               = extract_double(values(ccol))
-               CASE ('e')                  ; scp(zon)%e                  = extract_double(values(ccol))
-               CASE ('F')                  ; scp(zon)%F                  = extract_double(values(ccol))
-               CASE ('n')                  ; scp(zon)%n                  = extract_double(values(ccol))
-               CASE ('dPsi')               ; scp(zon)%dPsi               = extract_double(values(ccol))
-               CASE ('KDHyd')              ; scp(zon)%KDHyd              = extract_double(values(ccol))
-               CASE ('KOAc')               ; scp(zon)%KOAc               = extract_double(values(ccol))
-               CASE ('KH2')                ; scp(zon)%KH2                = extract_double(values(ccol))
-               CASE ('YDHyAer')            ; scp(zon)%YDHyAer            = extract_double(values(ccol))
-               CASE ('YDHyFer')            ; scp(zon)%YDHyFer            = extract_double(values(ccol))
-               CASE ('YDenDHy')            ; scp(zon)%YDenDHy            = extract_double(values(ccol))
-               CASE ('YAerOAc')            ; scp(zon)%YAerOAc            = extract_double(values(ccol))
-               CASE ('YDenOAc')            ; scp(zon)%YDenOAc            = extract_double(values(ccol))
-               CASE ('YDenH2')             ; scp(zon)%YDenH2             = extract_double(values(ccol))
-               CASE ('YManOAc')            ; scp(zon)%YManOAc            = extract_double(values(ccol))
-               CASE ('YIroOAc')            ; scp(zon)%YIroOAc            = extract_double(values(ccol))
-               CASE ('YIroH2')             ; scp(zon)%YIroH2             = extract_double(values(ccol))
-               CASE ('YSulOAc')            ; scp(zon)%YSulOAc            = extract_double(values(ccol))
-               CASE ('YSulH2')             ; scp(zon)%YSulH2             = extract_double(values(ccol))
-               CASE ('YMetOAc')            ; scp(zon)%YMetOAc            = extract_double(values(ccol))
-               CASE ('YMetH2')             ; scp(zon)%YMetH2             = extract_double(values(ccol))
+            CASE ('kHyd1')              ; scp(zon)%kHyd1              = extract_double(values(ccol))
+            CASE ('kHyd2')              ; scp(zon)%kHyd2              = extract_double(values(ccol))
+            CASE ('kHyd3')              ; scp(zon)%kHyd3              = extract_double(values(ccol))
+            CASE ('kHyd4')              ; scp(zon)%kHyd4              = extract_double(values(ccol))
+            CASE ('kHydN')              ; scp(zon)%kHydN              = extract_double(values(ccol))
+            CASE ('CellWeight')         ; scp(zon)%CellWeight         = extract_double(values(ccol))
+            CASE ('fuse')               ; scp(zon)%fuse               = extract_double(values(ccol))
+            CASE ('Tiny')               ; scp(zon)%Tiny               = extract_double(values(ccol))
+            CASE ('Temporary_proton')   ; scp(zon)%Temporary_proton   = extract_double(values(ccol))
+            CASE ('BMax')               ; scp(zon)%BMax               = extract_double(values(ccol))
+            CASE ('e')                  ; scp(zon)%e                  = extract_double(values(ccol))
+            CASE ('F')                  ; scp(zon)%F                  = extract_double(values(ccol))
+            CASE ('n')                  ; scp(zon)%n                  = extract_double(values(ccol))
+            CASE ('dPsi')               ; scp(zon)%dPsi               = extract_double(values(ccol))
+            CASE ('KDHyd')              ; scp(zon)%KDHyd              = extract_double(values(ccol))
+            CASE ('KOAc')               ; scp(zon)%KOAc               = extract_double(values(ccol))
+            CASE ('KH2')                ; scp(zon)%KH2                = extract_double(values(ccol))
+            CASE ('YDHyAer')            ; scp(zon)%YDHyAer            = extract_double(values(ccol))
+            CASE ('YDHyFer')            ; scp(zon)%YDHyFer            = extract_double(values(ccol))
+            CASE ('YDenDHy')            ; scp(zon)%YDenDHy            = extract_double(values(ccol))
+            CASE ('YAerOAc')            ; scp(zon)%YAerOAc            = extract_double(values(ccol))
+            CASE ('YDenOAc')            ; scp(zon)%YDenOAc            = extract_double(values(ccol))
+            CASE ('YDenH2')             ; scp(zon)%YDenH2             = extract_double(values(ccol))
+            CASE ('YManH2')             ; scp(zon)%YManH2             = extract_double(values(ccol))
+            CASE ('YManOAc')            ; scp(zon)%YManOAc            = extract_double(values(ccol))
+            CASE ('YIroOAc')            ; scp(zon)%YIroOAc            = extract_double(values(ccol))
+            CASE ('YIroH2')             ; scp(zon)%YIroH2             = extract_double(values(ccol))
+            CASE ('YSulOAc')            ; scp(zon)%YSulOAc            = extract_double(values(ccol))
+            CASE ('YSulH2')             ; scp(zon)%YSulH2             = extract_double(values(ccol))
+            CASE ('YMetOAc')            ; scp(zon)%YMetOAc            = extract_double(values(ccol))
+            CASE ('YMetH2')             ; scp(zon)%YMetH2             = extract_double(values(ccol))
 
-               CASE ('knh4ox')             ; scp(zon)%knh4ox             = extract_double(values(ccol))
-               CASE ('ktsno3')             ; scp(zon)%ktsno3             = extract_double(values(ccol))
-               CASE ('ktsox')              ; scp(zon)%ktsox              = extract_double(values(ccol))
-               CASE ('kmnox')              ; scp(zon)%kmnox              = extract_double(values(ccol))
-               CASE ('kmnno3')             ; scp(zon)%kmnno3             = extract_double(values(ccol))
-               CASE ('kfeox')              ; scp(zon)%kfeox              = extract_double(values(ccol))
-               CASE ('kfesox')             ; scp(zon)%kfesox             = extract_double(values(ccol))
-               CASE ('kfes2ox')            ; scp(zon)%kfes2ox            = extract_double(values(ccol))
- !##           CASE ('kfe1ox')             ; scp(zon)%kfe1ox             = extract_double(values(ccol))
- !##           CASE ('kfe2ox')             ; scp(zon)%kfe2ox             = extract_double(values(ccol))
-               CASE ('kfeAge')             ; scp(zon)%kfeAge             = extract_double(values(ccol))
-               CASE ('kmnAge')             ; scp(zon)%kmnAge             = extract_double(values(ccol))
-               CASE ('kfeno3')             ; scp(zon)%kfeno3             = extract_double(values(ccol))
- !##           CASE ('kfe2no3')            ; scp(zon)%kfe2no3            = extract_double(values(ccol))
-               CASE ('kfesmn')             ; scp(zon)%kfesmn             = extract_double(values(ccol))
-               CASE ('kfesfe')             ; scp(zon)%kfesfe             = extract_double(values(ccol))
-               CASE ('kfesppt')            ; scp(zon)%kfesppt            = extract_double(values(ccol))
-               CASE ('ktsfe')              ; scp(zon)%ktsfe              = extract_double(values(ccol))
-               CASE ('kpyrite')            ; scp(zon)%kpyrite            = extract_double(values(ccol))
-               CASE ('kmnfe')              ; scp(zon)%kmnfe              = extract_double(values(ccol))
-               CASE ('ktsmn')              ; scp(zon)%ktsmn              = extract_double(values(ccol))
-               CASE ('kch4ox')             ; scp(zon)%kch4ox             = extract_double(values(ccol))
-               CASE ('kch4so4')            ; scp(zon)%kch4so4            = extract_double(values(ccol))
-               CASE ('ko2')                ; scp(zon)%ko2                = extract_double(values(ccol))
-               CASE ('kpo2')               ; scp(zon)%kpo2               = extract_double(values(ccol))
-               CASE ('kno3')               ; scp(zon)%kno3               = extract_double(values(ccol))
-               CASE ('kpno3')              ; scp(zon)%kpno3              = extract_double(values(ccol))
-               CASE ('kmn')                ; scp(zon)%kmn                = extract_double(values(ccol))
-               CASE ('kpmn')               ; scp(zon)%kpmn               = extract_double(values(ccol))
-               CASE ('kfe')                ; scp(zon)%kfe                = extract_double(values(ccol))
-               CASE ('kpfe')               ; scp(zon)%kpfe               = extract_double(values(ccol))
-               CASE ('kso4')               ; scp(zon)%kso4               = extract_double(values(ccol))
-               CASE ('kpso4')              ; scp(zon)%kpso4              = extract_double(values(ccol))
-               CASE ('lo2')                ; scp(zon)%lo2                = extract_double(values(ccol))
-               CASE ('lpo2')               ; scp(zon)%lpo2               = extract_double(values(ccol))
-               CASE ('lno3')               ; scp(zon)%lno3               = extract_double(values(ccol))
-               CASE ('lpno3')              ; scp(zon)%lpno3              = extract_double(values(ccol))
-               CASE ('lmn')                ; scp(zon)%lmn                = extract_double(values(ccol))
-               CASE ('lpmn')               ; scp(zon)%lpmn               = extract_double(values(ccol))
-               CASE ('lfe')                ; scp(zon)%lfe                = extract_double(values(ccol))
-               CASE ('lpfe')               ; scp(zon)%lpfe               = extract_double(values(ccol))
-               CASE ('lso4')               ; scp(zon)%lso4               = extract_double(values(ccol))
-               CASE ('lpso4')              ; scp(zon)%lpso4              = extract_double(values(ccol))
-               CASE ('kanh4')              ; scp(zon)%kanh4              = extract_double(values(ccol))
-               CASE ('kapo4')              ; scp(zon)%kapo4              = extract_double(values(ccol))
+            CASE ('knh4ox')             ; scp(zon)%knh4ox             = extract_double(values(ccol))
+            CASE ('ktsno3')             ; scp(zon)%ktsno3             = extract_double(values(ccol))
+            CASE ('ktsox')              ; scp(zon)%ktsox              = extract_double(values(ccol))
+            CASE ('kmnox')              ; scp(zon)%kmnox              = extract_double(values(ccol))
+            CASE ('kmnno3')             ; scp(zon)%kmnno3             = extract_double(values(ccol))
+            CASE ('kfeox')              ; scp(zon)%kfeox              = extract_double(values(ccol))
+            CASE ('kfesox')             ; scp(zon)%kfesox             = extract_double(values(ccol))
+            CASE ('kfes2ox')            ; scp(zon)%kfes2ox            = extract_double(values(ccol))
+!##         CASE ('kfe1ox')             ; scp(zon)%kfe1ox             = extract_double(values(ccol))
+!##         CASE ('kfe2ox')             ; scp(zon)%kfe2ox             = extract_double(values(ccol))
+            CASE ('kfeAge')             ; scp(zon)%kfeAge             = extract_double(values(ccol))
+            CASE ('kmnAge')             ; scp(zon)%kmnAge             = extract_double(values(ccol))
+            CASE ('kfeno3')             ; scp(zon)%kfeno3             = extract_double(values(ccol))
+!##         CASE ('kfe2no3')            ; scp(zon)%kfe2no3            = extract_double(values(ccol))
+            CASE ('kfesmn')             ; scp(zon)%kfesmn             = extract_double(values(ccol))
+            CASE ('kfesfe')             ; scp(zon)%kfesfe             = extract_double(values(ccol))
+            CASE ('kfesppt')            ; scp(zon)%kfesppt            = extract_double(values(ccol))
+            CASE ('ktsfe')              ; scp(zon)%ktsfe              = extract_double(values(ccol))
+            CASE ('kpyrite')            ; scp(zon)%kpyrite            = extract_double(values(ccol))
+            CASE ('kmnfe')              ; scp(zon)%kmnfe              = extract_double(values(ccol))
+            CASE ('ktsmn')              ; scp(zon)%ktsmn              = extract_double(values(ccol))
+            CASE ('kch4ox')             ; scp(zon)%kch4ox             = extract_double(values(ccol))
+            CASE ('kch4so4')            ; scp(zon)%kch4so4            = extract_double(values(ccol))
+            CASE ('ko2')                ; scp(zon)%ko2                = extract_double(values(ccol))
+            CASE ('kpo2')               ; scp(zon)%kpo2               = extract_double(values(ccol))
+            CASE ('kno3')               ; scp(zon)%kno3               = extract_double(values(ccol))
+            CASE ('kpno3')              ; scp(zon)%kpno3              = extract_double(values(ccol))
+            CASE ('kmn')                ; scp(zon)%kmn                = extract_double(values(ccol))
+            CASE ('kpmn')               ; scp(zon)%kpmn               = extract_double(values(ccol))
+            CASE ('kfe')                ; scp(zon)%kfe                = extract_double(values(ccol))
+            CASE ('kpfe')               ; scp(zon)%kpfe               = extract_double(values(ccol))
+            CASE ('kso4')               ; scp(zon)%kso4               = extract_double(values(ccol))
+            CASE ('kpso4')              ; scp(zon)%kpso4              = extract_double(values(ccol))
+            CASE ('lo2')                ; scp(zon)%lo2                = extract_double(values(ccol))
+            CASE ('lpo2')               ; scp(zon)%lpo2               = extract_double(values(ccol))
+            CASE ('lno3')               ; scp(zon)%lno3               = extract_double(values(ccol))
+            CASE ('lpno3')              ; scp(zon)%lpno3              = extract_double(values(ccol))
+            CASE ('lmn')                ; scp(zon)%lmn                = extract_double(values(ccol))
+            CASE ('lpmn')               ; scp(zon)%lpmn               = extract_double(values(ccol))
+            CASE ('lfe')                ; scp(zon)%lfe                = extract_double(values(ccol))
+            CASE ('lpfe')               ; scp(zon)%lpfe               = extract_double(values(ccol))
+            CASE ('lso4')               ; scp(zon)%lso4               = extract_double(values(ccol))
+            CASE ('lpso4')              ; scp(zon)%lpso4              = extract_double(values(ccol))
+            CASE ('kanh4')              ; scp(zon)%kanh4              = extract_double(values(ccol))
+            CASE ('kapo4')              ; scp(zon)%kapo4              = extract_double(values(ccol))
 
-               CASE ('kSidppt')            ; scp(zon)%kSidppt            = extract_double(values(ccol))
-               CASE ('kCalppt')            ; scp(zon)%kCalppt            = extract_double(values(ccol))
-               CASE ('kRodppt')            ; scp(zon)%kRodppt            = extract_double(values(ccol))
-               CASE ('kMnO2Appt')          ; scp(zon)%kMnO2Appt          = extract_double(values(ccol))
-               CASE ('kMnO2Bppt')          ; scp(zon)%kMnO2Bppt          = extract_double(values(ccol))
-               CASE ('kFeOHAppt')          ; scp(zon)%kFeOHAppt          = extract_double(values(ccol))
-               CASE ('kFeOHBppt')          ; scp(zon)%kFeOHBppt          = extract_double(values(ccol))
+            CASE ('kSidppt')            ; scp(zon)%kSidppt            = extract_double(values(ccol))
+            CASE ('kCalppt')            ; scp(zon)%kCalppt            = extract_double(values(ccol))
+            CASE ('kRodppt')            ; scp(zon)%kRodppt            = extract_double(values(ccol))
+            CASE ('kMnO2Appt')          ; scp(zon)%kMnO2Appt          = extract_double(values(ccol))
+            CASE ('kMnO2Bppt')          ; scp(zon)%kMnO2Bppt          = extract_double(values(ccol))
+            CASE ('kFeOHAppt')          ; scp(zon)%kFeOHAppt          = extract_double(values(ccol))
+            CASE ('kFeOHBppt')          ; scp(zon)%kFeOHBppt          = extract_double(values(ccol))
 
-               CASE ('Xname')              ; scp(zon)%Xname              = extract_string(values(ccol))
-               CASE ('Xmk')                ; scp(zon)%Xmk                = extract_double(values(ccol))
-               CASE ('Xfl')                ; scp(zon)%Xfl                = extract_double(values(ccol))
-               CASE ('Xfm')                ; scp(zon)%Xfm                = extract_double(values(ccol))
-               CASE ('kXSppt')             ; scp(zon)%kXSppt             = extract_double(values(ccol))
-               CASE ('rxn_mode')           ; scp(zon)%rxn_mode           = extract_integer(values(ccol))
-               CASE ('PO4AdsorptionModel') ; scp(zon)%PO4AdsorptionModel = extract_integer(values(ccol))
-               CASE ('KPO4p')              ; scp(zon)%KPO4p              = extract_double(values(ccol))
-               CASE ('Kadsratio')          ; scp(zon)%Kadsratio          = extract_double(values(ccol))
-               CASE ('Qmax')               ; scp(zon)%Qmax               = extract_double(values(ccol))
-               CASE ('ads_use_pH')         ; scp(zon)%ads_use_pH         = extract_logical(values(ccol))
-               CASE DEFAULT ; print *, 'Unknown column ', TRIM(csvnames(ccol))
-            END SELECT
-         ENDDO
+            CASE ('Xname')              ; scp(zon)%Xname              = extract_string(values(ccol))
+            CASE ('Xmk')                ; scp(zon)%Xmk                = extract_double(values(ccol))
+            CASE ('Xfl')                ; scp(zon)%Xfl                = extract_double(values(ccol))
+            CASE ('Xfm')                ; scp(zon)%Xfm                = extract_double(values(ccol))
+            CASE ('kXSppt')             ; scp(zon)%kXSppt             = extract_double(values(ccol))
+            CASE ('rxn_mode')           ; scp(zon)%rxn_mode           = extract_integer(values(ccol))
+            CASE ('PO4AdsorptionModel') ; scp(zon)%PO4AdsorptionModel = extract_integer(values(ccol))
+            CASE ('KPO4p')              ; scp(zon)%KPO4p              = extract_double(values(ccol))
+            CASE ('Kadsratio')          ; scp(zon)%Kadsratio          = extract_double(values(ccol))
+            CASE ('Qmax')               ; scp(zon)%Qmax               = extract_double(values(ccol))
+            CASE ('ads_use_pH')         ; scp(zon)%ads_use_pH         = extract_logical(values(ccol))
+
+            CASE ('density')            ; scp(zon)%density            = extract_double(values(ccol))
+            CASE ('job')                ; scp(zon)%job                = extract_double(values(ccol))
+            CASE ('FInO2Onlyswitch')    ; scp(zon)%FInO2Onlyswitch    = extract_double(values(ccol))
+            CASE ('VCW')                ; scp(zon)%VCW                = extract_logical(values(ccol))
+            CASE ('R0')                 ; scp(zon)%R0                 = extract_double(values(ccol))
+            CASE ('VCWBeta')            ; scp(zon)%VCWBeta            = extract_double(values(ccol))
+            CASE ('BMin')               ; scp(zon)%BMin               = extract_double(values(ccol))
+            CASE ('Cellweight')         ; scp(zon)%Cellweight         = extract_double(values(ccol))
+            CASE ('xlab')               ; scp(zon)%xlab               = extract_double(values(ccol))
+            CASE ('xref')               ; scp(zon)%xref               = extract_double(values(ccol))
+            CASE ('xspecial')           ; scp(zon)%xspecial           = extract_double(values(ccol))
+            CASE ('ylab')               ; scp(zon)%ylab               = extract_double(values(ccol))
+            CASE ('yref')               ; scp(zon)%yref               = extract_double(values(ccol))
+            CASE ('yspecial')           ; scp(zon)%yspecial           = extract_double(values(ccol))
+            CASE ('zlab')               ; scp(zon)%zlab               = extract_double(values(ccol))
+            CASE ('zref')               ; scp(zon)%zref               = extract_double(values(ccol))
+            CASE ('zspecial')           ; scp(zon)%zspecial           = extract_double(values(ccol))
+            CASE ('XMetal_lab')         ; scp(zon)%XMetal_lab         = extract_double(values(ccol))
+            CASE ('XMetal_ref')         ; scp(zon)%XMetal_ref         = extract_double(values(ccol))
+            CASE ('XMetal_special')     ; scp(zon)%XMetal_special     = extract_double(values(ccol))
+            CASE ('xPOM1')              ; scp(zon)%xPOM1              = extract_double(values(ccol))
+            CASE ('yPOM1')              ; scp(zon)%yPOM1              = extract_double(values(ccol))
+            CASE ('zPOM1')              ; scp(zon)%zPOM1              = extract_double(values(ccol))
+            CASE ('XMetal_POM1')        ; scp(zon)%XMetal_POM1        = extract_double(values(ccol))
+            CASE ('xPOM2')              ; scp(zon)%xPOM2              = extract_double(values(ccol))
+            CASE ('yPOM2')              ; scp(zon)%yPOM2              = extract_double(values(ccol))
+            CASE ('zPOM2')              ; scp(zon)%zPOM2              = extract_double(values(ccol))
+            CASE ('XMetal_POM2')        ; scp(zon)%XMetal_POM2        = extract_double(values(ccol))
+            CASE ('xPOM3')              ; scp(zon)%xPOM3              = extract_double(values(ccol))
+            CASE ('yPOM3')              ; scp(zon)%yPOM3              = extract_double(values(ccol))
+            CASE ('zPOM3')              ; scp(zon)%zPOM3              = extract_double(values(ccol))
+            CASE ('XMetal_POM3')        ; scp(zon)%XMetal_POM3        = extract_double(values(ccol))
+            CASE ('xPOM4')              ; scp(zon)%xPOM4              = extract_double(values(ccol))
+            CASE ('yPOM4')              ; scp(zon)%yPOM4              = extract_double(values(ccol))
+            CASE ('zPOM4')              ; scp(zon)%zPOM4              = extract_double(values(ccol))
+            CASE ('XMetal_POM4')        ; scp(zon)%XMetal_POM4        = extract_double(values(ccol))
+            CASE ('xDHyd')              ; scp(zon)%xDHyd              = extract_double(values(ccol))
+            CASE ('yDHyd')              ; scp(zon)%yDHyd              = extract_double(values(ccol))
+            CASE ('zDHyd')              ; scp(zon)%zDHyd              = extract_double(values(ccol))
+            CASE ('XMetal_DHyd')        ; scp(zon)%XMetal_DHyd        = extract_double(values(ccol))
+            CASE ('xOAc')               ; scp(zon)%xOAc               = extract_double(values(ccol))
+            CASE ('yOAc')               ; scp(zon)%yOAc               = extract_double(values(ccol))
+            CASE ('zOAc')               ; scp(zon)%zOAc               = extract_double(values(ccol))
+            CASE ('xH2')                ; scp(zon)%xH2                = extract_double(values(ccol))
+            CASE ('yH2')                ; scp(zon)%yH2                = extract_double(values(ccol))
+            CASE ('zH2')                ; scp(zon)%zH2                = extract_double(values(ccol))
+            CASE ('kNH4OX')             ; scp(zon)%kNH4OX             = extract_double(values(ccol))
+            CASE ('kTSNO3')             ; scp(zon)%kTSNO3             = extract_double(values(ccol))
+            CASE ('kTSOX')              ; scp(zon)%kTSOX              = extract_double(values(ccol))
+            CASE ('kMnOX')              ; scp(zon)%kMnOX              = extract_double(values(ccol))
+            CASE ('kMnadsOx')           ; scp(zon)%kMnadsOx           = extract_double(values(ccol))
+            CASE ('kMnNO3')             ; scp(zon)%kMnNO3             = extract_double(values(ccol))
+            CASE ('kFeOX')              ; scp(zon)%kFeOX              = extract_double(values(ccol))
+            CASE ('kFeadsOX')           ; scp(zon)%kFeadsOX           = extract_double(values(ccol))
+            CASE ('kFeSOX')             ; scp(zon)%kFeSOX             = extract_double(values(ccol))
+            CASE ('kFeS2OX')            ; scp(zon)%kFeS2OX            = extract_double(values(ccol))
+            CASE ('kMnAge')             ; scp(zon)%kMnAge             = extract_double(values(ccol))
+            CASE ('kFeAge')             ; scp(zon)%kFeAge             = extract_double(values(ccol))
+            CASE ('kFeNO3')             ; scp(zon)%kFeNO3             = extract_double(values(ccol))
+            CASE ('kFeSMn')             ; scp(zon)%kFeSMn             = extract_double(values(ccol))
+            CASE ('kFeSFe')             ; scp(zon)%kFeSFe             = extract_double(values(ccol))
+            CASE ('kFeSppt')            ; scp(zon)%kFeSppt            = extract_double(values(ccol))
+            CASE ('kFeSdis')            ; scp(zon)%kFeSdis            = extract_double(values(ccol))
+            CASE ('kTSFe')              ; scp(zon)%kTSFe              = extract_double(values(ccol))
+            CASE ('kPyrite')            ; scp(zon)%kPyrite            = extract_double(values(ccol))
+            CASE ('kMnFe')              ; scp(zon)%kMnFe              = extract_double(values(ccol))
+            CASE ('kTSMn')              ; scp(zon)%kTSMn              = extract_double(values(ccol))
+            CASE ('kCH4OX')             ; scp(zon)%kCH4OX             = extract_double(values(ccol))
+            CASE ('kCH4SO4')            ; scp(zon)%kCH4SO4            = extract_double(values(ccol))
+            CASE ('kSiddis')            ; scp(zon)%kSiddis            = extract_double(values(ccol))
+            CASE ('kRoddis')            ; scp(zon)%kRoddis            = extract_double(values(ccol))
+            CASE ('kO2')                ; scp(zon)%kO2                = extract_double(values(ccol))
+            CASE ('kpO2')               ; scp(zon)%kpO2               = extract_double(values(ccol))
+            CASE ('kNO3')               ; scp(zon)%kNO3               = extract_double(values(ccol))
+            CASE ('kpNO3')              ; scp(zon)%kpNO3              = extract_double(values(ccol))
+            CASE ('kMnO2')              ; scp(zon)%kMnO2              = extract_double(values(ccol))
+            CASE ('kpMnO2')             ; scp(zon)%kpMnO2             = extract_double(values(ccol))
+            CASE ('kFeOH')              ; scp(zon)%kFeOH              = extract_double(values(ccol))
+            CASE ('kpFeOH')             ; scp(zon)%kpFeOH             = extract_double(values(ccol))
+            CASE ('kSO4')               ; scp(zon)%kSO4               = extract_double(values(ccol))
+            CASE ('kpSO4')              ; scp(zon)%kpSO4              = extract_double(values(ccol))
+            CASE ('kpO2NO3')            ; scp(zon)%kpO2NO3            = extract_double(values(ccol))
+            CASE ('kpO2MnO2')           ; scp(zon)%kpO2MnO2           = extract_double(values(ccol))
+            CASE ('kpO2FeOH')           ; scp(zon)%kpO2FeOH           = extract_double(values(ccol))
+            CASE ('kpO2SO4')            ; scp(zon)%kpO2SO4            = extract_double(values(ccol))
+            CASE ('kpO2CH4')            ; scp(zon)%kpO2CH4            = extract_double(values(ccol))
+            CASE ('lO2')                ; scp(zon)%lO2                = extract_double(values(ccol))
+            CASE ('lpO2')               ; scp(zon)%lpO2               = extract_double(values(ccol))
+            CASE ('lNO3')               ; scp(zon)%lNO3               = extract_double(values(ccol))
+            CASE ('lpNO3')              ; scp(zon)%lpNO3              = extract_double(values(ccol))
+            CASE ('lMnO2')              ; scp(zon)%lMnO2              = extract_double(values(ccol))
+            CASE ('lpMnO2')             ; scp(zon)%lpMnO2             = extract_double(values(ccol))
+            CASE ('lFeOH')              ; scp(zon)%lFeOH              = extract_double(values(ccol))
+            CASE ('lpFeOH')             ; scp(zon)%lpFeOH             = extract_double(values(ccol))
+            CASE ('lSO4')               ; scp(zon)%lSO4               = extract_double(values(ccol))
+            CASE ('lpSO4')              ; scp(zon)%lpSO4              = extract_double(values(ccol))
+            CASE ('lpo2no3')            ; scp(zon)%lpo2no3            = extract_double(values(ccol))
+            CASE ('lpo2mno2')           ; scp(zon)%lpo2mno2           = extract_double(values(ccol))
+            CASE ('lpo2feoh')           ; scp(zon)%lpo2feoh           = extract_double(values(ccol))
+            CASE ('lpo2so4')            ; scp(zon)%lpo2so4            = extract_double(values(ccol))
+            CASE ('lpo2ch4')            ; scp(zon)%lpo2ch4            = extract_double(values(ccol))
+            CASE ('fracOAc')            ; scp(zon)%fracOAc            = extract_double(values(ccol))
+            CASE ('fracH2')             ; scp(zon)%fracH2             = extract_double(values(ccol))
+            CASE ('kNH4Ads')            ; scp(zon)%kNH4Ads            = extract_double(values(ccol))
+            CASE ('VCWSb')              ; scp(zon)%VCWSb              = extract_double(values(ccol))
+            CASE ('GammaS')             ; scp(zon)%GammaS             = extract_double(values(ccol))
+            CASE ('KSMnads')            ; scp(zon)%KSMnads            = extract_double(values(ccol))
+            CASE ('KSFeads')            ; scp(zon)%KSFeads            = extract_double(values(ccol))
+            CASE ('kPO4Ads')            ; scp(zon)%kPO4Ads            = extract_double(values(ccol))
+            CASE ('KPSid')              ; scp(zon)%KPSid              = extract_double(values(ccol))
+            CASE ('KPRod')              ; scp(zon)%KPRod              = extract_double(values(ccol))
+            CASE ('KPFeS')              ; scp(zon)%KPFeS              = extract_double(values(ccol))
+
+            CASE DEFAULT ; print *, 'Unknown column "', TRIM(csvnames(ccol)), '"'
+         END SELECT
       ENDDO
-   ENDIF
+   ENDDO
 
    meh = aed_csv_close(unit)
    !# don't care if close fails
@@ -529,6 +635,7 @@ SUBROUTINE default_sed_parm(sed_parm)
    sed_parm%dG0DenOAc           = -813.0
    sed_parm%dG0DenH2            = -226.0
    sed_parm%dG0ManOAc           = -625.0
+!  sed_parm%dG0ManH2            = -625.0     !# (CAB) ??? Default ?
 
    sed_parm%dG0IroOAc           = -736.6
    sed_parm%dG0IroH2            = -230.7

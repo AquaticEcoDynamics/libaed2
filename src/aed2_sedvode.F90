@@ -251,7 +251,7 @@ CONTAINS
                    istate, iopt, rwork, lrw, iwork, liw, jac, mf,              &
                    rpar, ipar)
 
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout):: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout):: candi
    INTEGER,    INTENT(IN)                      :: neq
    INTEGER,    INTENT(IN)                      :: lrw
    INTEGER,    INTENT(IN)                      :: liw
@@ -330,7 +330,7 @@ CONTAINS
    IF (init /= 1) GO TO 603
    IF (istate == 2) GO TO 200
    GO TO 20
-   10 init = 0
+10 init = 0
    IF (tout == t) RETURN
    !-----------------------------------------------------------------------
    ! Block B.
@@ -341,7 +341,7 @@ CONTAINS
    ! First check legality of the non-optional input NEQ, ITOL, IOPT,
    ! MF, ML, and MU.
    !-----------------------------------------------------------------------
-   20 IF (neq <= 0) GO TO 604
+20 IF (neq <= 0) GO TO 604
    IF (istate == 1) GO TO 25
    IF (neq > n) GO TO 605
    25 n = neq
@@ -358,7 +358,7 @@ CONTAINS
    mu = iwork(2)
    IF (ml < 0 .OR. ml >= n) GO TO 609
    IF (mu < 0 .OR. mu >= n) GO TO 610
-   30 CONTINUE
+30 CONTINUE
    ! Next process and check the optional input. ---------------------------
    IF (iopt == 1) GO TO 40
    maxord = mord(meth)
@@ -368,7 +368,7 @@ CONTAINS
    hmxi = zero
    hmin = zero
    GO TO 60
-   40 maxord = iwork(5)
+40 maxord = iwork(5)
    IF (maxord < 0) GO TO 611
    IF (maxord == 0) maxord = 100
    maxord = MIN(maxord,mord(meth))
@@ -381,7 +381,7 @@ CONTAINS
    IF (istate /= 1) GO TO 50
    h0 = rwork(5)
    IF ((tout - t)*h0 < zero) GO TO 614
-   50 hmax = rwork(6)
+50 hmax = rwork(6)
    IF (hmax < zero) GO TO 615
    hmxi = zero
    IF (hmax > zero) hmxi = one/hmax
@@ -394,7 +394,7 @@ CONTAINS
    ! Segments of RWORK (in order) are denoted  YH, WM, EWT, SAVF, ACOR.
    ! Within WM, LOCJS is the location of the saved Jacobian (JSV .gt. 0).
    !-----------------------------------------------------------------------
-   60 lyh = 21
+60 lyh = 21
    IF (istate == 1) nyh = n
    lwm = lyh + (maxord + 1)*nyh
    jco = MAX(0,jsv)
@@ -441,7 +441,7 @@ CONTAINS
      rwork(lsavf+i)=rwork(lwm+i)
    enddo
    ! Reload WM(1) = RWORK(LWM), since LWM may have changed. ---------------
-   90 IF (miter > 0) rwork(lwm) = SQRT(uround)
+90 IF (miter > 0) rwork(lwm) = SQRT(uround)
    !-----------------------------------------------------------------------
    ! Block C.
    ! The next block is for the initial CALL only (ISTATE = 1).
@@ -473,6 +473,10 @@ CONTAINS
    ! Initial CALL to F.  (LF0 points to YH(*,2).) -------------------------
    lf0 = lyh + nyh
 
+!# CAB
+!#print*,"======== Calling Fex ==========="
+!#print*,"y = ",y
+!#print*,"============="
    CALL f (candi, n, t, y, rwork(lf0), rpar, ipar)  ! Here is where FEX is called
    ! Wow how on earth do you know that? - Dan
 
@@ -494,7 +498,7 @@ CONTAINS
    nfe = nfe + niter
    IF (ier /= 0) GO TO 622
    ! Adjust H0 if necessary to meet HMAX bound. ---------------------------
-   180 rh = ABS(h0)*hmxi
+180 rh = ABS(h0)*hmxi
    IF (rh > one) h0 = h0/rh
    ! Load H with H0 and scale YH(*,2) by H0. ------------------------------
    h = h0
@@ -508,7 +512,7 @@ CONTAINS
    ! The next code block is for continuation calls only (ISTATE = 2 or 3)
    ! and is to check stop conditions before taking a step.
    !-----------------------------------------------------------------------
-   200 nslast = nst
+200 nslast = nst
    kuth = 0
    SELECT CASE ( itask )
      CASE (    1)
@@ -522,12 +526,12 @@ CONTAINS
      CASE (    5)
        GO TO  240
    END SELECT
-   210 IF ((tn - tout)*h < zero) GO TO 250
+210 IF ((tn - tout)*h < zero) GO TO 250
    CALL dvindy (tout, 0, rwork(lyh), nyh, y, iflag)
    IF (iflag /= 0) GO TO 627
    t = tout
    GO TO 420
-   220 tp = tn - hu*(one + hun*uround)
+220 tp = tn - hu*(one + hun*uround)
    IF ((tp - tout)*h > zero) GO TO 623
    IF ((tn - tout)*h < zero) GO TO 250
    GO TO 400
@@ -539,9 +543,9 @@ CONTAINS
    IF (iflag /= 0) GO TO 627
    t = tout
    GO TO 420
-   240 tcrit = rwork(1)
+240 tcrit = rwork(1)
    IF ((tn - tcrit)*h > zero) GO TO 624
-   245 hmx = ABS(tn) + ABS(h)
+245 hmx = ABS(tn) + ABS(h)
    ihit = ABS(tn - tcrit) <= hun*uround*hmx
    IF (ihit) GO TO 400
    tnext = tn + hnew*(one + four*uround)
@@ -559,14 +563,14 @@ CONTAINS
    ! start of problem), check for too much accuracy being requested, and
    ! check for H below the roundoff level in T.
    !-----------------------------------------------------------------------
-   250 CONTINUE
+250 CONTINUE
    IF ((nst-nslast) >= mxstep) GO TO 500
    CALL dewset (n, itol, rtol, atol, rwork(lyh), rwork(lewt))
    DO  i = 1,n
      IF (rwork(i+lewt-1) <= zero) GO TO 510
      rwork(i+lewt-1) = one/rwork(i+lewt-1)
    END DO
-   270 tolsf = uround*dvnorm (n, rwork(lyh), rwork(lewt))
+270 tolsf = uround*dvnorm (n, rwork(lyh), rwork(lewt))
    IF (tolsf <= one) GO TO 280
    tolsf = tolsf*two
    IF (nst == 0) GO TO 626
@@ -585,7 +589,7 @@ CONTAINS
    CALL xerrwd (msg, 50, 102, 1, 0, 0, 0, 0, zero, zero)
    msg = '      it will not be issued again for this problem'
    CALL xerrwd (msg, 50, 102, 1, 1, mxhnil, 0, 0, zero, zero)
-   290 CONTINUE
+290 CONTINUE
    !-----------------------------------------------------------------------
    ! CALL DVSTEP (Y, YH, NYH, YH, EWT, SAVF, VSAV, ACOR,
    !              WM, IWM, F, JAC, F, DVNLSD, RPAR, IPAR)
@@ -609,7 +613,7 @@ CONTAINS
    ! The following block handles the case of a successful return from the
    ! core integrator (KFLAG = 0).  Test for stop conditions.
    !-----------------------------------------------------------------------
-   300 init = 1
+300 init = 1
    kuth = 0
    SELECT CASE ( itask )
      CASE (    1)
@@ -624,18 +628,18 @@ CONTAINS
        GO TO  350
    END SELECT
    ! ITASK = 1.  If TOUT has been reached, interpolate. -------------------
-   310 IF ((tn - tout)*h < zero) GO TO 250
+310 IF ((tn - tout)*h < zero) GO TO 250
    CALL dvindy (tout, 0, rwork(lyh), nyh, y, iflag)
    t = tout
    GO TO 420
    ! ITASK = 3.  Jump to exit if TOUT was reached. ------------------------
-   330 IF ((tn - tout)*h >= zero) GO TO 400
+330 IF ((tn - tout)*h >= zero) GO TO 400
    GO TO 250
    ! ITASK = 4.  See if TOUT or TCRIT was reached.  Adjust H if necessary.
-   340 IF ((tn - tout)*h < zero) GO TO 345
+340 IF ((tn - tout)*h < zero) GO TO 345
    CALL dvindy (tout, 0, rwork(lyh), nyh, y, iflag)
    t = tout
-   GO TO 420
+GO TO 420
    345 hmx = ABS(tn) + ABS(h)
    ihit = ABS(tn - tcrit) <= hun*uround*hmx
    IF (ihit) GO TO 400
@@ -645,7 +649,7 @@ CONTAINS
    kuth = 1
    GO TO 250
    ! ITASK = 5.  See if TCRIT was reached and jump to exit. ---------------
-   350 hmx = ABS(tn) + ABS(h)
+350 hmx = ABS(tn) + ABS(h)
    ihit = ABS(tn - tcrit) <= hun*uround*hmx
    !-----------------------------------------------------------------------
    ! Block G.
@@ -654,12 +658,12 @@ CONTAINS
    ! ISTATE is set to 2, and the optional output is loaded into the work
    ! arrays before returning.
    !-----------------------------------------------------------------------
-   400 CONTINUE
+400 CONTINUE
    CALL dcopy (n, rwork(lyh), 1, y, 1)
    t = tn
    IF (itask /= 4 .AND. itask /= 5) GO TO 420
    IF (ihit) t = tcrit
-   420 istate = 2
+420 istate = 2
    rwork(11) = hu
    rwork(12) = hnew
    rwork(13) = tn
@@ -682,20 +686,20 @@ CONTAINS
    ! The optional output is loaded into the work arrays before returning.
    !-----------------------------------------------------------------------
    ! The maximum number of steps was taken before reaching TOUT. ----------
-   500  msg = 'DVODE--  At current T (=R1), MXSTEP (=I1) steps   '
+500  msg = 'DVODE--  At current T (=R1), MXSTEP (=I1) steps   '
    CALL xerrwd (msg, 50, 201, 1, 0, 0, 0, 0, zero, zero)
    msg = '      taken on this CALL before reaching TOUT     '
    CALL xerrwd (msg, 50, 201, 1, 1, mxstep, 0, 1, tn, zero)
    istate = -1
    GO TO 580
    ! EWT(i) .le. 0.0 for some i (not at start of problem). ----------------
-   510 ewti = rwork(lewt+i-1)
+510 ewti = rwork(lewt+i-1)
    msg = 'DVODE--  At T (=R1), EWT(I1) has become R2 .le. 0.'
    CALL xerrwd (msg, 50, 202, 1, 1, i, 0, 2, tn, ewti)
    istate = -6
    GO TO 580
    ! Too much accuracy requested for machine precision. -------------------
-   520 msg = 'DVODE--  At T (=R1), too much accuracy requested  '
+520 msg = 'DVODE--  At T (=R1), too much accuracy requested  '
    CALL xerrwd (msg, 50, 203, 1, 0, 0, 0, 0, zero, zero)
    msg = '      for precision of machine..  see TOLSF (=R2) '
    CALL xerrwd (msg, 50, 203, 1, 0, 0, 0, 2, tn, tolsf)
@@ -703,14 +707,14 @@ CONTAINS
    istate = -2
    GO TO 580
    ! KFLAG = -1.  Error test failed repeatedly or with ABS(H) = HMIN. -----
-   530 msg = 'DVODE--  At T(=R1) and step size H(=R2), the error'
+530 msg = 'DVODE--  At T(=R1) and step size H(=R2), the error'
    CALL xerrwd (msg, 50, 204, 1, 0, 0, 0, 0, zero, zero)
    msg = '      test failed repeatedly or with abs(H) = HMIN'
    CALL xerrwd (msg, 50, 204, 1, 0, 0, 0, 2, tn, h)
    istate = -4
    GO TO 560
    ! KFLAG = -2.  Convergence failed repeatedly or with abs(H) = HMIN. ----
-   540  msg = 'DVODE--  At T (=R1) and step size H (=R2), the    '
+540  msg = 'DVODE--  At T (=R1) and step size H (=R2), the    '
    CALL xerrwd (msg, 50, 205, 1, 0, 0, 0, 0, zero, zero)
    msg = '      corrector convergence failed repeatedly     '
    CALL xerrwd (msg, 50, 205, 1, 0, 0, 0, 0, zero, zero)
@@ -718,7 +722,7 @@ CONTAINS
    CALL xerrwd (msg, 30, 205, 1, 0, 0, 0, 2, tn, h)
    istate = -5
    ! Compute IMXER if relevant. -------------------------------------------
-   560 big = zero
+560 big = zero
    imxer = 1
    DO  i = 1,n
      size = ABS(rwork(i+lacor-1)*rwork(i+lewt-1))
@@ -728,7 +732,7 @@ CONTAINS
    END DO
    iwork(16) = imxer
    ! Set Y vector, T, and optional output. --------------------------------
-   580 CONTINUE
+580 CONTINUE
    CALL dcopy (n, rwork(lyh), 1, y, 1)
    t = tn
    rwork(11) = hu
@@ -751,109 +755,109 @@ CONTAINS
    ! First the error message routine is called.   If the illegal input
    ! is a negative ISTATE, the run is aborted (apparent infinite loop).
    !-----------------------------------------------------------------------
-   601 msg = 'DVODE--  ISTATE (=I1) illegal '
+601 msg = 'DVODE--  ISTATE (=I1) illegal '
    CALL xerrwd (msg, 30, 1, 1, 1, istate, 0, 0, zero, zero)
    IF (istate < 0) GO TO 800
    GO TO 700
-   602 msg = 'DVODE--  ITASK (=I1) illegal  '
+602 msg = 'DVODE--  ITASK (=I1) illegal  '
    CALL xerrwd (msg, 30, 2, 1, 1, itask, 0, 0, zero, zero)
    GO TO 700
-   603 msg='DVODE--  ISTATE (=I1) .gt. 1 but DVODE not initialized      '
+603 msg='DVODE--  ISTATE (=I1) .gt. 1 but DVODE not initialized      '
    CALL xerrwd (msg, 60, 3, 1, 1, istate, 0, 0, zero, zero)
    GO TO 700
-   604 msg = 'DVODE--  NEQ (=I1) .lt. 1     '
+604 msg = 'DVODE--  NEQ (=I1) .lt. 1     '
    CALL xerrwd (msg, 30, 4, 1, 1, neq, 0, 0, zero, zero)
    GO TO 700
-   605 msg = 'DVODE--  ISTATE = 3 and NEQ increased (I1 to I2)  '
+605 msg = 'DVODE--  ISTATE = 3 and NEQ increased (I1 to I2)  '
    CALL xerrwd (msg, 50, 5, 1, 2, n, neq, 0, zero, zero)
    GO TO 700
-   606 msg = 'DVODE--  ITOL (=I1) illegal   '
+606 msg = 'DVODE--  ITOL (=I1) illegal   '
    CALL xerrwd (msg, 30, 6, 1, 1, itol, 0, 0, zero, zero)
    GO TO 700
-   607 msg = 'DVODE--  IOPT (=I1) illegal   '
+607 msg = 'DVODE--  IOPT (=I1) illegal   '
    CALL xerrwd (msg, 30, 7, 1, 1, iopt, 0, 0, zero, zero)
    GO TO 700
-   608 msg = 'DVODE--  MF (=I1) illegal     '
+608 msg = 'DVODE--  MF (=I1) illegal     '
    CALL xerrwd (msg, 30, 8, 1, 1, mf, 0, 0, zero, zero)
    GO TO 700
-   609 msg = 'DVODE--  ML (=I1) illegal.. .lt.0 or .ge.NEQ (=I2)'
+609 msg = 'DVODE--  ML (=I1) illegal.. .lt.0 or .ge.NEQ (=I2)'
    CALL xerrwd (msg, 50, 9, 1, 2, ml, neq, 0, zero, zero)
    GO TO 700
-   610 msg = 'DVODE--  MU (=I1) illegal.. .lt.0 or .ge.NEQ (=I2)'
+610 msg = 'DVODE--  MU (=I1) illegal.. .lt.0 or .ge.NEQ (=I2)'
    CALL xerrwd (msg, 50, 10, 1, 2, mu, neq, 0, zero, zero)
    GO TO 700
-   611 msg = 'DVODE--  MAXORD (=I1) .lt. 0  '
+611 msg = 'DVODE--  MAXORD (=I1) .lt. 0  '
    CALL xerrwd (msg, 30, 11, 1, 1, maxord, 0, 0, zero, zero)
    GO TO 700
-   612 msg = 'DVODE--  MXSTEP (=I1) .lt. 0  '
+612 msg = 'DVODE--  MXSTEP (=I1) .lt. 0  '
    CALL xerrwd (msg, 30, 12, 1, 1, mxstep, 0, 0, zero, zero)
    GO TO 700
-   613 msg = 'DVODE--  MXHNIL (=I1) .lt. 0  '
+613 msg = 'DVODE--  MXHNIL (=I1) .lt. 0  '
    CALL xerrwd (msg, 30, 13, 1, 1, mxhnil, 0, 0, zero, zero)
    GO TO 700
-   614 msg = 'DVODE--  TOUT (=R1) behind T (=R2)      '
+614 msg = 'DVODE--  TOUT (=R1) behind T (=R2)      '
    CALL xerrwd (msg, 40, 14, 1, 0, 0, 0, 2, tout, t)
    msg = '      integration direction is given by H0 (=R1)  '
    CALL xerrwd (msg, 50, 14, 1, 0, 0, 0, 1, h0, zero)
    GO TO 700
-   615 msg = 'DVODE--  HMAX (=R1) .lt. 0.0  '
+615 msg = 'DVODE--  HMAX (=R1) .lt. 0.0  '
    CALL xerrwd (msg, 30, 15, 1, 0, 0, 0, 1, hmax, zero)
    GO TO 700
-   616 msg = 'DVODE--  HMIN (=R1) .lt. 0.0  '
+616 msg = 'DVODE--  HMIN (=R1) .lt. 0.0  '
    CALL xerrwd (msg, 30, 16, 1, 0, 0, 0, 1, hmin, zero)
    GO TO 700
-   617 CONTINUE
+617 CONTINUE
    msg='DVODE--  RWORK length needed, LENRW (=I1), exceeds LRW (=I2)'
    CALL xerrwd (msg, 60, 17, 1, 2, lenrw, lrw, 0, zero, zero)
    GO TO 700
-   618 CONTINUE
+618 CONTINUE
    msg='DVODE--  IWORK length needed, LENIW (=I1), exceeds LIW (=I2)'
    CALL xerrwd (msg, 60, 18, 1, 2, leniw, liw, 0, zero, zero)
    GO TO 700
-   619 msg = 'DVODE--  RTOL(I1) is R1 .lt. 0.0        '
+619 msg = 'DVODE--  RTOL(I1) is R1 .lt. 0.0        '
    CALL xerrwd (msg, 40, 19, 1, 1, i, 0, 1, rtoli, zero)
    GO TO 700
-   620 msg = 'DVODE--  ATOL(I1) is R1 .lt. 0.0        '
+620 msg = 'DVODE--  ATOL(I1) is R1 .lt. 0.0        '
    CALL xerrwd (msg, 40, 20, 1, 1, i, 0, 1, atoli, zero)
    GO TO 700
-   621 ewti = rwork(lewt+i-1)
+621 ewti = rwork(lewt+i-1)
    msg = 'DVODE--  EWT(I1) is R1 .le. 0.0         '
    CALL xerrwd (msg, 40, 21, 1, 1, i, 0, 1, ewti, zero)
    GO TO 700
-   622 CONTINUE
+622 CONTINUE
    msg='DVODE--  TOUT (=R1) too close to T(=R2) to start integration'
    CALL xerrwd (msg, 60, 22, 1, 0, 0, 0, 2, tout, t)
    GO TO 700
-   623 CONTINUE
+623 CONTINUE
    msg='DVODE--  ITASK = I1 and TOUT (=R1) behind TCUR - HU (= R2)  '
    CALL xerrwd (msg, 60, 23, 1, 1, itask, 0, 2, tout, tp)
    GO TO 700
-   624 CONTINUE
+624 CONTINUE
    msg='DVODE--  ITASK = 4 or 5 and TCRIT (=R1) behind TCUR (=R2)   '
    CALL xerrwd (msg, 60, 24, 1, 0, 0, 0, 2, tcrit, tn)
    GO TO 700
-   625 CONTINUE
+625 CONTINUE
    msg='DVODE--  ITASK = 4 or 5 and TCRIT (=R1) behind TOUT (=R2)   '
    CALL xerrwd (msg, 60, 25, 1, 0, 0, 0, 2, tcrit, tout)
    GO TO 700
-   626 msg = 'DVODE--  At start of problem, too much accuracy   '
+626 msg = 'DVODE--  At start of problem, too much accuracy   '
    CALL xerrwd (msg, 50, 26, 1, 0, 0, 0, 0, zero, zero)
    msg='      requested for precision of machine..  see TOLSF (=R1) '
    CALL xerrwd (msg, 60, 26, 1, 0, 0, 0, 1, tolsf, zero)
    rwork(14) = tolsf
    GO TO 700
-   627 msg='DVODE--  Trouble from DVINDY.  ITASK = I1, TOUT = R1.       '
+627 msg='DVODE--  Trouble from DVINDY.  ITASK = I1, TOUT = R1.       '
    CALL xerrwd (msg, 60, 27, 1, 1, itask, 0, 1, tout, zero)
 
-   700  CONTINUE
+700  CONTINUE
    istate = -3
    RETURN
 
-   800 msg = 'DVODE--  Run aborted.. apparent infinite loop     '
+800 msg = 'DVODE--  Run aborted.. apparent infinite loop     '
    CALL xerrwd (msg, 50, 303, 2, 0, 0, 0, 0, zero, zero)
    RETURN
    !----------------------- End of Subroutine DVODE -----------------------
- END SUBROUTINE dvode
+END SUBROUTINE dvode
 !------------------------------------------------------------------------------!
 
 
@@ -899,7 +903,7 @@ CONTAINS
  SUBROUTINE dvhin (candi, n, t0, y0, ydot, f, rpar, ipar, tout, uround,        &
                    ewt, itol, atol, y, temp, h0, niter, ier)
 
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
 
    INTEGER,    INTENT(IN)             :: n
    REAL(SEDP), INTENT(IN)             :: t0
@@ -967,7 +971,7 @@ CONTAINS
    END IF
 
    ! Looping point for iteration. -----------------------------------------
-   50  CONTINUE
+50  CONTINUE
    ! Estimate the second derivative as a difference quotient in f. --------
    t1 = t0 + hg
    DO  i = 1, n
@@ -1003,10 +1007,10 @@ CONTAINS
    GO TO 50
 
    ! Iteration done.  Apply bounds, bias factor, and sign.  Then exit. ----
-   80 h0 = hnew*0.5
+80 h0 = hnew*0.5
    IF (h0 < hlb) h0 = hlb
    IF (h0 > hub) h0 = hub
-   90 h0 = SIGN(h0, tout - t0)
+90 h0 = SIGN(h0, tout - t0)
    niter = iter
    ier = 0
    RETURN
@@ -1014,10 +1018,8 @@ CONTAINS
    100 ier = -1
    RETURN
    !----------------------- End of Subroutine DVHIN -----------------------
- END SUBROUTINE dvhin
+END SUBROUTINE dvhin
 !------------------------------------------------------------------------------!
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1052,8 +1054,7 @@ CONTAINS
                                                                                !
 ! Discussion above and comments in driver explain all variables.               !
 !------------------------------------------------------------------------------!
- SUBROUTINE dvindy (t, k, yh, ldyh, dky, iflag)
-
+SUBROUTINE dvindy (t, k, yh, ldyh, dky, iflag)
    INTEGER,    INTENT(IN)                      :: k
    INTEGER,    INTENT(INOUT)                   :: ldyh
    REAL(SEDP), INTENT(IN)                      :: yh(ldyh,*)
@@ -1115,7 +1116,7 @@ CONTAINS
    DO  jj = jj1, nq
      ic = ic*jj
    END DO
-   15 c = FLOAT(ic)
+15 c = FLOAT(ic)
    DO  i = 1, n
      dky(i) = c*yh(i,l)
    END DO
@@ -1130,34 +1131,32 @@ CONTAINS
      DO  jj = jj1, j
        ic = ic*jj
      END DO
-     35   c = FLOAT(ic)
+35   c = FLOAT(ic)
      DO  i = 1, n
        dky(i) = c*yh(i,jp1) + s*dky(i)
      END DO
    END DO
    IF (k == 0) RETURN
-   55 r = h**(-k)
+55 r = h**(-k)
    !CALL dscal (n, r, dky, 1)
    do i=1,n
      dky(i)=dky(i)*r
    enddo
    RETURN
 
-   80 msg = 'DVINDY-- K (=I1) illegal      '
+80 msg = 'DVINDY-- K (=I1) illegal      '
    CALL xerrwd (msg, 30, 51, 1, 1, k, 0, 0, zero, zero)
    iflag = -1
    RETURN
-   90 msg = 'DVINDY-- T (=R1) illegal      '
+90 msg = 'DVINDY-- T (=R1) illegal      '
    CALL xerrwd (msg, 30, 52, 1, 0, 0, 0, 1, t, zero)
    msg='      T not in interval TCUR - HU (= R1) to TCUR (=R2)      '
    CALL xerrwd (msg, 60, 52, 1, 0, 0, 0, 2, tp, tn)
    iflag = -2
    RETURN
    !----------------------- End of Subroutine DVINDY ----------------------
- END SUBROUTINE dvindy
+END SUBROUTINE dvindy
 !------------------------------------------------------------------------------!
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1221,7 +1220,7 @@ CONTAINS
  SUBROUTINE dvstep (candi, y, yh, ldyh, yh1, ewt, savf, vsav, acor,                   &
                     wm, iwm, f, jac, psol, vnls, rpar, ipar)
 
-   TYPE(aed2_sed_candi_t),POINTER,INTENT(inout) :: candi
+   TYPE(aed2_sed_candi_t),INTENT(inout) :: candi
    REAL(SEDP), INTENT(INOUT)         :: y(*)
    INTEGER,    INTENT(IN)            :: ldyh
    REAL(SEDP), INTENT(OUT)           :: yh(ldyh,*)
@@ -1322,12 +1321,12 @@ CONTAINS
    ! On an order increase, the history array is augmented by a column.
    ! On a change of step size H, the history array YH is rescaled.
    !-----------------------------------------------------------------------
-   20 CONTINUE
+20 CONTINUE
    IF (kuth == 1) THEN
      eta = MIN(eta,h/hscal)
      newh = 1
    END IF
-   50 IF (newh == 0) GO TO 200
+50 IF (newh == 0) GO TO 200
    IF (newq == nq) GO TO 150
    IF (newq < nq) THEN
      CALL dvjust (yh, ldyh, -1)
@@ -1355,7 +1354,7 @@ CONTAINS
    ! by HMIN if KUTH = 0, and by HMXI in any case.
    ! Finally, the history array YH is rescaled.
    !-----------------------------------------------------------------------
-   100 CONTINUE
+100 CONTINUE
    lmax = maxord + 1
    IF (n == ldyh) GO TO 120
    i1 = 1 + (newq + 1)*ldyh
@@ -1383,14 +1382,14 @@ CONTAINS
    eta = MIN(eta,one)
    nq = maxord
    l = lmax
-   140 IF (kuth == 1) eta = MIN(eta,ABS(h/hscal))
+140 IF (kuth == 1) eta = MIN(eta,ABS(h/hscal))
    IF (kuth == 0) eta = MAX(eta,hmin/ABS(hscal))
    eta = eta/MAX(one,ABS(hscal)*hmxi*eta)
    newh = 1
    nqwait = l
    IF (newq <= maxord) GO TO 50
    ! Rescale the history array for a change in H by a factor of ETA. ------
-   150 r = one
+150 r = one
    DO  j = 2, l
      r = r*eta
    !  CALL dscal (n, r, yh(1,j), 1 )
@@ -1408,7 +1407,7 @@ CONTAINS
    ! DVSET is called to calculate all integration coefficients.
    ! RC is the ratio of new to old values of the coefficient H/EL(2)=h/l1.
    !-----------------------------------------------------------------------
-   200 tn = tn + h
+200 tn = tn + h
    i1 = nqnyh + 1
    DO  jb = 1, nq
      i1 = i1 - ldyh
@@ -1455,7 +1454,7 @@ CONTAINS
    ! The corrector has converged (NFLAG = 0).  The local error test is
    ! made and control passes to statement 500 if it fails.
    !-----------------------------------------------------------------------
-   450 CONTINUE
+450 CONTINUE
    dsm = acnrm/tq(2)
    IF (dsm > one) GO TO 500
    !-----------------------------------------------------------------------
@@ -1486,7 +1485,7 @@ CONTAINS
      yh(i,lmax)=acor(i)
    enddo
    conp = tq(5)
-   490 IF (etamax /= one) GO TO 560
+490 IF (etamax /= one) GO TO 560
    IF (nqwait < 2) nqwait = 2
    newq = nq
    newh = 0
@@ -1500,7 +1499,7 @@ CONTAINS
    ! same order.  After repeated failures, H is forced to decrease
    ! more rapidly.
    !-----------------------------------------------------------------------
-   500 kflag = kflag - 1
+500 kflag = kflag - 1
    netf = netf + 1
    nflag = -2
    tn = told
@@ -1528,7 +1527,7 @@ CONTAINS
    ! the step is retried.  After a total of 7 consecutive failures,
    ! an exit is taken with KFLAG = -1.
    !-----------------------------------------------------------------------
-   530 IF (kflag == kfh) GO TO 660
+530 IF (kflag == kfh) GO TO 660
    IF (nq == 1) GO TO 540
    eta = MAX(etamin,hmin/ABS(h))
    CALL dvjust (yh, ldyh, -1)
@@ -1536,7 +1535,7 @@ CONTAINS
    nq = nq - 1
    nqwait = l
    GO TO 150
-   540 eta = MAX(etamin,hmin/ABS(h))
+540 eta = MAX(etamin,hmin/ABS(h))
    h = h*eta
    hscal = h
    tau(1) = h
@@ -1558,7 +1557,7 @@ CONTAINS
    ! then NQWAIT is set to 2 (reconsider it after 2 steps).
    !-----------------------------------------------------------------------
    ! Compute ratio of new H to current H at the current order. ------------
-   560 flotl = FLOAT(l)
+560 flotl = FLOAT(l)
    etaq = one/((bias2*dsm)**(one/flotl) + addon)
    IF (nqwait /= 0) GO TO 600
    nqwait = 2
@@ -1567,7 +1566,7 @@ CONTAINS
    ! Compute ratio of new H to current H at the current order less one. ---
    ddn = dvnorm (n, yh(1,l), ewt)/tq(1)
    etaqm1 = one/((bias1*ddn)**(one/(flotl - one)) + addon)
-   570 etaqp1 = zero
+570 etaqp1 = zero
    IF (l == lmax) GO TO 580
    ! Compute ratio of new H to current H at current order plus one. -------
    cnquot = (tq(5)/conp)*(h/tau(2))**l
@@ -1576,30 +1575,30 @@ CONTAINS
    END DO
    dup = dvnorm (n, savf, ewt)/tq(3)
    etaqp1 = one/((bias3*dup)**(one/(flotl + one)) + addon)
-   580  IF (etaq >= etaqp1) GO TO 590
+580  IF (etaq >= etaqp1) GO TO 590
    IF (etaqp1 > etaqm1) GO TO 620
    GO TO 610
    590  IF (etaq < etaqm1) GO TO 610
-   600  eta = etaq
+600  eta = etaq
    newq = nq
    GO TO 630
-   610  eta = etaqm1
+610  eta = etaqm1
    newq = nq - 1
    GO TO 630
-   620  eta = etaqp1
+620  eta = etaqp1
    newq = nq + 1
    !CALL dcopy (n, acor, 1, yh(1,lmax), 1)
    do i=1,n
      yh(i,lmax)=acor(i)
    enddo
    ! Test tentative new H against THRESH, ETAMAX, and HMXI, then exit. ----
-   630  IF (eta < thresh .OR. etamax == one) GO TO 640
+630  IF (eta < thresh .OR. etamax == one) GO TO 640
    eta = MIN(eta,etamax)
    eta = eta/MAX(one,ABS(h)*hmxi*eta)
    newh = 1
    hnew = h*eta
    GO TO 690
-   640  newq = nq
+640  newq = nq
    newh = 0
    eta = one
    hnew = h
@@ -1608,27 +1607,25 @@ CONTAINS
    ! All returns are made through this section.
    ! On a successful return, ETAMAX is reset and ACOR is scaled.
    !-----------------------------------------------------------------------
-   660  kflag = -1
+660  kflag = -1
    GO TO 720
    670  kflag = -2
    GO TO 720
    680  IF (nflag == -2) kflag = -3
    IF (nflag == -3) kflag = -4
    GO TO 720
-   690  etamax = etamx3
+690  etamax = etamx3
    IF (nst <= 10) etamax = etamx2
    r = one/tq(2)
    !CALL dscal (n, r, acor, 1)
    do i=1,n
      acor(i)=acor(i)*r
    enddo
-   720  jstart = 1
+720  jstart = 1
    RETURN
    !----------------------- End of Subroutine DVSTEP ----------------------
  END SUBROUTINE dvstep
 !------------------------------------------------------------------------------!
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1726,7 +1723,7 @@ CONTAINS
    END SELECT
 
    ! Set coefficients for Adams methods. ----------------------------------
-   100  IF (nq /= 1) GO TO 110
+100  IF (nq /= 1) GO TO 110
    el(1) = one
    el(2) = one
    tq(1) = one
@@ -1734,7 +1731,7 @@ CONTAINS
    tq(3) = six*tq(2)
    tq(5) = one
    GO TO 300
-   110  hsum = h
+110  hsum = h
    em(1) = one
    flotnq = flotl - one
    DO  i = 2, l
@@ -1749,7 +1746,7 @@ CONTAINS
        s = -s
      END DO
      tq(1) = em(nqm1)/(flotnq*csum)
-     130    rxi = h/hsum
+130    rxi = h/hsum
      DO  iback = 1, j
        i = (j + 2) - iback
        em(i) = em(i) + em(i-1)*rxi
@@ -1793,7 +1790,7 @@ CONTAINS
    GO TO 300
 
    ! Set coefficients for BDF methods. ------------------------------------
-   200 DO  i = 3, l
+200 DO  i = 3, l
      el(i) = zero
    END DO
    el(1) = one
@@ -1824,7 +1821,7 @@ CONTAINS
      i = (nq + 2) - iback
      el(i) = el(i) + el(i-1)*rxis
    END DO
-   240 t1 = one - ahatn0 + alph0
+240 t1 = one - ahatn0 + alph0
    t2 = one + FLOAT(nq)*t1
    tq(2) = ABS(alph0*t2/t1)
    tq(5) = ABS(t2/(el(l)*rxi/rxis))
@@ -1840,13 +1837,11 @@ CONTAINS
    t6 = ahatn0 - rxi
    elp = t2/(one - t6 + t5)
    tq(3) = ABS(elp*rxi*(flotl + one)*t5)
-   300 tq(4) = cortes*tq(2)
+300 tq(4) = cortes*tq(2)
    RETURN
    !----------------------- End of Subroutine DVSET -----------------------
  END SUBROUTINE dvset
 !------------------------------------------------------------------------------!
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -2002,7 +1997,7 @@ CONTAINS
    ! weight vector EWT.  The sum of the corrections is accumulated in the
    ! vector ACOR(i).  The YH array is not altered in the corrector loop.
    !-----------------------------------------------------------------------
-   220  m = 0
+220  m = 0
    delp = zero
    !CALL dcopy (n, yh(1,1), 1, y, 1 )
    do i=1,n
@@ -2024,11 +2019,11 @@ CONTAINS
    nslp = nst
    ! If matrix is singular, take error return to force cut in step size. --
    IF (ierpj /= 0) GO TO 430
-   250 DO  i = 1,n
+250 DO  i = 1,n
      acor(i) = zero
    END DO
    ! This is a looping point for the corrector iteration. -----------------
-   270  IF (miter /= 0) GO TO 350
+270  IF (miter /= 0) GO TO 350
    !-----------------------------------------------------------------------
    ! In the case of functional iteration, update Y directly from
    ! the result of the last function evaluation.
@@ -2054,7 +2049,7 @@ CONTAINS
    ! P as coefficient matrix.  The correction is scaled by the factor
    ! 2/(1+RC) to account for changes in h*rl1 since the last DVJAC CALL.
    !-----------------------------------------------------------------------
-   350  DO  i = 1,n
+350  DO  i = 1,n
      y(i) = (rl1*h)*savf(i) - (rl1*yh(i,2) + acor(i))
    END DO
    CALL dvsol (wm, iwm, y, iersl)
@@ -2081,7 +2076,7 @@ CONTAINS
    ! Test for convergence.  If M .gt. 0, an estimate of the convergence
    ! rate constant is stored in CRATE, and this is used in the test.
    !-----------------------------------------------------------------------
-   400  IF (m /= 0) crate = MAX(crdown*crate,del/delp)
+400  IF (m /= 0) crate = MAX(crdown*crate,del/delp)
    dcon = del*MIN(one,crate)/tq(4)
    IF (dcon <= one) GO TO 450
    m = m + 1
@@ -2092,19 +2087,19 @@ CONTAINS
    nfe = nfe + 1
    GO TO 270
 
-   410  IF (miter == 0 .OR. jcur == 1) GO TO 430
+410  IF (miter == 0 .OR. jcur == 1) GO TO 430
    icf = 1
    ipup = miter
    GO TO 220
 
-   430  CONTINUE
+430  CONTINUE
    nflag = -1
    icf = 2
    ipup = miter
    RETURN
 
    ! Return for successful step. ------------------------------------------
-   450  nflag = 0
+450  nflag = 0
    jcur = 0
    icf = 0
    IF (m == 0) acnrm = del
@@ -2500,10 +2495,10 @@ CONTAINS
      CASE (    5)
        GO TO  400
    END SELECT
-   100  CALL dgesl (wm(3), n, n, iwm(31), x, 0)
+100  CALL dgesl (wm(3), n, n, iwm(31), x, 0)
    RETURN
 
-   300  phrl1 = wm(2)
+300  phrl1 = wm(2)
    hrl1 = h*rl1
    wm(2) = hrl1
    IF (hrl1 == phrl1) GO TO 330
@@ -2514,14 +2509,14 @@ CONTAINS
      wm(i+2) = one/di
    END DO
 
-   330  DO  i = 1,n
+330  DO  i = 1,n
      x(i) = wm(i+2)*x(i)
    END DO
    RETURN
    390 iersl = 1
    RETURN
 
-   400  ml = iwm(1)
+400  ml = iwm(1)
    mu = iwm(2)
    meband = 2*ml + mu + 1
    CALL dgbsl (wm(3), meband, n, ml, mu, iwm(31), x, 0)
@@ -2602,7 +2597,7 @@ CONTAINS
    ! Nonstiff option...
    ! Check to see if the order is being increased or decreased.
    !-----------------------------------------------------------------------
-   100  CONTINUE
+100  CONTINUE
    IF (iord == 1) GO TO 180
    ! Order decrease. ------------------------------------------------------
    DO  j = 1, lmax
@@ -2643,7 +2638,7 @@ CONTAINS
    ! Stiff option...
    ! Check to see if the order is being increased or decreased.
    !-----------------------------------------------------------------------
-   200  CONTINUE
+200  CONTINUE
    IF (iord == 1) GO TO 300
    ! Order decrease. ------------------------------------------------------
    DO  j = 1, lmax
@@ -2669,7 +2664,7 @@ CONTAINS
    END DO
    RETURN
    ! Order increase. ------------------------------------------------------
-   300  DO  j = 1, lmax
+300  DO  j = 1, lmax
      el(j) = zero
    END DO
    el(3) = one
@@ -2693,7 +2688,7 @@ CONTAINS
      END DO
      xiold = xi
    END DO
-   340 CONTINUE
+340 CONTINUE
    t1 = (-alph0 - alph1)/prod
    ! Load column L + 1 in YH array. ---------------------------------------
    lp1 = l + 1

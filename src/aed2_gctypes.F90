@@ -131,7 +131,11 @@ MODULE aed2_gctypes
 !#----------------- sed_candi types ----------------------------------
 !#----------------- sed_candi types ----------------------------------
 !
-#define SED_REAL REAL(SEDP)
+#ifdef SINGLE
+# define SED_REAL REAL
+#else
+# define SED_REAL REAL(SEDP)
+#endif
 
   ! ------------------------------------------------------
    TYPE aed2_sed_candi_time_t
@@ -205,7 +209,7 @@ MODULE aed2_gctypes
       INTEGER  :: FInO2Onlyswitch  !# 2
       INTEGER  :: FOMswitch        !# 1
       INTEGER  :: Bsolidswitch     !# 1
-!     SED_REAL :: SolidInitialUnit !# mmolLsolid !umolg  !mM ! percentsolids ! mM ! percentsolidsmM ! percentsolids ! mM ! percentsolids
+      CHARACTER(len=20) :: SolidInitialUnit !# mmolLsolid !umolg  !mM ! percentsolids ! mM ! percentsolidsmM ! percentsolids ! mM ! percentsolids
 !     SED_REAL :: SolidFluxUnit    !#  mMm2y ! percentsolids ! mMm2y ! percentsolids
 !     SED_REAL :: SolidOutputUnit  !#  mmolLsolids !mM
 
@@ -379,6 +383,7 @@ MODULE aed2_gctypes
      SED_REAL :: dG0DenOAc         !# -813.0    ! #Roden and Jin 2011
      SED_REAL :: dG0DenH2          !# -226.0    ! #Roden and Jin 2011
      SED_REAL :: dG0ManOAc         !# -625.0    ! #Roden and Jin 2011
+     SED_REAL :: dG0ManH2
 
      SED_REAL :: dG0IroOAc         !# -736.6   ! #Roden and Jin 2011 |# -61     #kJ mol OAc^-1 Bethke 2011
      SED_REAL :: dG0IroH2          !# -230.7   ! #Roden and Jin 2011 |# -30      #kJ mol H2^-1  Bethke 2011
@@ -393,6 +398,7 @@ MODULE aed2_gctypes
       SED_REAL :: YAerOAc          !# 17.25 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YDenOAc          !# 16.82 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YDenH2           !# 04.49 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
+      SED_REAL :: YManH2           !#
       SED_REAL :: YManOAc          !# 14.14 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YIroOAc          !# 18.70 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011 |  #9.0/CellWeight #Watson 2003
       SED_REAL :: YIroH2           !# 04.54 ! /CellWeight #gB/mol H2  / g/mol cell Roden and Jin 2011 |  #9.0/CellWeight #Watson 2003
@@ -612,6 +618,8 @@ MODULE aed2_gctypes
      INTEGER  :: MnIIy
      INTEGER  :: FeIIy
      INTEGER  :: FeIIIy
+     INTEGER  :: Feadsy
+     INTEGER  :: Mnadsy
      INTEGER  :: FeSY
      INTEGER  :: FeS2Y
      INTEGER  :: PO4sy
@@ -656,11 +664,14 @@ MODULE aed2_gctypes
 !
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RNH4OX
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RMnOX
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RMnadsOX
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RFeOX
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RFeadsox
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RTSOX
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RCH4OX
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RFeSOX
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RFeS2OX
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RXSOx
 !
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RNH4NO2
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RMnNO3
@@ -692,6 +703,19 @@ MODULE aed2_gctypes
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RMnO2Bppt
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RPO4ads
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RNH4ads
+
+!# CAB new
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: QSid
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: deltaSid
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: deltadisSid
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: QRod
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: deltaRod
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: deltadisRod
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: QFeS
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: deltaFeS
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: deltadisFeS
+!# CAB end
+
 !
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RPOM1
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RPOM2
@@ -706,6 +730,43 @@ MODULE aed2_gctypes
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RDenNO3DHyd
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RFerDHyd
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RDHyd
+
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RO2
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RNO3
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RMnO2
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RSO4
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RFeOH
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RMet
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RCO2
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RCH4
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMO2
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMNO3
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMMnO2
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMSO4
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMFeOH
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMMet
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMMnii
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: ROMFeii
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: TP
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: TN
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: TOC
+
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: k_iron
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: kp_iron
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: k_manganese
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: kp_manganese
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: l_manganese
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: lp_manganese
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: l_iron
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: lp_iron
+
+
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: TerminalOxidation
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: Nrelease
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: NH4release
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: NO3release
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: Prelease
+  REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: XMetalrelease
 
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RdeathFer
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: RdeathAer
@@ -738,7 +799,9 @@ MODULE aed2_gctypes
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: dGDenH2
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTDenH2
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: dGManOAc
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: dGManH2
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTManOAc
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTManH2
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: dGIroOAc
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTIroOAc
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: dGIroH2
@@ -753,10 +816,41 @@ MODULE aed2_gctypes
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTMetH2
 !
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: Btot
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: Bsubtot
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FBHyd
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FDHyd
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FOAc
      REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FH2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FBMax
+
+!# CAB new
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_O2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_NO3
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_MnO2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_FeOH
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_SO4
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_CH4
+
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_O2NO3
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_O2MnO2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_O2FeOH
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_O2SO4
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FIN_O2CH4
+
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTEA_O2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTEA_NO3
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTEA_MnO2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTEA_FeOH
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTEA_SO4
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTEA_CH4
+
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTem_O2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTem_NO3
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTem_MnO2
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTem_FeOH
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTem_SO4
+     REAL(SEDP), DIMENSION(:),   ALLOCATABLE :: FTem_Met
+!# CAB end
 
      REAL(SEDP) :: dGmp                                            !Dan added
 
