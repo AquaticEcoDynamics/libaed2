@@ -1092,9 +1092,9 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
          fSal = 0. + ( (salt-5.)/(18.-5.) )
        ELSE IF ( salt>18. .AND. salt<=40. ) THEN
          fSal = one_
-       ELSE IF ( salt>40. .AND. salt<=65. ) THEN
-         fSal = 1. - ( (salt-40.)/(65.-40.) )
-       ELSE IF ( salt>65. ) THEN
+       ELSE IF ( salt>40. .AND. salt<=85. ) THEN
+         fSal = 1. - ( (salt-40.)/(85.-40.) )
+       ELSE IF ( salt>85. ) THEN
          fSal = zero_
        ENDIF
        
@@ -1157,6 +1157,7 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
 
        ! METAL AND TOXIC EFFECTS
        fXl = 1.0
+       IF(bottom_stress>0.09) fXl =0.0
 
        ! Compute P-I
        fI = photosynthesis_irradiance(0, &  ! 0 is vertical integral
@@ -1241,17 +1242,21 @@ SUBROUTINE aed2_calculate_benthic_macroalgae(data,column,layer_idx)
 
 
        ! Redistribute into the water column if sloughing occurs.
-       IF( bottom_stress>data%slough_stress ) THEN
+      IF( bottom_stress>data%slough_stress*2. ) THEN
+         malg_flux = 0.3*malg
+         _FLUX_VAR_(data%id_p(malg_i)) = _FLUX_VAR_(data%id_p(malg_i)) + malg_flux
+         _FLUX_VAR_B_(data%id_pben(malg_i)) = _FLUX_VAR_B_(data%id_pben(malg_i)) - malg_flux
+
+       ELSEIF( bottom_stress>data%slough_stress .AND. salinity>60.) THEN
          malg_flux = 0.67*malg
          _FLUX_VAR_(data%id_p(malg_i)) = _FLUX_VAR_(data%id_p(malg_i)) + malg_flux
          _FLUX_VAR_B_(data%id_pben(malg_i)) = _FLUX_VAR_B_(data%id_pben(malg_i)) - malg_flux
 
          !% in & ip here
-
        ENDIF
 
        ! Update the diagnostic variables
-       _DIAG_VAR_(data%id_TMALG) =  malg*(12.*1e-3/0.5)
+       _DIAG_VAR_(data%id_TMALG) =  (malg+_STATE_VAR_(data%id_p(malg_i))*depth )*(12.*1e-3/0.5)
      ENDIF
 
      IF( data%simMalgHSI == malg_i) THEN

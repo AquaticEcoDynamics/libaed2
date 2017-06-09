@@ -43,6 +43,7 @@ MODULE aed2_tracer
       INTEGER :: id_l_bot, id_tau_0, id_epsilon, id_resus
       INTEGER :: id_temp, id_taub, id_salt, id_rho
       INTEGER :: id_d_taub
+      INTEGER :: id_E_sedzone
 
       !# Module configuration
       INTEGER :: num_tracers
@@ -198,9 +199,10 @@ SUBROUTINE aed2_define_tracer(data, namlst)
    ENDIF
    IF ( resuspension > 0 ) THEN
       data%id_taub = aed2_locate_global_sheet('taub')
+      data%id_E_sedzone = aed2_locate_global_sheet('sed_zone')
       data%id_d_taub = aed2_define_sheet_diag_variable('d_taub','N/m**2',  'taub diagnostic')
       data%id_resus =  aed2_define_sheet_diag_variable('resus','g/m**2/s', 'resuspension rate')
-    ENDIF
+   ENDIF
 
 END SUBROUTINE aed2_define_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -247,7 +249,7 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
    AED_REAL :: temp
 
    ! State
-   AED_REAL :: ss, bottom_stress
+   AED_REAL :: ss, bottom_stress, matz
 
    ! Temporary variables
    AED_REAL :: ss_flux, theta_sed_ss = 1.0, resus_flux = 0.
@@ -262,7 +264,7 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
    temp = _STATE_VAR_(data%id_temp) ! local temperature
    IF ( data%resuspension  > 0) THEN
       bottom_stress = _STATE_VAR_S_(data%id_taub)
-      bottom_stress = MIN(bottom_stress, 100.)
+      bottom_stress = MIN(bottom_stress, 1.)
       _DIAG_VAR_S_(data%id_d_taub) = bottom_stress
       _DIAG_VAR_S_(data%id_resus) = zero_
    ENDIF
@@ -291,6 +293,11 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
          ELSE
             dummy_tau = data%tau_0(i)
             dummy_eps = data%epsilon * data%fs(i)
+
+            !MH CORRONG account for low clay conetent in more sandy MTAZ
+            matz = _STATE_VAR_S_(data%id_E_sedzone)
+            IF (matz >3) dummy_eps = dummy_eps* 0.3  
+
          ENDIF
 
          IF ( bottom_stress > dummy_tau ) THEN

@@ -37,7 +37,6 @@ MODULE aed2_habitat
       INTEGER :: id_bird, id_mtox
       INTEGER :: id_chsi, id_chpl, id_chfl, id_chsd
       INTEGER :: id_rhsi, id_rhpl, id_rhfl, id_rhsd, id_rhtr, id_rhsp
-      INTEGER :: id_wettime, id_drytime
       INTEGER, ALLOCATABLE :: id_d_rupfs(:),id_d_rupft(:),id_d_rupfl(:),id_d_rupfa(:),id_d_rupfd(:)
 
       !# Dependencies
@@ -65,10 +64,7 @@ MODULE aed2_habitat
 
    END TYPE
 
-!-------------------------------------------------------------------------------
-!MODULE VARIABLES
    LOGiCAL :: extra_diag
-   AED_REAL, PARAMETER :: DDT = 0.25/24.    ! Currently assuming 15 min timestep
 
 !===============================================================================
 CONTAINS
@@ -187,8 +183,6 @@ SUBROUTINE aed2_define_habitat(data, namlst)
      data%id_rhsd =  aed2_define_sheet_diag_variable('ruppia_hsi_seed','-', 'Ruppia Habitat Suitability - seed germination')
      data%id_rhtr =  aed2_define_sheet_diag_variable('ruppia_hsi_turion','-', 'Ruppia Habitat Suitability - turion')
      data%id_rhsp =  aed2_define_sheet_diag_variable('ruppia_hsi_sprout','-', 'Ruppia Habitat Suitability - sprout')
-     data%id_wettime = aed2_define_sheet_diag_variable('wettime','d','time cell has been innundated')
-     data%id_drytime = aed2_define_sheet_diag_variable('drytime','d','time cell has been exposed')
 
      rhsi_falg_link = 'MAG_ulva_ben'
      rhsi_salg_link = 'MAG_ulva'
@@ -441,15 +435,6 @@ SUBROUTINE aed2_calculate_riparian_habitat(data,column,layer_idx, pc_wet)
      _DIAG_VAR_S_(data%id_rhtr) = rhtr
      _DIAG_VAR_S_(data%id_rhsp) = rhsp
 
-     ! Inundation time counter and wetness checker
-     IF( pc_wet < 0.1 ) THEN
-       _DIAG_VAR_S_(data%id_drytime) = _DIAG_VAR_S_(data%id_drytime) + DDT
-       IF( _DIAG_VAR_S_(data%id_drytime)>2. ) _DIAG_VAR_S_(data%id_wettime) = zero_
-     ELSE
-       _DIAG_VAR_S_(data%id_wettime) = _DIAG_VAR_S_(data%id_wettime) + DDT
-       IF( _DIAG_VAR_S_(data%id_wettime)>2. )_DIAG_VAR_S_(data%id_drytime) = zero_
-     ENDIF
-
      ! Overall HSI : Habitat Suitability Index (Issue here re time integration)
      _DIAG_VAR_S_(data%id_rhsi) = (rhpl+rhfl+rhsd+rhtr+rhsp)/5.
 
@@ -667,16 +652,16 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
 
      IF( TRIM(stage)=="seed" ) THEN
 
-       !<10 unsuitable
-       !10-30 suboptimal
+       !<19 unsuitable
+       !19-40 suboptimal
        !40-60 optimal
        !60-85 suboptimal
        !>85 unsuitable
-       IF( salt<=10. ) THEN
+       IF( salt<=19. ) THEN
          ruppia_salinity = zero_
-       ELSE IF ( salt>10. .AND. salt<=30.  ) THEN
-         ruppia_salinity = 0. + ( (salt-10.)/(30.-10.) )
-       ELSE IF ( salt>30. .AND. salt<=60. ) THEN
+       ELSE IF ( salt>19. .AND. salt<=40.  ) THEN
+         ruppia_salinity = 0. + ( (salt-19.)/(40.-19.) )
+       ELSE IF ( salt>40. .AND. salt<=60. ) THEN
          ruppia_salinity = one_
        ELSE IF ( salt>60. .AND. salt<=85. ) THEN
          ruppia_salinity = 1. - ( (salt-60.)/(85.-60.) )
@@ -690,10 +675,10 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        !20-75 optimal
        !75 - 130 suboptimal
        !>130 unsuitable
-       IF( salt<=0.1 ) THEN
+       IF( salt<=0. ) THEN
          ruppia_salinity = zero_
-       ELSE IF ( salt>0.1 .AND. salt<=20.  ) THEN
-         ruppia_salinity = 0. + ( (salt-0.1)/(20.-0.1) )
+       ELSE IF ( salt>0. .AND. salt<=20.  ) THEN
+         ruppia_salinity = 0. + ( (salt-0.)/(20.-0.) )
        ELSE IF ( salt>20. .AND. salt<=75. ) THEN
          ruppia_salinity = one_
        ELSE IF ( salt>75. .AND. salt<=130. ) THEN
@@ -711,9 +696,9 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        !>230 unsuitable
        IF( salt<=10. ) THEN
          ruppia_salinity = zero_
-       ELSE IF ( salt>10. .AND. salt<=31.  ) THEN
-         ruppia_salinity = 0. + ( (salt-10.)/(31.-10.) )
-       ELSE IF ( salt>31. .AND. salt<=123. ) THEN
+       ELSE IF ( salt>10. .AND. salt<=72.  ) THEN
+         ruppia_salinity = 0. + ( (salt-10.)/(72.-10.) )
+       ELSE IF ( salt>72. .AND. salt<=123. ) THEN
          ruppia_salinity = one_
        ELSE IF ( salt>123. .AND. salt<=230. ) THEN
          ruppia_salinity = 1. - ( (salt-123.)/(230.-123.) )
@@ -728,14 +713,14 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
        !50 - 62 optimal
        !62 - 70 suboptimal
        !>70 unsuitable
-       IF( salt<=10. ) THEN
+       IF( salt<=47. ) THEN
          ruppia_salinity = zero_
-       ELSE IF ( salt>10. .AND. salt<=35.  ) THEN
-         ruppia_salinity = 0. + ( (salt-10.)/(35.-10.) )
-       ELSE IF ( salt>35. .AND. salt<=62. ) THEN
+       ELSE IF ( salt>47. .AND. salt<=50.  ) THEN
+         ruppia_salinity = 0. + ( (salt-47.)/(50.-47.) )
+       ELSE IF ( salt>50. .AND. salt<=70. ) THEN
          ruppia_salinity = one_
-       ELSE IF ( salt>62. .AND. salt<=100. ) THEN
-         ruppia_salinity = 1. - ( (salt-62.)/(100.-62.) )
+       ELSE IF ( salt>70. .AND. salt<=100. ) THEN
+         ruppia_salinity = 1. - ( (salt-70.)/(100.-70.) )
        ELSE IF ( salt>100. ) THEN
          ruppia_salinity = zero_
        ENDIF
@@ -850,13 +835,14 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
 
      ruppia_filalgae = one_
 
-     IF( TRIM(stage)=="adult"  .OR. &
+     IF( TRIM(stage)=="sprout" .OR. &
+         TRIM(stage)=="adult"  .OR. &
          TRIM(stage)=="flower" ) THEN
 
-       IF ( fa>=0. .AND. fa<=25. ) THEN
+       IF ( fa>=0. .AND. fa<=50. ) THEN
          ruppia_filalgae = one_
-       ELSE IF ( fa>25. .AND. fa<=100. ) THEN
-         ruppia_filalgae = 1. - ( (fa-25.)/(100.-25.) )
+       ELSE IF ( fa>50. .AND. fa<=100. ) THEN
+         ruppia_filalgae = 1. - ( (fa-50.)/(100.-50.) )
        ELSE IF ( fa>100. ) THEN
          ruppia_filalgae = zero_
        ENDIF
@@ -881,11 +867,11 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
 
      IF( TRIM(stage)=="adult" ) THEN
 
-       IF ( depth<=0.1 ) THEN
+       IF ( depth>=0. .AND. depth<=0.1 ) THEN
          ruppia_depth = zero_
-       ELSE IF ( depth>0.1 .AND. depth<=0.2 ) THEN
-         ruppia_depth = 1. - ( (depth-0.1)/(0.2-0.1) )
-       ELSE IF ( depth>0.2 ) THEN
+       ELSE IF ( depth>0.1 .AND. depth<=0.3 ) THEN
+         ruppia_depth = 1. - ( (depth-0.1)/(0.3-0.1) )
+       ELSE IF ( depth>0.3 ) THEN
          ruppia_depth = one_
        ENDIF
 
@@ -905,12 +891,8 @@ SUBROUTINE ruppia_habitat_suitability(data,rhpl,rhfl,rhsd,rhtr,rhsp,depth,salt,t
          ruppia_depth = zero_
        ELSE IF ( depth>0.01 .AND. depth<=0.1 ) THEN
          ruppia_depth = 1. - ( (depth-0.01)/(0.1-0.01) )
-       ELSE IF ( depth>0.1 .AND. depth<=0.4 ) THEN
+       ELSE IF ( depth>0.1 ) THEN
          ruppia_depth = one_
-       ELSE IF ( depth>0.4 .AND. depth<=1. ) THEN
-         ruppia_depth = 1. - ( (depth-0.4)/(1.-0.4) )
-       ELSE IF ( depth>1.0 ) THEN
-         ruppia_depth = zero_
        ENDIF
 
      ENDIF
