@@ -817,6 +817,7 @@ print *,"for nSedCols ", nSedCols
    print *,'nSpecies',candi%nSpecies
    print *,'nSedCols',nSedCols
    print *,'**************************************************************'
+
    !-- Set local constants
    CALL SetLocalConstants(candi,dia)
 
@@ -884,7 +885,7 @@ print *,"for nSedCols ", nSedCols
       WRITE(*,*) " Compulsory CANDI Variable not simulated: DIC. STOPPING"
       STOP
    END IF
-
+print*,'OMModel is ...',candi%param%OMModel
    !-------- kgmod ------------ OMModel1
    IF(candi%param%OMModel < 1 .OR. candi%param%OMModel > 3) THEN
      PRINT *, ('OMModel must be 1, 2 or 3. STOPPING')
@@ -1492,6 +1493,7 @@ print *,"for nSedCols ", nSedCols
 
    WRITE(*,"(9X,'Configuration Successful ')")
 
+
  END SUBROUTINE ConfigureCANDI
 !------------------------------------------------------------------------------!
 
@@ -1609,6 +1611,7 @@ SUBROUTINE InitialiseCANDI(candi,bottomConcs,sedimentConcs)
      !##
      !##END IF
 
+	  
      ! Hardcoded mixed-profile types for CdA sed candi
      !OM_min = 0.80
      !InitMinDepth = 100.0 !cm
@@ -1669,6 +1672,7 @@ SUBROUTINE InitialiseCANDI(candi,bottomConcs,sedimentConcs)
      !-- Restart
      ! CALL readauf(11)
    END IF
+
 print*,"End InitialiseCANDI"
 !print*," candi%y bounds ",lbound(candi%y,1), ubound(candi%y,1),lbound(candi%y,2), ubound(candi%y,2)
 !do i=1,100
@@ -2084,11 +2088,18 @@ SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
    !psp(:) = ps(:)/poros(:)
    !pps(:) = poros(:)/ps(:)
    !#endif
+
+	  
    !-- Calculate RATE constants
    CALL RATES(candi)
 
+	  
+
    !-- Calculate REACTION terms
    CALL REACTION(candi)
+
+	  
+   
 !print*,"--------------- reac ----------------------"
 !print*,candi%reac
 
@@ -2186,6 +2197,7 @@ SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
 
    !#endif
 
+
    !  Find out which species has the largest changes between two timesteps
    maxdot = 0.0
    DO i=1,candi%npt
@@ -2204,6 +2216,7 @@ SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
      !-- Fill 1D YFEX arrays from 2D arrays for the VODE solver
      CALL Copy2Dinto1D(neq,yfex,ydotfex,candi%nSPECIES,candi%y,candi%ydot)
    END IF
+
 
    RETURN
  END SUBROUTINE FEX
@@ -2295,7 +2308,9 @@ SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
    candi%ydot(speci,candi%npt) = candi%DIFFC(speci,candi%npt)/candi%t2(candi%npt) * TWO             &
                      * (-candi%y(speci,candi%npt)+candi%y(speci,candi%npt-1))/candi%dh2(candi%npt)
    RETURN
+
  END SUBROUTINE LiqMotion
+
 !------------------------------------------------------------------------------!
 
 !------------------------------------------------------------------------------!
@@ -2363,6 +2378,7 @@ SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
 
    candi%ydot(speci,candi%npt) = diff+adv
 
+
    RETURN
  END SUBROUTINE SolMotion
 !------------------------------------------------------------------------------!
@@ -2377,6 +2393,7 @@ SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
    INTEGER, INTENT(IN)                  :: layer
 
    firrig = candi%cirrig(layer)*(candi%top_bound(speci) - candi%y(speci,layer))
+
 
    RETURN
  END FUNCTION FIrrig
@@ -2471,6 +2488,14 @@ SUBROUTINE FEX(candi_, neq, t, yfex, ydotfex, rparfex, ipar)
        candi%reac(candi%POMLy,i) = - candi%param%poml2dic*candi%y(candi%POMLy,i)
        candi%reac(candi%POMRy,i) = - candi%param%pomr2dic*candi%y(candi%POMRy,i)
        candi%reac(candi%POMspecialy,i) = - candi%param%pomspecial2dic*candi%y(candi%POMspecialy,i)
+	
+
+	   !IF (candi%param%poml2dic>1) THEN
+	   !  diagenesis%param%poml2dic
+	   !print*,'poml2dic', candi%param%poml2dic
+	   !PAUSE
+	   !ENDIF
+	   	   
        ELSE
        candi%reac(candi%POMLy,i) = - candi%TerminalOxidation(i)
      !  reac(POMRy,i) = 0.
@@ -4054,6 +4079,9 @@ END DO ! Search "Tiger"
          !These stoichiometry ratios are from Van Cappellen and Wang 1996
            !because I wanted to calibrate to their data.
          !Canavan et al 2006 use different stoichiometry.
+		 
+		 !print*, 'POML' , candi%y(candi%POMLy,1:5)
+		 
          !These are written from the point of view of the oxidants, normalised to 1 carbon.
          candi%TerminalOxidation(:) = candi%param%poml2dic*candi%y(candi%POMLy,:)*(candi%param%xlab/candi%param%xlab) &
                + candi%param%pomr2dic*candi%y(candi%POMRy,:)*(candi%param%xref/candi%param%xref) &
@@ -4695,7 +4723,7 @@ print*,"p00= ",candi%param%p00
    ELSE
      candi%poros(:)= (candi%param%p0-candi%param%p00)*EXP(-candi%param%bp*candi%rpar(:)) + candi%param%p00
    END IF
-print*,"poros=",candi%poros
+!print*,"poros=",candi%poros
    !#ifdef porosvar
    !do i=1,npt
    !  poros_bg(i) = poros(i)
@@ -4782,10 +4810,10 @@ print*,"poros=",candi%poros
       candi%psp(i) = candi%ps(i)/candi%poros(i)
       candi%pps(i) = candi%poros(i)/candi%ps(i)
    ENDDO
-   print*,"p0",candi%param%p0
-   print*,"psp",candi%psp(:)
-   print*,"pps",candi%pps(:)
-   print*,"poros",candi%poros(:)
+  ! print*,"p0",candi%param%p0
+  ! print*,"psp",candi%psp(:)
+  ! print*,"pps",candi%pps(:)
+  ! print*,"poros",candi%poros(:)
    !       Burial velocity of solids
    candi%wvel(:) = candi%param%w00*(one - candi%param%p00)/(candi%ps(:))
    !       Porewater velocity du to burial of sediment in case of const.
@@ -5247,7 +5275,6 @@ END SUBROUTINE myerror
              +candi%y(candi%DOCRy,candi%npt)+candi%y(candi%POCRy,candi%npt))*candi%wvel(candi%npt)*candi%ps(candi%npt)
    ! note: should split to wvel and uvel for solids and liquids
 
-
    WRITE(fid,'(a50)') '============================================='
    WRITE(fid,'(a50)') 'Results from Corg-mass conservation check'
    WRITE(fid,'(a25,f20.10)') 'Flux in (fg0+fg1+fg2) : ',(candi%fg0+candi%fg1+candi%fg2)
@@ -5279,7 +5306,6 @@ END SUBROUTINE myerror
    WRITE(fid,'(a20,f20.10)') 'Flux FeII       :',dfluxes(candi,2,candi%feiiy)
    END IF
    WRITE(fid,'(a20,f20.10)') 'Flux CH4        :',dfluxes(candi,2,candi%ch4y)
-
    WRITE(fid,'(a50)') '============================================='
    WRITE(fid,'(a50)') 'Fluxes at the bottom:                        '
    WRITE(fid,'(a20,f20.10)') 'Flux O2         :',dfluxes(candi,candi%npt,candi%o2y)
@@ -5297,6 +5323,7 @@ END SUBROUTINE myerror
        -(candi%y(candi%DOCLy,candi%npt)+candi%y(candi%POCLy,candi%npt) &
        +candi%y(candi%POCRy,candi%npt)+candi%y(candi%DOCRy,candi%npt)  &
        )*candi%ps(candi%npt)*candi%wvel(candi%npt)
+
 
    WRITE(fid,'(a50)') '============================================='
    WRITE(fid,'(a50)') 'Vertical integrated secondary redox-rates'
@@ -5323,6 +5350,7 @@ END SUBROUTINE myerror
    WRITE(fid,'(a25,f20.10)') 'RFe1NO3               : ',candi%srfe1no3
    WRITE(fid,'(a25,f20.10)') 'RFe2NO3               : ',candi%srfe2no3
    END IF
+ 
    WRITE(fid,'(a50)') '============================================='
    WRITE(fid,'(a50)') 'Vertical integrated equilibrium rates'
    WRITE(fid,'(a25,f20.10)') 'RDCO2                : ',candi%srdco2

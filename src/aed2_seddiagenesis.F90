@@ -25,7 +25,7 @@
 MODULE aed2_seddiagenesis
 
    USE aed2_core
-   USE aed2_util,        ONLY : PO4AdsorptionFraction
+   USE aed2_util,        ONLY : PO4AdsorptionFraction, in_zone_set
    USE aed2_read_candi
    USE aed2_gctypes
    USE aed2_gclib,       ONLY : AED_GC_Input,printTables
@@ -34,6 +34,11 @@ MODULE aed2_seddiagenesis
                                 UpdateEquilibration
    USE aed2_sedcandi,    ONLY : ConfigureCANDI, InitialiseCANDI, doCANDI, &
                                 dfluxes, aed2_sed_candi_t, ResultsDir
+								
+								
+								
+								
+								
 
    IMPLICIT NONE
 
@@ -52,13 +57,14 @@ MODULE aed2_seddiagenesis
       INTEGER, ALLOCATABLE :: id_bw(:)
       INTEGER, ALLOCATABLE :: id_df(:),id_pf(:)
 
-      INTEGER  :: id_zones
-!     INTEGER  :: id_tot_sed
+      INTEGER  :: id_sed_zone
+      AED_REAL,ALLOCATABLE :: active_zones(:)
 
       !# Model parameters
-      INTEGER  :: sed_modl, n_zones, nSedLayers, startSedCol, endSedCol
+      INTEGER  :: sed_modl, n_zones, startSedCol, endSedCol
+	  INTEGER, ALLOCATABLE :: nSedLayers(:)
 
-      TYPE(aed2_sed_candi_t) :: candi
+      TYPE(aed2_sed_candi_t), DIMENSION(:), ALLOCATABLE :: candi
       AED_REAL, DIMENSION(:,:,:), ALLOCATABLE :: SedLayerData
 
      CONTAINS
@@ -74,7 +80,8 @@ MODULE aed2_seddiagenesis
    CHARACTER(len=40) :: variables(_MAX_LINKS_),      &
                         water_link(_MAX_LINKS_),     &
                         diss_flux_link(_MAX_LINKS_), &
-                        part_sed_link(_MAX_LINKS_)
+                        part_sed_link(_MAX_LINKS_),  &
+                        morevariables(_MAX_LINKS_)						
 
    AED_REAL          :: default_vals(_MAX_LINKS_)
    AED_REAL          :: initial_vals(_MAX_LINKS_)
@@ -87,18 +94,20 @@ MODULE aed2_seddiagenesis
    INTEGER, ALLOCATABLE :: dColMap(:)
    INTEGER, ALLOCATABLE :: pColMap(:)
    INTEGER  :: nSedDissEqVars, nSedPartEqVars
-
+   LOGICAL,DIMENSION(:),ALLOCATABLE           :: dummySolid
 
    TYPE(AEDConstDiagenesisType), DIMENSION(:), ALLOCATABLE :: diagenesis
 
-   INTEGER  :: fgcount, updateStep, nvars
+   INTEGER  :: fgcount, updateStep, nvars, nmorevars
 
    INTEGER, PARAMETER :: sedfid_=101010
+   INTEGER, PARAMETER :: sedfid_2=202020
    INTEGER :: sedfid
+   INTEGER :: sedfid2
 
-   AED_REAL :: time
+  ! AED_REAL :: time
   !INTEGER  :: substep, thisStep
-   INTEGER  :: thisStep
+  ! INTEGER  :: thisStep
 
 !===============================================================================
 CONTAINS
@@ -141,7 +150,7 @@ SUBROUTINE aed2_define_seddiagenesis(data, namlst)
    IF ( sediment_model .EQ. "DYNAMIC" ) THEN
       data%sed_modl = 3
    ELSEIF ( sediment_model .EQ. "DYNAMIC2D" ) THEN
-      data%id_zones = aed2_locate_global('sed_zone')
+      data%id_sed_zone = aed2_locate_global('sed_zone')  !FIX
       data%sed_modl = 4
    ELSE
       print *,'Not supported'
@@ -182,7 +191,8 @@ print*,"locating PSL '",TRIM(part_sed_link(i)),"'",i
    data%id_temp = aed2_locate_global( 'temperature')
    data%id_salt = aed2_locate_global( 'salinity')
    data%id_par = aed2_locate_global(  'par')
-
+   data%id_sed_zone = aed2_locate_global_sheet('sed_zone')
+   
    ! Now initialise it
    CALL initialise_dynamic_sediment(data,namlst,default_vals)
 
@@ -199,17 +209,17 @@ CONTAINS
       INTEGER,INTENT(in)                              :: namlst
    !
    !LOCALS
-      LOGICAL,DIMENSION(:),ALLOCATABLE           :: dummySolid
+
       CHARACTER(LEN=64),DIMENSION(:),ALLOCATABLE :: dummyName
      !CHARACTER(len=64) :: sediment_model=''
 
-      INTEGER  :: i, nSedCols, parCounter, disCounter, var
+      INTEGER  :: i, nSedCols, parCounter, disCounter, var, zone, morevar
       INTEGER  :: num_components, num_minerals
       CHARACTER(len=64) :: dis_components(MAX_GC_COMPONENTS)
       CHARACTER(len=64) :: the_minerals(MAX_GC_MINERALS)
       INTEGER, ALLOCATABLE :: dColMapTmp(:)
       INTEGER, ALLOCATABLE :: pColMapTmp(:)
-
+   
       !-- Timey things --!
         INTEGER  :: timeswitch
         REAL     :: num_days
@@ -267,9 +277,8 @@ CONTAINS
         CHARACTER(len=256) :: geochem_file = 'aed2_geochem_pars.dat'
 
         !-- other
-        INTEGER  :: nZones = 1, the_zones(10)
+        INTEGER  :: nZones = 1, active_zones(1000)
         CHARACTER(len=128) :: zone_pars
-
         INTEGER  :: Bsolidswitch
 
       NAMELIST /aed2_sed_candi/                                                &
@@ -294,16 +303,16 @@ CONTAINS
 
                      ! var links etc
                      variables, default_vals, initial_vals,                    &
-                     water_link, diss_flux_link, part_sed_link,                &
+                     water_link, diss_flux_link, part_sed_link,			       &
+					 morevariables, & 
 
                      ! zone stuff
-                     nZones, the_zones, zone_pars, Bsolidswitch
-
+                     nZones, active_zones, zone_pars, Bsolidswitch
 
    !----------------------------------------------------------------------------
    !BEGIN
       variables = ''
-
+      	  
       ! Read the namelist
       read(namlst,nml=aed2_sed_candi,iostat=status)
       IF (status /= 0) STOP 'Error reading namelist aed2_sed_candi'
@@ -311,71 +320,97 @@ CONTAINS
       IF (substep < 0) substep = 24   ! Assuming AED2 is running hourly
 
       data%n_zones = nZones
+      IF (nZones > 0) THEN
+        ALLOCATE(data%active_zones(nZones))
+        DO i=1,nZones
+         data%active_zones(i) = active_zones(i)
+        ENDDO
+      ENDIF		
 
-      ALLOCATE(diagenesis(data%n_zones))
+      ALLOCATE(data%candi(data%n_zones))
+	  ALLOCATE(diagenesis(data%n_zones))
+		print*,'n_zones', data%n_zones
 
-      DO i=1,data%n_zones
+      DO zone=1,data%n_zones
+	    data%candi(zone)%daysFromStart = zero_
       ! OM model 1
-        diagenesis(i)%stcoef%fracCPL       = fracCPL !(i)          ! Dan added
-        diagenesis(i)%stcoef%fracCPR       = fracCPR !(i)          ! Dan added
-        diagenesis(i)%stcoef%fracCPspecial = fracCPspecial !(i)    ! Dan added
-        diagenesis(i)%stcoef%fracNPL       = fracNPL !(i)          ! Dan added
-        diagenesis(i)%stcoef%fracNPR       = fracNPR !(i)          ! Dan added
-        diagenesis(i)%stcoef%fracNPspecial = fracNPspecial !(i)    ! Dan added
-        diagenesis(i)%stcoef%fracPPL       = fracPPL !(i)          ! Dan added
-        diagenesis(i)%stcoef%fracPPR       = fracPPR !(i)          ! Dan added
-        diagenesis(i)%stcoef%fracPPspecial = fracPPspecial !(i)    ! Dan added
+        !data%candi(zone)%param%stcoef ...  = fracCPL !(i)   
+		
+		diagenesis(zone)%stcoef%fracCPL       = fracCPL !(i)          ! Dan added
+        diagenesis(zone)%stcoef%fracCPR       = fracCPR !(i)          ! Dan added
+        diagenesis(zone)%stcoef%fracCPspecial = fracCPspecial !(i)    ! Dan added
+        diagenesis(zone)%stcoef%fracNPL       = fracNPL !(i)          ! Dan added
+        diagenesis(zone)%stcoef%fracNPR       = fracNPR !(i)          ! Dan added
+        diagenesis(zone)%stcoef%fracNPspecial = fracNPspecial !(i)    ! Dan added
+        diagenesis(zone)%stcoef%fracPPL       = fracPPL !(i)          ! Dan added
+        diagenesis(zone)%stcoef%fracPPR       = fracPPR !(i)          ! Dan added
+        diagenesis(zone)%stcoef%fracPPspecial = fracPPspecial !(i)    ! Dan added
       ! OM model 2
       ! Nothing.
       ! OM model 3
-        diagenesis(i)%stcoef%fracCDHyd    = fracCDHyd
-        diagenesis(i)%stcoef%fracNDHyd    = fracNDHyd
-        diagenesis(i)%stcoef%fracPDHyd    = fracPDHyd
-        diagenesis(i)%stcoef%fracCOAc     = fracCOAc
-        diagenesis(i)%stcoef%fracNOAc     = fracNOAc
-        diagenesis(i)%stcoef%fracPOAc     = fracPOAc
-        diagenesis(i)%stcoef%fracCH2      = fracCH2
-        diagenesis(i)%stcoef%fracNH2      = fracNH2
-        diagenesis(i)%stcoef%fracPH2      = fracPH2
+        diagenesis(zone)%stcoef%fracCDHyd    = fracCDHyd
+        diagenesis(zone)%stcoef%fracNDHyd    = fracNDHyd
+        diagenesis(zone)%stcoef%fracPDHyd    = fracPDHyd
+        diagenesis(zone)%stcoef%fracCOAc     = fracCOAc
+        diagenesis(zone)%stcoef%fracNOAc     = fracNOAc
+        diagenesis(zone)%stcoef%fracPOAc     = fracPOAc
+        diagenesis(zone)%stcoef%fracCH2      = fracCH2
+        diagenesis(zone)%stcoef%fracNH2      = fracNH2
+        diagenesis(zone)%stcoef%fracPH2      = fracPH2
 
-        diagenesis(i)%BC%ibc2          = ibc2 !(i)
-        diagenesis(i)%BC%ibbc          = ibbc !(i)
-        diagenesis(i)%BC%startSteady   = startSteady !(i)
-        diagenesis(i)%BC%flux_scale    = flux_scale !(i)
-        diagenesis(i)%BC%POMVR         = POMVR !(i)
-        diagenesis(i)%BC%InitSedDepth  = InitSedDepth !(i)
-        diagenesis(i)%BC%OMInitMethodL = OMInitMethodL !(i)
-        diagenesis(i)%BC%OM_topL       = OM_topL !(i)
-        diagenesis(i)%BC%OM_minL       = OM_minL !(i)
-        diagenesis(i)%BC%OM_cfL        = OM_cfL !(i)
-        diagenesis(i)%BC%InitMinDepthL = InitMinDepthL !(i)
-        diagenesis(i)%BC%OMInitMethodR = OMInitMethodR !(i)
-        diagenesis(i)%BC%OM_topR       = OM_topR !(i)
-        diagenesis(i)%BC%OM_minR       = OM_minR !(i)
-        diagenesis(i)%BC%OM_cfR        = OM_cfR !(i)
-        diagenesis(i)%BC%InitMinDepthR = InitMinDepthR !(i)
-        diagenesis(i)%BC%InMinDep      = InMinDep !(i)
-        diagenesis(i)%BC%OutputUnits   = OutputUnits !(i)
+        diagenesis(zone)%BC%ibc2          = ibc2 !(i)
+        diagenesis(zone)%BC%ibbc          = ibbc !(i)
+        diagenesis(zone)%BC%startSteady   = startSteady !(i)
+        diagenesis(zone)%BC%flux_scale    = flux_scale !(i)
+        diagenesis(zone)%BC%POMVR         = POMVR !(i)
+        diagenesis(zone)%BC%InitSedDepth  = InitSedDepth !(i)
+        diagenesis(zone)%BC%OMInitMethodL = OMInitMethodL !(i)
+        diagenesis(zone)%BC%OM_topL       = OM_topL !(i)
+        diagenesis(zone)%BC%OM_minL       = OM_minL !(i)
+        diagenesis(zone)%BC%OM_cfL        = OM_cfL !(i)
+        diagenesis(zone)%BC%InitMinDepthL = InitMinDepthL !(i)
+        diagenesis(zone)%BC%OMInitMethodR = OMInitMethodR !(i)
+        diagenesis(zone)%BC%OM_topR       = OM_topR !(i)
+        diagenesis(zone)%BC%OM_minR       = OM_minR !(i)
+        diagenesis(zone)%BC%OM_cfR        = OM_cfR !(i)
+        diagenesis(zone)%BC%InitMinDepthR = InitMinDepthR !(i)
+        diagenesis(zone)%BC%InMinDep      = InMinDep !(i)
+        diagenesis(zone)%BC%OutputUnits   = OutputUnits !(i)
 
-        diagenesis(i)%time%timeswitch    = timeswitch !(i)
-        diagenesis(i)%time%num_days      = num_days !(i)
-        diagenesis(i)%time%fluxon        = fluxon !(i)
-        diagenesis(i)%time%fluxoff       = fluxoff  !(i)
-        diagenesis(i)%time%substep       = substep  !(i)
-        diagenesis(i)%time%driverDT      = driverDT  !(i)
+        diagenesis(zone)%time%timeswitch    = timeswitch !(i)
+        diagenesis(zone)%time%num_days      = num_days !(i)
+        diagenesis(zone)%time%fluxon        = fluxon !(i)
+        diagenesis(zone)%time%fluxoff       = fluxoff  !(i)
+        diagenesis(zone)%time%substep       = substep  !(i)
+        diagenesis(zone)%time%driverDT      = driverDT  !(i)
+		print*, 'zone index in the allocation do loop ...', zone
+	
       ENDDO
 
+	    
  print*,'Calling read_sed_candi_params with ',ubound(diagenesis%param,1), data%n_zones
       CALL read_sed_candi_params(zone_pars, diagenesis%param, data%n_zones)
+	  !    Function in separate .F90 ('../External/AED2/aed2_candi_params.csv' in aed2.nml , the values from the csv, a list of integers in aed2.nml)
       diagenesis%param%SolidInitialUnit = SolidInitialUnit
 
-      data%nSedLayers = diagenesis(1)%param%maxnpts
+print*,'The whole diagenesis%param is ...', diagenesis%param
+print*, 'zone index ...', zone
+
+ALLOCATE(data%nSedLayers(data%n_zones))
+data%nSedLayers = diagenesis%param%maxnpts
+
 
       WRITE(*,"(6X,'Configuring CANDI...')")
       DO i =1,_MAX_LINKS_
          IF(TRIM(variables(i))/='') nvars = i
       ENDDO
+	  
+	  DO i =1,_MAX_LINKS_
+         IF(TRIM(morevariables(i))/='') nmorevars = i
+      ENDDO
       !nvars = 38
+!print *, 'morevariables size', LENGTH(morevariables)
+!PAUSE
 
       ! Variables not requested by user that are compulsory, and added to the end
       variables(nvars+1) = 'pH'
@@ -753,27 +788,39 @@ CONTAINS
 
       ENDDO
 
+print*,'nzones is ...', nzones
+print*, 'i index ...' , i
+print*, 'zone index ...', zone
+
+
+
       !----------------------------------------------------------------------------
       !-- Configure the main CANDI-AED model configuration
-      CALL ConfigureCANDI(data%candi,            &
-                          diagenesis(1),         &
-                          data%nSedLayers,       &
+	  DO zone=1,data%n_zones
+         CALL ConfigureCANDI(data%candi(zone),    &
+                          diagenesis(zone),       &
+                          diagenesis(zone)%param%maxnpts,       &
                           nvars+3,               &
                           variables(1:nvars+3),  &
                           dummySolid(1:nvars+3), &
                           nSedCols)
+						  print*,'zone',zone
+	  ENDDO
+
+  
       data%startSedCol = 0
       data%endSedCol   = nSedCols-1
       print *,'nsedcols    %%%%%%%%%%%%%%%%%%%', nSedCols,data%endSedCol
 
       !-- Allocate space component objects
-      ALLOCATE(data%SedLayerData(data%n_zones,data%nSedLayers,data%startSedCol:data%endSedCol))
-      data%SedLayerData = 0.0
-
-      time = 0.0
-      thisStep = 0
-
-
+	  
+      !ALLOCATE(data%SedLayerData(data%n_zones,data%nSedLayers(),data%startSedCol:data%endSedCol))
+      
+	  !ALLOCATE(data%SedLayerData(data%n_zones,data%nSedLayers,data%startSedCol:data%endSedCol))
+      !data%SedLayerData = 0.0
+      !time = 0.0
+      !thisStep = 0
+	  
      !----------------------------------------------------------------------------
      ! Configure the geochemical solver for sediment vars
 !    CALL AED_GC_Input('aed2_geochem_pars.dat')
@@ -849,7 +896,8 @@ SUBROUTINE initialise_dynamic_sediment(data,namlst,default_vals)
    CHARACTER(LEN=256) :: FileName
    CHARACTER(len=128) :: ResultsDirX
    CHARACTER(len=8) :: zoneName
-!
+   
+   !
 !-------------------------------------------------------------------------------
 !BEGIN
     WRITE(*,"(4X,'Initialising sediment diagenesis model (CANDI-AED)...')")
@@ -864,7 +912,7 @@ SUBROUTINE initialise_dynamic_sediment(data,namlst,default_vals)
 
     DO zone = 1,data%n_zones         ! DO Horse
        sedfid = sedfid_ + (zone-1)*(nSedPartEqVars+nVars+3+12)
-       write(zoneName, "(I5.5)") zone
+       write(zoneName, "(I5.5)")  INT(data%active_zones(zone))
        ResultsDirX = TRIM(ResultsDir) // TRIM(zoneName) // '/'
        if (.NOT. make_dir_path(ResultsDirX) ) print*, "failed to make directory ", TRIM(ResultsDirX)
 
@@ -874,7 +922,7 @@ SUBROUTINE initialise_dynamic_sediment(data,namlst,default_vals)
        DO var = data%startSedCol,data%endSedCol         ! DO Donkey
 
            bottomConcs(var)   = default_vals(var+1) /1e3  ! mmol/m3 -> mmol/L
-           IF(data%candi%isSolid(var)) THEN
+           IF(data%candi(zone)%isSolid(var)) THEN
               ! Assumign solids are fluxing, init val all the way to the top
               bottomConcs(var)   = initial_vals(var+1) /1e3  ! mmol/m3 -> mmol/L
            END IF
@@ -893,28 +941,30 @@ SUBROUTINE initialise_dynamic_sediment(data,namlst,default_vals)
        sedimentConcs((nvars+3)-1)  =    0 ! -0.056
 
 !# CAB
-print *,'Zone ',zone
+print *,'Zone +++++++++++++',zone
+
 !print *, 'sedimentConcs', sedimentConcs
 !print *, 'bottomConcs', bottomConcs
        ! For the fish project, the field data shows a consistent water pH of 8.0
        !-- Initialise diagenesis model
         !print *, 'bottomConcs', bottomConcs
-       CALL initialiseCANDI(data%candi,bottomConcs,sedimentConcs)
+       CALL initialiseCANDI(data%candi(zone),bottomConcs,sedimentConcs)
+	   
 !#CAB
 !print *,'===================================='
 !print*,data%candi%Y
 !print *,'===================================='
        !This function lives in aed2_sedcandi
        !-- IF INITIALIZING WE MUST PERFORM AN INITIAL EQUILIBRATION
-       DO kk = 1,data%nSedLayers      !DO Unicorns
-          dissConcs = data%candi%Y(dColMap,kk)
-          partConcs = data%candi%Y(pColMap,kk)
+       DO kk = 1, diagenesis(zone)%param%maxnpts       !DO Unicorns
+          dissConcs = data%candi(zone)%Y(dColMap,kk)
+          partConcs = data%candi(zone)%Y(pColMap,kk)
 !         print *, 'dissConcs', dissConcs
 !         print *,'bottomConcs,',bottomConcs
 !         print *,'partConcs,',partConcs
           CALL InitialiseGCProperties( dissConcs, partConcs, 0 )
-          data%candi%Y(dColMap,kk) = dissConcs
-          data%candi%Y(pColMap,kk) = partConcs
+          data%candi(zone)%Y(dColMap,kk) = dissConcs
+          data%candi(zone)%Y(pColMap,kk) = partConcs
        ENDDO                          !ENDDO Unicorns
 !      !-- Store initialised "Y" array into SedimentData for this zone
 !      DO kk = 1,data%nSedLayers
@@ -934,10 +984,10 @@ print *,'Zone ',zone
          WRITE(sedfid+var, &
            "('%! AED SedDiagenesis Output: ',A40 )")FileName
          WRITE(sedfid+var, &
-            "('%!   1st column is time (years), remaining ',I3,' columns correspond to sed layers')")data%nSedLayers
+            "('%!   1st column is time (years), remaining ',I3,' columns correspond to sed layers')")diagenesis(zone)%param%maxnpts
          WRITE(sedfid+var, &
            "('%!   1st row is layer depths (cm)')")
-         WRITE(sedfid+var,"(E13.5, 100E11.4)")0.0,data%candi%rpar(:)
+         WRITE(sedfid+var,"(E13.5, 100E11.4)")0.0,data%candi(zone)%rpar(:)
        ENDDO
        DO var = 1,SIZE(partConcs)
          FileName = TRIM(ResultsDirX)//"/IAP_"//TRIM(listSedPartEqVars(var))//".sed"   ! Needs zone dir
@@ -952,10 +1002,10 @@ print *,'Zone ',zone
          WRITE(sedfid+(nvars+3)+var+1, &
            "('%! AED SedDiagenesis IAP Output: ',A40 )")FileName
          WRITE(sedfid+(nvars+3)+var+1, &
-            "('%!   1st column is time (years), remaining ',I3,' columns correspond to sed layers')")data%nSedLayers
+            "('%!   1st column is time (years), remaining ',I3,' columns correspond to sed layers')")diagenesis(zone)%param%maxnpts
          WRITE(sedfid+(nvars+3)+var+1, &
            "('%!   1st row is layer depths (cm)')")
-         WRITE(sedfid+(nvars+3)+var+1,"(E13.5, 100E11.4)")0.0,data%candi%rpar(:)
+         WRITE(sedfid+(nvars+3)+var+1,"(E13.5, 100E11.4)")0.0,data%candi(zone)%rpar(:)
        ENDDO
        FileName = TRIM(ResultsDirX)//"/swi_fluxes.sed"   ! need a file for dissolved fluxes
        OPEN(UNIT = sedfid+(nvars+3)+SIZE(partConcs)+10, FILE = TRIM(FileName), &
@@ -971,13 +1021,51 @@ print *,'Zone ',zone
        WRITE(sedfid+(nvars+3)+SIZE(partConcs)+10, &
           "('%!   1st column is time (years), remaining ',I3,' columns correspond to variables')")nvars
 !      sedfid = sedfid_ + (zone-1)*(nSedPartEqVars+nVars+3+12)
-    ENDDO    ! DO Horse
+         WRITE(sedfid+(nvars+3)+SIZE(partConcs)+10,"('  Variable      ',100(A12,2X))")variables (1:(nvars))
+         WRITE(sedfid+(nvars+3)+SIZE(partConcs)+10,"('  Solid        ',100(L,12X))")  dummysolid(1:(nvars))
+
+		 
+  !--------------- Open some output text files to put the other variables (factors, rates and concentration sums)! ---------------------
+       DO nmorevars = 1, 2!(morevariables)
+	     FileName = TRIM(ResultsDirX)//TRIM(morevariables(nmorevars))//".sed"  
+         OPEN(UNIT = sedfid2+nmorevars, FILE = TRIM(FileName), &
+             STATUS = "REPLACE", ACTION = "WRITE", IOSTAT = openStatus)
+         !IF (openStatus /= 0) THEN
+         !  PRINT *,' initialise_dynamic_sediment(): Error on attempt to open sed file:',FileName
+         !  PRINT *,'   Make sure the directory ./results/candi_aed/ exists'
+         !  STOP    " PROGRAM STOPPED"
+         !END IF
+         !-- Now print file header containing info and layer details
+         WRITE(sedfid2+nmorevars, &
+           "('%! AED SedDiagenesis Output: ',A40 )")FileName
+         WRITE(sedfid2+nmorevars, &
+            "('%!   1st column is time (years), remaining ',I3,' columns correspond to sed layers')")diagenesis(zone)%param%maxnpts
+         WRITE(sedfid2+nmorevars, &
+           "('%!   1st row is layer depths (cm)')")
+         WRITE(sedfid2+nmorevars,"(E13.5, 100E11.4)")0.0,data%candi(zone)%rpar(:)
+	
+	   ENDDO ! ---------------------------------------------------------------------------------------------------------
+
+		 
+	OPEN(UNIT=404040+00, FILE=TRIM(ResultsDirX)//"Depths.sed")
+    WRITE(404040+00,"('Depths      ', E13.5, 401E11.4)")data%candi(zone)%rpar(:)
+    WRITE(404040+00,"('Porosity    ', E13.5, 401E11.4)")data%candi(zone)%poros(:)
+    WRITE(404040+00,"('Irrigation  ', E13.5, 401E11.4)")data%candi(zone)%cirrig(:)
+    WRITE(404040+00,"('Bioturbation', E13.5, 401E11.4)")data%candi(zone)%bioturb(:)
+	
+		 
+		 
+    ENDDO    ! DO Horse (zones)
     DEALLOCATE(sedimentConcs)
     DEALLOCATE(bottomConcs)
 !   DEALLOCATE(tt)
     WRITE(*,"(6X,'CANDI initialised OK')")
 !   RETURN
 !99 CALL fatal_error('aed2_sediment_init','Error reading namelist initialise_dynamic_sediment')
+
+
+
+
 END SUBROUTINE initialise_dynamic_sediment
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -996,23 +1084,36 @@ SUBROUTINE aed2_calculate_benthic_seddiagenesis(data,column,layer_idx)
  ! AED_REAL :: steady, conc, flux, factor, default_bottom_ubalchg, default_bottom_pH
    DOUBLETYPE :: steady
    AED_REAL :: conc, flux, factor, default_bottom_ubalchg, default_bottom_pH
-   INTEGER  :: zone,layer, var, rxn_mode
+   INTEGER  :: zone,layer, var, rxn_mode,i, morevars
    AED_REAL,DIMENSION(nSedDissEqVars)     :: dissConcs
-   AED_REAL,DIMENSION(nSedPartEqVars)     :: partConcs, IAPtmp, KIAPtmp, QIAPtmp
+   AED_REAL,DIMENSION(nSedPartEqVars)     :: partConcs, IAPtmp, KIAPtmp, QIAPtmp, morevarlist
    AED_REAL,DIMENSION(SIZE(default_vals)) :: dynamic_vals
    AED_REAL,DIMENSION(SIZE(default_vals)) :: swi_flux
    AED_REAL :: PO4dis,PO4par,pH
 
    AED_REAL :: Kpo4p, Kadsratio, Qmax   ! CAB Added
+   AED_REAL :: matz
 
+   
+ 
+   ! Check this cell is in an active zone for diagenesis
+   matz = _STATE_VAR_S_(data%id_sed_zone)
+   if ( .NOT. in_zone_set(matz, data%active_zones) ) return
 
-   CALL do_ben(data%candi)
+   zone = 0
+   DO i = 1,data%n_zones
+        IF(data%active_zones(i) == matz ) zone = i
+   ENDDO
 
+	CALL do_ben( data%candi(zone), zone )
+
+ 
 CONTAINS
 
    !############################################################################
-   SUBROUTINE do_ben(candi)
+   SUBROUTINE do_ben(candi,zone)
    TYPE(aed2_sed_candi_t),TARGET :: candi
+   INTEGER :: zone
    !----------------------------------------------------------------------------
    !
       TYPE(aed2_sed_candi_t),pointer :: pcandi
@@ -1020,32 +1121,37 @@ CONTAINS
    !BEGIN
       pcandi => candi
 
-      thisStep = thisStep+1
+	  
+	  !-- Update zone-specific time counter and report
+      candi%thisStep = candi%thisStep+1
+      IF( candi%thisStep<candi%time%substep ) RETURN
 
-      IF(thisStep<candi%time%substep) RETURN
+      candi%daysFromStart = candi%daysFromStart + candi%deltaT *365.25      ! DeltaT is calculated in sedcandi (in years).
+      WRITE(*,"(8X,'seddiagenesis zone: ',I5,'(',I5,'/',I5,') @t=',F8.5,' days')")&
+	       ,INT(data%active_zones(zone)),zone,data%n_zones,candi%daysFromStart
+	  
+	  !-- Set zone-specific file ID
+      sedfid = sedfid_ + (zone-1)*(nSedPartEqVars+nVars+3+12)
 
-      time = time + candi%deltaT
-      !print *, 'time', time
-      DO zone = 1,data%n_zones
-         sedfid = sedfid_ + (zone-1)*(nSedPartEqVars+nVars+3+12)
-         WRITE(*,"(8X,'Updating sediment profiles @ zone: ',I5,'/',I5,' :',F8.5,' years')")zone,data%n_zones,time
+      !-- Retrieve current environmental conditions for the cell.
+      candi%TEMP = _STATE_VAR_(data%id_temp) ! local temperature
+      candi%SALT = _STATE_VAR_(data%id_salt) ! local salinity
+      candi%PRES = 1.025E-3 * 1.0
 
-         !-- Retrieve current environmental conditions for the cell.
-         candi%TEMP = _STATE_VAR_(data%id_temp) ! local temperature
-         candi%SALT = _STATE_VAR_(data%id_salt) ! local salinity
-         candi%PRES = 1.025E-3 * 1.0
+	  !-- Update surface BCs from file, if necessary
+      IF(candi%BC%IBC2==10) dynamic_vals = GetDynamicBCVals(candi%daysFromStart)
 
-         IF(candi%BC%IBC2==10) &
-            dynamic_vals = GetDynamicBCVals(time)
-
-         !-- Prepare bottom water concentration for boundary specification
-         DO var = data%startSedCol,data%endSedCol-3
+      !-- Prepare bottom water concentration for boundary specification
+      DO var = data%startSedCol,data%endSedCol-3
             ! Only set dissoved species concs here
             IF(.NOT. candi%isSolid(var)) THEN
 
                IF(TRIM(water_link(var+1))/='') THEN
                   conc = _STATE_VAR_(data%id_bw(var+1))
                   candi%Y(var,1) =  conc /1e3
+				  print *, 'water link', TRIM(water_link(var+1))
+				  print *, 'var', candi%Y(var,1)
+				  
                ELSE
                   IF(candi%BC%IBC2==10) THEN
                      ! Dynamic BW conc assigned as read in
@@ -1056,23 +1162,22 @@ CONTAINS
                   ENDIF
                ENDIF
             ENDIF
-         ENDDO
+      ENDDO
 
-         default_bottom_pH = 8.00
-         dissConcs = candi%Y(dColMap,1)
-         partConcs = candi%Y(pColMap,1)
-         dissConcs(SIZE(dissConcs)-2)=default_bottom_pH
+      default_bottom_pH = 8.00
+      dissConcs = candi%Y(dColMap,1)
+      partConcs = candi%Y(pColMap,1)
+      dissConcs(SIZE(dissConcs)-2)=default_bottom_pH
+      CALL InitialiseGCProperties( dissConcs, partConcs, 0 )
+      default_bottom_ubalchg = dissConcs(SIZE(dissConcs))
 
-         CALL InitialiseGCProperties( dissConcs, partConcs, 0 )
+      candi%Y((nvars+1)-1,1) = default_bottom_pH
+      candi%Y((nvars+3)-1,1) = default_bottom_ubalchg
 
-         default_bottom_ubalchg = dissConcs(SIZE(dissConcs))
-!print *, 'dissConcs  ===========================', dissConcs
-         candi%Y((nvars+1)-1,1) = default_bottom_pH
-         candi%Y((nvars+3)-1,1) = default_bottom_ubalchg
+	  !print *, 'dissConcs  ===========================', dissConcs
 
-         !-- Prepare particulate flux amounts for boundary specification
-
-         IF(candi%BC%IBC2 == 0) THEN
+      !-- Prepare particulate flux amounts for boundary specification
+      IF(candi%BC%IBC2 == 0) THEN
             !-- Get sediment surface particulate flux from deposition amounts
             DO var = data%startSedCol,data%endSedCol-3
                ! umol/cm2/yr (from g/ts)
@@ -1115,7 +1220,7 @@ CONTAINS
                   IF (candi%time%timeswitch == 1) THEN   !
                      IF (variables(var+1)=='pomspecial') THEN ! If it is 'pomspecial'
                         !IF(var==45) THEN ! If it is 'pomspecial'
-                        IF(time<candi%time%fluxon .OR. time>candi%time%fluxoff) THEN
+                        IF(candi%daysFromStart<candi%time%fluxon .OR. candi%daysFromStart>candi%time%fluxoff) THEN
                             candi%PartFluxes(var)=0.00E+00
                         ELSE
                             candi%PartFluxes(var)= default_vals(var+1) * 1e3 / 1e4 ! (CANDI expects umol/cm2/yr)
@@ -1144,26 +1249,30 @@ CONTAINS
             ENDDO
             ! Optional place to hard-code fluxes here
             ! PartFluxes(var) = X
-         ENDIF
+      ENDIF
 
-         !-- Calculate advection velocities for solids (wvel) and liquids (uvel)
-         DO layer = 1,data%nSedLayers
+      !-- Calculate advection velocities for solids (wvel) and liquids (uvel)
+	  !DO zone=1,data%n_zones
+      DO layer = 1,diagenesis(zone)%param%maxnpts
             candi%wvel(layer)   = candi%param%w00*(1.0 - candi%param%p00)/(candi%ps(layer))
             candi%uvel(layer)   = candi%param%w00*candi%param%p00/candi%poros(layer)
             candi%kg0var(layer) = 0.01*exp(-candi%rpar(layer)**2.0/(2.0*candi%param%x2))  &   !!&&???
                        + 0.16*(candi%param%x2/candi%param%w00+candi%rpar(layer)/candi%wvel(layer))**(-0.95)
-         ENDDO
-
-         !-- Set uniform starting value if running in steady mode
-         IF (candi%iSTEADY == 1) THEN
-            DO layer = 2,data%nSedLayers
+      ENDDO
+      !ENDDO ! ENDDO zones
+      !-- Set uniform starting value if running in steady mode
+      !DO zone=1,data%n_zones
+      IF (candi%iSTEADY == 1) THEN
+            DO layer = 2,diagenesis(zone)%param%maxnpts
                candi%Y(candi%hco3y,layer) = candi%Y(candi%hco3y,1)
                candi%Y(candi%hsy,layer)   = 0.0
             ENDDO
-         ENDIF
-
-         !-- Perform thermodynamic equilibration prior to diagenesis equations
-         DO layer = 2,data%nSedLayers
+      ENDIF
+      !ENDDO ! ENDDO zones
+       
+	  !-- Perform thermodynamic equilibration prior to diagenesis equations
+	  !DO zone=1,data%n_zones		 
+      DO layer = 2,diagenesis(zone)%param%maxnpts  ! DO INTESTINAL WORMS
             dissConcs = candi%Y(dColMap,layer)
 
             WHERE(dissConcs(1:SIZE(dissConcs)-1)<0.0)dissConcs(1:SIZE(dissConcs)-1)=0.0
@@ -1176,8 +1285,9 @@ CONTAINS
             IAPtmp = 0.0
             KIAPtmp = 0.0
             QIAPtmp = 0.0
+			morevarlist = 0.0
 
-            ! Do geochemical equilibration
+		    ! Do geochemical equilibration
             IF (rxn_mode==0)THEN
                !'UpdateEquilibration' not called
             ELSEIF (rxn_mode==1)THEN
@@ -1198,6 +1308,7 @@ CONTAINS
             candi%IAP(pColMap,layer) = IAPtmp
             candi%KIAP(pColMap,layer) = KIAPtmp
             candi%QIAP(pColMap,layer) = QIAPtmp
+			!candi%morevarlist(pColMap,layer) = morevarlist
 
             IF (diagenesis(zone)%param%PO4AdsorptionModel==1 .OR. diagenesis(zone)%param%PO4AdsorptionModel==2) THEN
                Kpo4p = diagenesis(zone)%param%Kpo4p ; Kadsratio = diagenesis(zone)%param%Kadsratio ; Qmax = diagenesis(zone)%param%Qmax
@@ -1223,44 +1334,49 @@ CONTAINS
                candi%Y(candi%po4ly,layer) = PO4dis
                candi%Y(candi%po4sy,layer) = PO4par
             ENDIF ! End if adsorption model is on
-         ENDDO
+      ENDDO ! END INTESTINAL WORMS
+      !ENDDO ! ENDDO zones		 
 
-    !    DO layer = 1,data%nSedLayers
-    !       print *,'Y',Y(:,layer)
-    !    ENDDO
-         !-- Run main diagenesis model (kinetic components and transport)
-!print*,"sedd candi temp ",candi%temp
-!print*,"sedd data candi temp ",data%candi%temp
-!print*,size(data%candi%top_bound(:))
-!print*,size(data%candi%Y(:,1))
-         CALL doCANDI(pcandi,steady)
-print*,'Exited doCandi OK'
+      !-- Run main diagenesis model (kinetic components and transport)
 
-         ! Check columns (except last 3) for -ve
-         WHERE(candi%Y(1:nvars,:)<1e-20)candi%Y(1:nvars,:)=0.00
+      CALL doCANDI(pcandi,steady)
+      !print*,'Exited doCandi OK'
+
+      !-- Check columns (except last 3) for -ve
+      WHERE(candi%Y(1:nvars,:)<1e-20)candi%Y(1:nvars,:)=0.00
 
     !    !-- Update main sediment data store with new CANDI data (Y)
     !    DO layer = 1,data%nSedLayers
     !     ! data%SedLayerData(zone,layer,:) = Y(:,layer)
     !    ENDDO
 
-         !-- Write species concs to results/candi/*.sed files */
-         DO var = data%startSedCol,data%endSedCol
-            WRITE(sedfid+var,"(E13.5, 100E14.5)")time, candi%Y(var,:)
+      !-- Write species concs to results/candi/*.sed files */
+      DO var = data%startSedCol,data%endSedCol
+            WRITE(sedfid+var,"(E13.5, 100E14.5)")candi%daysFromStart, candi%Y(var,:)
             IF(var==data%endSedCol) THEN
                !print *,'sss',Y(var,:)
                !print *,'sss',Y(var-1,:)
                !pause
             END IF
-         ENDDO
-         !-- Write particualte IAP to results/candi/*.sed files */
-         DO var = 1,SIZE(IAPtmp)
-            WRITE(sedfid+(nvars+3)+var+1,"(E13.5, 100E14.5)")time, candi%IAP(pColMap(var),:)
-         ENDDO
+      ENDDO
+      !-- Write particualte IAP to results/candi/*.sed files */
+      DO var = 1,SIZE(IAPtmp)
+            WRITE(sedfid+(nvars+3)+var+1,"(E13.5, 100E14.5)")candi%daysFromStart, candi%IAP(pColMap(var),:)
+      ENDDO
+		
 
-         !-----------------------------------------------------------------------
-         !-- Set the flux of the dissolved species between water & sediment
-         DO var = data%startSedCol,data%endSedCol-3
+	  DO morevars = 1, 2
+	  !thisvar = 'candi%'//TRIM(morvariables(morevars))//'(:)'
+         !  WRITE(sedfid2+morevars,"(E13.5, 100E14.5)")candi%daysFromStart!, morevariables(morevars,:)
+      ENDDO
+     
+	 
+	 
+	 !WRITE(202020+5,"(E13.5, 401E11.4)")time,FTEA_NO3(:)
+      
+	  !-----------------------------------------------------------------------
+      !-- Set the flux of the dissolved species between water & sediment
+      DO var = data%startSedCol,data%endSedCol-3
             ! Only flux dissoved species concs here
             IF(.NOT. candi%isSolid(var)) THEN
                ! SEarch for linked var (most likely from aed2_sedflux)
@@ -1282,12 +1398,12 @@ print*,'Exited doCandi OK'
             ELSE
                swi_flux(var) = candi%PartFluxes(var)/(1e3/1e4)
             END IF
-         ENDDO
-         ! Output file designed to output in and out fluxes at the interface
-         WRITE(sedfid+(nvars+3)+SIZE(IAPtmp)+10,"(E13.5, 100E14.5)")time, swi_flux(1:nvars)
-!        sedfid = sedfid_ + (zone-1)*(nSedPartEqVars+nVars+3+12)
       ENDDO
-      thisStep = 0
+      ! Output file designed to output in and out fluxes at the interface
+      WRITE(sedfid+(nvars+3)+SIZE(IAPtmp)+10,"(E13.5, 100E14.5)")candi%daysFromStart, swi_flux(1:nvars)
+
+      !ENDDO
+      candi%thisStep = 0
    END SUBROUTINE do_ben
    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -921,6 +921,8 @@ MODULE aed2_gctypes
      REAL(SEDP) :: MK,FL,FM   ! Mineral Metal Stoichiometry
      REAL(SEDP) :: eqtol,lost,zeitschritt,day
      REAL(SEDP) :: DF(28)
+	 REAL(SEDP) :: daysFromStart
+     INTEGER    :: thisStep
   END TYPE aed2_sed_candi_t
 
 
@@ -929,9 +931,8 @@ MODULE aed2_gctypes
      TYPE(aed2_sed_candi_time_t)  :: time
      TYPE(aed2_sed_candi_bc_t)    :: bc
      TYPE(aed2_sed_candi_param_t) :: param
-
      TYPE(aed2_candi_stioc_coefs_t) :: stcoef
-
+     !???
      REAL                      :: Xmk, Xfl, Xfm
   END TYPE AEDConstDiagenesisType
 !-------------------------------------------------------------------------------
