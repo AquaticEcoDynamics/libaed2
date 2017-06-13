@@ -13,7 +13,7 @@
 #ifndef _AED2_H_
 #define _AED2_H_
 
-#define AED2_VERSION  "1.2.0"
+#define AED2_VERSION  "1.2.1"
 
 #define MAX_MODELS 40
 
@@ -42,13 +42,14 @@
 
 #define INP_LINE_LEN 512
 #define STR_LEN       32
-#define REACTION_START_CH  '['
-#define REACTION_END_CH    ']'
-#define PLUS               '+'
-#define MINUS              '-'
-#define EQUALS             '='
-#define L_PAREN            '('
-#define R_PAREN            ')'
+
+!# for generic vertical settling/mobility approaches
+#define _MOB_OFF_ 0
+#define _MOB_CONST_ 1
+#define _MOB_TEMP_  2
+#define _MOB_STOKES_  3
+#define _MOB_MOTILE_  4
+#define _MOB_ATTACHED_  5
 
 #ifdef SINGLE
 #  define AED_REAL real(4)

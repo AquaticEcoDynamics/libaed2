@@ -99,6 +99,8 @@ SUBROUTINE aed2_define_totals(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_totals initialization"
+
    tn_vars = '' ;       tkn_vars = '' ;      tp_vars = ''
    toc_vars = '' ;      tss_vars = '' ;      turb_vars = ''
    tfe_vars = '' ;      tal_vars = '' ;

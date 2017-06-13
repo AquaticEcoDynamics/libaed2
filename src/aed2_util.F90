@@ -29,10 +29,11 @@ MODULE aed2_util
 
    PRIVATE
 !
-   PUBLIC find_free_lun, qsort
-   PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, exp_integral
-   PUBLIC aed2_bio_temp_function,fTemp_function
+   PUBLIC find_free_lun, qsort, make_dir_path
+   PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, aed2_n2o_sat, exp_integral
+   PUBLIC aed2_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
+   PUBLIC water_viscosity
 !
 
 
@@ -66,6 +67,57 @@ END FUNCTION find_free_lun
 
 
 !###############################################################################
+LOGICAL FUNCTION make_dir_path(dir)
+!-------------------------------------------------------------------------------
+! Create the directory path as specified
+!-------------------------------------------------------------------------------
+#ifdef __INTEL_COMPILER
+   USE ifport
+#endif
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: dir
+!LOCALS
+   INTEGER :: len, i, sys
+   CHARACTER(len=128) :: d
+   LOGICAL :: res = .TRUE.
+#  define DIRSEP "/"
+!BEGIN
+!-------------------------------------------------------------------------------
+   len = LEN_TRIM(dir)
+!print*,'making dir path at "',TRIM(dir),'"'
+   d(1:128) = ' '
+   DO i=1,len
+      IF ( dir(i:i) == '/' ) THEN
+         IF ( i > 1 ) THEN
+          ! CALL execute_command_line("mkdir " // TRIM(d), exitstat=sys)
+! print*,'making dir at "',TRIM(d),'"'
+#ifdef __INTEL_COMPILER
+             sys = system("mkdir " // TRIM(d))
+#else
+             CALL system("mkdir " // TRIM(d))
+#endif
+         ENDIF
+         d(i:i) = DIRSEP
+      ELSE
+         d(i:i) = dir(i:i)
+      ENDIF
+   ENDDO
+! MAKEDIRQQ is an intel fortran extension
+! MAKEDIRQQ can create only one directory at a time. You cannot create a new
+! directory and a subdirectory below it in a single command. MAKEDIRQQ does not
+! translate path delimiters. You can use either slash (/) or backslash (\) as
+! valid delimiters.
+!  CALL MAKEDIRQQ(d)
+!  if not intel ...
+!  CALL SYSTEM("mkdir "//d)
+!  but the f2008 standard introduces execute_command_line as a standard way
+!  however it seems the ifort version we have been using doesnt support it?
+   make_dir_path = res
+END FUNCTION make_dir_path
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_model)
 !-------------------------------------------------------------------------------
 ! Atmospheric-surface water exchange piston velocity for O2, CO2 etc
@@ -78,48 +130,43 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_mo
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx
-   INTEGER :: schmidt_model_l
+   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x
+   INTEGER  :: schmidt_model_l
    ! Parameters
-   AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length(m)
+   AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   schmidt_model_l = 2
-   k_flow = zero_ ! Needs to be set based on flow velocity
+
+   !-----------------------------------------------
+   ! Decide on Sc equation to apply
+   schmidt_model_l = 2 !default
+   IF (PRESENT(schmidt_model)) schmidt_model_l = schmidt_model
 
    ! Adjust the windspeed if the sensor height is not 10m
    hgtCorrx =  LOG(10.00 / roughLength) / LOG(wshgt / roughLength)
 
-
-   IF (PRESENT(schmidt_model)) schmidt_model_l = schmidt_model
-
+   !-----------------------------------------------
+   ! Compute k_wind
    IF (PRESENT(LA)) THEN
 
-      ! 2)  - in aed2_util, I want to add a new option for the calculation of k_wind.
-      !    This piston velocity routine is called by oxygen and carbon, and so we would
-      !    need a new switch ("k600_model")  in both of those to choose which k_wind
-      !    formulation to use.
-      ! but note that this has a "lake area" (LA) variable included in it.  Is it possible
-      ! in AED2 to know what the area of the lake surface is from this function?
+      ! New option for the calculation of k_wind. Note that this has a
+      ! "lake area" (LA) variable included in it.
 
       ! Valchon & Prairie 2013: The ecosystem size and shape dependence of gas transfer
       !                              velocity versus wind speed relationships in lakes
       ! k600 = 2.51 (±0.99) + 1.48 (±0.34) · U10 + 0.39 (±0.08) · U10 · log10 LA
 
-      k_wind = 2.51 + 1.48*wind*hgtCorrx  +  0.39 * wind*hgtCorrx * log10(LA)
+      k_wind = 2.51 + 1.48*wind*hgtCorrx  +  0.39*wind*hgtCorrx*log10(LA)
 
    ELSE
       temp=tem
       salt=sal
-      IF (temp < 0.0)       temp = 0.0
-      IF (temp > 38.0)      temp = 38.0
-      IF (salt < 0.0)       salt = 0.0
-      IF (salt > 75.0)      salt = 75.0
+      IF (temp < 0.0)       temp = 0.0; IF (temp > 38.0)      temp = 38.0
+      IF (salt < 0.0)       salt = 0.0; IF (salt > 75.0)      salt = 75.0
 
       ! Schmidt, Sc
       ! control value : Sc = 590 at 20°C and 35 psu
-
       schmidt = 590.
 
       SELECT CASE (schmidt_model_l)
@@ -136,21 +183,33 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_mo
          ! CH4 one from Arianto Santoso <abs11@students.waikato.ac.nz>
          schmidt = 2039.2 - (120.31*temp) + (3.4209*temp*temp) - (0.040437*temp*temp*temp)
          schmidt = schmidt / 600
+       CASE (5)
+         ! CH4 from Sturm et al. 2014 (ex Wanninkhof, 1992)
+         schmidt = 1897.8 - (114.28*temp) + (3.2902*temp*temp) - (0.039061*temp*temp*temp)
+       CASE (6)
+         ! N2O from Sturm et al. 2014 (ex Wanninkhof, 1992)
+         schmidt = 2055.6 - (137.11*temp) + (4.3173*temp*temp) - (0.054350*temp*temp*temp)
       END SELECT
 
-      ! Gas transfer velocity, kCO2 (cm/hr)
-      ! k = 0.31 u^2 (Sc/660)^-0.5
-      ! This parameterization of course assumes 10m windspeed, and so
-      ! must be scaled by hgtCorrx
-
-      k_wind = 0.31 * wind*wind*hgtCorrx*hgtCorrx / SQRT(schmidt/660.0) !in cm/hr
+      ! Gas transfer velocity (cm/hr)
+      ! k = a u^2 (Sc/600)^-x
+      ! This parameterization assumes 10m windspeed, and must be scaled by hgtCorrx
+      a = 0.31
+      x = 0.50
+      IF( wind*hgtCorrx <3.) x = 0.66
+      k_wind = a * (wind*hgtCorrx)*(wind*hgtCorrx) * (schmidt/600.0)**(-x)
    ENDIF
-
    ! convert to m/s
    k_wind = k_wind / 3.6e5
 
+   !-----------------------------------------------
+   ! Compute k_flow
+   k_flow = zero_ !(vel**0.5)*(depth**(-0.5))
+
+   !-----------------------------------------------
    ! piston velocity is the sum due to flow and wind
    aed2_gas_piston_velocity = k_flow + k_wind
+
 END FUNCTION aed2_gas_piston_velocity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -184,6 +243,93 @@ PURE AED_REAL FUNCTION aed2_oxygen_sat(salt,temp)
    !Convert to mmol/m3
    aed2_oxygen_sat = (aed2_oxygen_sat / 32.) * 1e3
 END FUNCTION aed2_oxygen_sat
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+PURE AED_REAL FUNCTION aed2_n2o_sat(salt,temp)
+!-------------------------------------------------------------------------------
+!  gsw_N2Osol_SP_pt                            solubility of N2O in seawater
+!
+!  USAGE:
+!   N2Osol = gsw_N2Osol_SP_pt(SP,pt)
+!
+!  DESCRIPTION:
+!   Calculates the nitrous oxide, N2O, concentration expected at equilibrium
+!   with air at an Absolute Pressure of 101325 Pa (sea pressure of 0 dbar)
+!   including saturated water vapor  This function uses the solubility
+!   coefficients as listed in Hamme and Emerson (2004).
+!
+!   Note that this algorithm has not been approved by IOC and is not work
+!   from SCOR/IAPSO Working Group 127. It is included in the GSW
+!   Oceanographic Toolbox as it seems to be oceanographic best practice.
+!
+!  INPUT:
+!   salt  =  Practical Salinity  (PSS-78)                         [ unitless ]
+!   temp  =  potential temperature (ITS-90) referenced               [ deg C ]
+!          to one standard atmosphere (0 dbar).
+!
+!  OUTPUT:
+!   N2Osol = solubility of N2O                                      [ mol/L ]
+!
+!  AUTHOR:  Rich Pawlowicz, Paul Barker and Trevor McDougall
+!                                                       [ help@teos-10.org ]
+!
+!  VERSION NUMBER: 3.05 (27th January 2015)
+!
+!  REFERENCES:
+!   IOC, SCOR and IAPSO, 2010: The international thermodynamic equation of
+!    seawater - 2010: Calculation and use of thermodynamic properties.
+!    Intergovernmental Oceanographic Commission, Manuals and Guides No. 56,
+!    UNESCO (English), 196 pp.  Available from http://www.TEOS-10.org
+!
+!   Weiss, R.F. and B.A. Price, 1980: Nitrous oxide solubility in water and
+!    seawater. Mar. Chem., 8, 347-359.
+!
+!   The software is available from http://www.TEOS-10.org
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: salt,temp
+!
+!LOCALS
+   AED_REAL :: x, y, y_100, pt68, ph2odP
+   AED_REAL :: a0,a1,a2,a3,b1,b2,b3,m0,m1,m2,m3
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+
+  x = salt     !  Note that salinity argument is Practical Salinity, this is
+               !  beacuse the major ionic components of seawater related to Cl
+               !  are what affect the solubility of non-electrolytes in seawater
+
+  pt68 = temp*1.00024 ! pt68 is the potential temperature in degress C on
+                      ! the 1968 International Practical Temperature Scale IPTS-68.
+  y = pt68 + 273.15
+  y_100 = y*1e-2
+
+  !  The coefficents below are from Table 2 of Weiss and Price (1980)
+  a0 = -165.8806
+  a1 =  222.8743
+  a2 =  92.0792
+  a3 = -1.48425
+  b1 = -0.056235
+  b2 =  0.031619
+  b3 = -0.0048472
+
+  m0 = 24.4543
+  m1 = 67.4509
+  m2 = 4.8489
+  m3 = 0.000544
+
+  ph2odP = exp(m0 - m1*100.0/y - m2*log(y_100) - m3*x) !  Moist air correction at 1 atm.
+
+  !aed2_n2o_sat [mol/L] = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP);
+  aed2_n2o_sat = (exp(a0 + a1*100.0/y + a2*log(y_100) + a3*y_100*y_100 + x*(b1 + y_100*(b2 + b3*y_100))))/(1.-ph2odP)
+
+  !Convert to mmol/m3
+  aed2_n2o_sat = aed2_n2o_sat * 1e6
+
+END FUNCTION aed2_n2o_sat
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -606,6 +752,134 @@ LOGICAL FUNCTION in_zone_set(matz, active_zones)
    in_zone_set = res
 END FUNCTION in_zone_set
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION water_viscosity(temperature) RESULT(mu)
+!-------------------------------------------------------------------------------
+! Calculates the molecular viscosity of water for a given temperature
+!
+! From Table A.1b, FLUID_MECHANICS With Engineering Applications
+! by Robert L. Daugherty and Joseph B. Franzini,
+! however, note these values are common in most fluid mechanics texts.
+! NOTE: N s / m^2  = kg / m / s
+!
+!  Temp (C)     Viscosity (N s / m^2) x 10^3
+!  --------     ---------
+!      0          1.781
+!      5          1.518
+!     10          1.307
+!     15          1.139
+!     20          1.002
+!     25          0.890
+!     30          0.798
+!     40          0.653
+!     50          0.547
+!     60          0.466
+!     70          0.404
+!     80          0.354
+!     90          0.315
+!    100          0.282
+!
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+  AED_REAL,INTENT(inout)  :: temperature
+  AED_REAL :: mu
+!
+!LOCALS
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   !-- Check for non-sensical temperatures
+   IF( temperature<zero_ ) temperature = 0.0
+   IF( temperature>100.0 ) temperature = 100.0
+
+   IF( temperature<=20.0 ) THEN
+     ! 0C to 20C
+     ! y = 0.0008 * x^2 - 0.0556 * x + 1.7789
+     ! r^2 = 0.9999
+     mu = 0.0008 * temperature**2. - 0.0556 * temperature + 1.7789
+
+   ELSEIF(temperature <= 60) THEN
+     ! 20C to 60C
+     ! y = 0.0002 * x^2 - 0.0323 * x + 1.5471
+     ! r^2 = 0.9997
+     mu = 0.0002 * temperature**2. - 0.0323 * temperature + 1.5471
+   ELSE
+     ! 60C to 100C
+     ! y = 0.00006 * x^2 - 0.0141 * x + 1.1026
+     ! r^2 = 0.9995
+     mu = 0.00006 * temperature**2. - 0.0141 * temperature + 1.1026
+   ENDIF
+
+   ! Now convert to units of: N s / m^2
+   mu = mu / 1e3
+
+END FUNCTION water_viscosity
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+AED_REAL FUNCTION fSal_function(salinity, minS, Smin, Smax, maxS )
+!-------------------------------------------------------------------------------
+! Salinity tolerance of biotic variables
+!
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+  AED_REAL :: salinity
+  AED_REAL :: minS, Smin, Smax, maxS
+!
+!LOCALS
+  AED_REAL :: tmp1,tmp2
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   !-- Check for non-sensical salinity values
+
+   ! Salinity is non-limiting for sals > Smin and <Smax
+   ! minS is salinity when organisms stop production (feeding/photosynthesis)
+   ! Note the exception for FW species: Smin and minS are both zero.
+
+   ! Salinity is within the tolerance; no limitation.
+   ! If sal in bott cell is > min sal & < max sal set in WQcons, pf=1
+   IF( salinity >= Smin .and. salinity <= Smax ) THEN
+     fSal_function = one_
+     RETURN
+   ENDIF
+
+   ! Salinity is greater than the upper bound
+   ! maxS is set in caedym_globals at 45psu
+   IF( salinity > Smax ) THEN
+     fSal_function = (-salinity*salinity+2.0*Smax*salinity-  &
+            2.0*Smax*maxS+maxS*maxS)/((Smax-maxS)*(Smax-maxS))
+   ENDIF
+
+   ! Salinity is less than the lower bound but greater than low cut
+   ! If sal is < min set in WQcons but > clamLowCut set at clamCons.dat)!
+   tmp1 = zero_
+   tmp2 = zero_
+   IF( salinity < Smin .AND. salinity > minS ) THEN
+     tmp1 = salinity-minS
+     tmp2 = Smin-minS
+     fSal_function =  (2*tmp1/Smin-(tmp1*tmp1/(Smin*Smin)))/ &
+            (2*tmp2/Smin-(tmp2*tmp2/(Smin*Smin)))
+   ENDIF
+
+   ! Salinity is less than the minS
+   ! If sal < lowest sal (hardwired at start of fn), shells close
+   IF( salinity <= minS ) fSal_function = zero_
+
+   ! If lower bound and low cut are both zero then it is a freshwater species
+   ! and we need to set f(S) to one
+   IF( Smin==zero_ ) THEN
+     IF( salinity <= Smin ) fSal_function =  one_
+   ENDIF
+
+   ! Ensure salinity function is not negative
+   IF(fSal_function <= zero_) fSal_function = zero_
+
+ END FUNCTION fSal_function
+!-------------------------------------------------------------------------------
 
 
 END MODULE aed2_util

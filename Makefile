@@ -22,11 +22,15 @@ endif
 
 INCLUDES=-I${incdir}
 
+ifneq ("$(wildcard ../libaed2-plus/Makefile)","")
+  HAVEPLUS=-DHAVE_PLUS
+endif
+
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -warn all -module ${moddir} -i-static -mp1 -stand f03 -warn nounused $(DEFINES) $(INCLUDES)
+  FFLAGS=-fPIC -warn all -module ${moddir} -i-static -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check
   endif
@@ -35,9 +39,6 @@ ifeq ($(F90),ifort)
   else
     FFLAGS+=-real-size 64
   endif
-  LIBS+=-lifcore -lsvml
-  LIBS+=-limf -lintlc
-  LIBS+=-L/opt/intel/lib -Wl,-rpath=/opt/intel/lib
 else
   F90=gfortran
   INCLUDES+=-I/usr/include
@@ -48,7 +49,6 @@ else
     FFLAGS+=-fcheck=all
   endif
   FFLAGS+=-fdefault-real-8 -fdefault-double-8
-  LIBS+=-lgfortran
 endif
 
 ifeq ($(COMPILATION_MODE),debug)
@@ -64,20 +64,12 @@ else
   # OPT_FFLAGS=
 endif
 
-LIBS+=-lnetcdff -lnetcdf
-ifeq ($(PLOTS),true)
-  LIBS+=-L$(PLOTDIR) -lplot -lgd -lpng -ljpeg -lm
-  ifeq ($(XPLOTS),true)
-    LIBS+=-lX11
-  endif
-endif
-
 ifeq ($(SINGLE),true)
   FFLAGS += -DSINGLE=1
 endif
 
 
-FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS)
+FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS) $(HAVEPLUS)
 
 
 OBJS = \
@@ -97,11 +89,8 @@ ${objdir}/aed2_bio_utils.o \
 ${objdir}/aed2_phytoplankton.o \
 ${objdir}/aed2_zoop_utils.o \
 ${objdir}/aed2_zooplankton.o \
-${objdir}/aed2_bivalve.o \
-${objdir}/aed2_pathogens.o \
 ${objdir}/aed2_tracer.o \
 ${objdir}/aed2_totals.o \
-${objdir}/aed2_test.o \
 ${objdir}/aed2_common.o
 
 

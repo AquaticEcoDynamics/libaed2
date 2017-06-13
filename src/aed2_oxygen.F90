@@ -93,6 +93,8 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_oxygen initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_oxygen,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_oxygen'
@@ -119,7 +121,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
                      'sed_oxy', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
 
    data%id_atm_oxy_exch = aed2_define_sheet_diag_variable(   &
-                     'atm_oxy_exch', 'mmol/m**2/d', 'O2 exchange across atm/water interface')
+                     'atm_oxy_flux', 'mmol/m**2/d', 'O2 exchange across atm/water interface')
 
 !  data%id_atm_oxy_exch3d = aed2_define_sheet_diag_variable( &
 !                    'atm_oxy_exch3d', 'mmol/m**2/d', 'Oxygen exchange across atm/water interface')

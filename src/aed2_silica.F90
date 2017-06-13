@@ -80,6 +80,8 @@ SUBROUTINE aed2_define_silica(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_silica initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_silica,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_silica'

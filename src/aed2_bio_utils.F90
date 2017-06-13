@@ -24,9 +24,9 @@ MODULE aed2_bio_utils
    USE aed2_core
 
    USE aed2_util,ONLY : find_free_lun, &
-                       exp_integral,  &
-                       aed2_bio_temp_function, &
-                       fTemp_function
+                        exp_integral, &
+                        aed2_bio_temp_function, &
+                        fTemp_function
 
    IMPLICIT NONE
 
@@ -37,7 +37,7 @@ MODULE aed2_bio_utils
    TYPE phyto_data
       ! General Attributes
       CHARACTER(64) :: p_name
-      AED_REAL :: p0, Xcc, kc,i_min,rmax,gmax,iv,alpha,rpn,rzn,rdn,rpdu,rpdl,rzd
+      AED_REAL :: p0,Xcc !,kc,i_min,rmax,gmax,iv,alpha,rpn,rzn,rdn,rpdu,rpdl,rzd
       ! Growth rate parameters
       INTEGER  :: fT_Method
       AED_REAL :: R_growth, theta_growth, T_std, T_opt, T_max, kTn, aTn, bTn
@@ -61,8 +61,10 @@ MODULE aed2_bio_utils
       ! Carbon parameters
       INTEGER  :: simCUptake, dic_mode
       ! Sedimentation parameters
-      AED_REAL :: w_p
-      INTEGER  :: w_model
+      INTEGER  :: settling
+      AED_REAL :: w_p, d_phy, rho_phy, f1, f2, c1, c3
+      ! Resuspension parameters
+      AED_REAL  :: resuspension
    END TYPE
 
 
@@ -542,6 +544,7 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
 !-------------------------------------------------------------------------------
 !BEGIN
    fI    = 0.0
+   IF (Io == zero_) RETURN
 
    ! MH fix this
    par_t = par
@@ -553,8 +556,6 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
          ! Light limitation without photoinhibition.
          ! This is the Webb et al (1974) model solved using the numerical
          ! integration approach as in CAEDYM (Hipsey and Hamilton, 2008)
-
-         IF (Io == zero_) RETURN
 
          z1 = -par_t / I_K
          z2 = -par_b / I_K

@@ -52,6 +52,7 @@ MODULE aed2_zooplankton
       TYPE(type_zoop_data),DIMENSION(:),ALLOCATABLE :: zoops
       LOGICAL  :: simDNexcr, simDPexcr, simDCexcr
       LOGICAL  :: simPNexcr, simPPexcr, simPCexcr
+      LOGICAL  :: simZoopFeedback
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_zooplankton
@@ -166,6 +167,7 @@ SUBROUTINE aed2_define_zooplankton(data, namlst)
 
    INTEGER  :: num_zoops
    INTEGER  :: the_zoops(MAX_ZOOP_TYPES)
+   LOGICAL  :: simZoopFeedback
 
    CHARACTER(len=64)  :: dn_target_variable='' !dissolved nitrogen target variable
    CHARACTER(len=64)  :: pn_target_variable='' !particulate nitrogen target variable
@@ -180,15 +182,17 @@ SUBROUTINE aed2_define_zooplankton(data, namlst)
    NAMELIST /aed2_zooplankton/ num_zoops, the_zoops, &
                     dn_target_variable, pn_target_variable, dp_target_variable, &
                     pp_target_variable, dc_target_variable, pc_target_variable, &
-                    dbase
+                    dbase, simZoopFeedback
 !-----------------------------------------------------------------------
 !BEGIN
-!print *,'**** Reading /aed2_zooplankton/ namelist'
+   print *,"        aed2_zooplankton initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_zooplankton,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_zooplankton'
 
     data%num_zoops = 0
+    data%simZoopFeedback = simZoopFeedback
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted in aed2_zooplankton_load_params to values per second.
@@ -486,7 +490,7 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
 
       _FLUX_VAR_(data%id_zoo(zoop_i)) = _FLUX_VAR_(data%id_zoo(zoop_i)) + ( (data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality)*zoo )
 
-
+      IF( data%simZoopFeedback ) THEN
       ! Now take food grazed by zooplankton from food pools in mmolC/s
       phy_i = 0
       DO prey_i = 1,data%zoops(zoop_i)%num_prey
@@ -524,6 +528,7 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
       ENDIF
       IF (data%simPPexcr) THEN
          _FLUX_VAR_(data%id_Pmorttarget) = _FLUX_VAR_(data%id_Pmorttarget) + ( pop_excr)
+      ENDIF
       ENDIF
 
       ! Export diagnostic variables

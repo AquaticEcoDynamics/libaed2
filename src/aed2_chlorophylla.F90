@@ -91,6 +91,8 @@ SUBROUTINE aed2_define_chla(data,  namlst)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *,"        aed2_chla initialization"
+
    ! Read the namelist
    read(namlst,nml=aed2_chla,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_chla'

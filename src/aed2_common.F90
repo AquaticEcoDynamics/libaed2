@@ -42,12 +42,9 @@ MODULE aed2_common
    USE aed2_phosphorus
    USE aed2_organic_matter
    USE aed2_phytoplankton
-   USE aed2_pathogens
    USE aed2_zooplankton
-   USE aed2_bivalve
    USE aed2_tracer
    USE aed2_totals
-   USE aed2_test
 
    IMPLICIT NONE
 
@@ -62,7 +59,8 @@ MODULE aed2_common
    PUBLIC aed2_calculate, aed2_calculate_surface, aed2_calculate_benthic
    PUBLIC aed2_light_extinction, aed2_delete, aed2_equilibrate
    PUBLIC aed2_initialize, aed2_calculate_riparian, aed2_calculate_dry
-   PUBLIC aed2_rain_loss, aed2_light_shading, aed2_bio_drag, aed2_particle_bgc
+   PUBLIC aed2_mobility, aed2_rain_loss, aed2_light_shading
+   PUBLIC aed2_bio_drag, aed2_particle_bgc
 
    !# Re-export these from aed2_core.
    PUBLIC aed2_model_data_t, aed2_variable_t, aed2_column_t
@@ -105,12 +103,9 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_organic_matter'); prefix = 'OGM'; ALLOCATE(aed2_organic_matter_data_t::model)
       CASE ('aed2_phytoplankton');  prefix = 'PHY'; ALLOCATE(aed2_phytoplankton_data_t::model)
       CASE ('aed2_zooplankton');    prefix = 'ZOO'; ALLOCATE(aed2_zooplankton_data_t::model)
-      CASE ('aed2_bivalve');        prefix = 'BIV'; ALLOCATE(aed2_bivalve_data_t::model)
-      CASE ('aed2_pathogens');      prefix = 'PAT'; ALLOCATE(aed2_pathogens_data_t::model)
       CASE ('aed2_tracer');         prefix = 'TRC'; ALLOCATE(aed2_tracer_data_t::model)
       CASE ('aed2_totals');         prefix = 'TOT'; ALLOCATE(aed2_totals_data_t::model)
-      CASE ('aed2_test');           prefix = 'TST'; ALLOCATE(aed2_test_data_t::model)
-      CASE DEFAULT;                 print *,'*** Unknown module ', modelname
+      CASE DEFAULT;                 CALL aed2_if_plus(modelname)
    END SELECT
 
    model%aed2_model_name = modelname
@@ -120,6 +115,47 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
    IF ( ASSOCIATED(last_model) ) last_model%next => model
    last_model => model
 END FUNCTION aed2_new_model
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_if_plus(modelname)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: modelname
+!LOCALS
+   LOGICAL :: is_plus
+!BEGIN
+   is_plus = .FALSE.
+#ifndef HAVE_PLUS
+   SELECT CASE (modelname)
+      CASE ('aed2_land');           is_plus = .TRUE.
+      CASE ('aed2_ass');            is_plus = .TRUE.
+      CASE ('aed2_soilbgc');        is_plus = .TRUE.
+!     CASE ('aed2_cladophora');     is_plus = .TRUE.
+      CASE ('aed2_macrophyte');     is_plus = .TRUE.
+      CASE ('aed2_macroalgae');     is_plus = .TRUE.
+      CASE ('aed2_iron');           is_plus = .TRUE.
+      CASE ('aed2_isotope');        is_plus = .TRUE.
+      CASE ('aed2_isotope_c');      is_plus = .TRUE.
+      CASE ('aed2_radon');          is_plus = .TRUE.
+      CASE ('aed2_sulfur');         is_plus = .TRUE.
+      CASE ('aed2_geochemistry');   is_plus = .TRUE.
+      CASE ('aed2_seddiagenesis');  is_plus = .TRUE.
+      CASE ('aed2_vegetation');     is_plus = .TRUE.
+      CASE ('aed2_habitat');        is_plus = .TRUE.
+      CASE ('csiro_optical');       is_plus = .TRUE.
+      CASE ('aed2_bivalve');        is_plus = .TRUE.
+      CASE ('aed2_pathogens');      is_plus = .TRUE.
+      CASE ('aed2_test');           is_plus = .TRUE.
+   END SELECT
+#endif
+   IF ( is_plus ) THEN
+      print*,"To use ',TRIM(modelname),' you will need aed2+"
+   ELSE
+      print *,'*** Unknown module ', modelname
+   ENDIF
+END SUBROUTINE aed2_if_plus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -341,6 +377,26 @@ SUBROUTINE aed2_light_extinction(column, layer_idx, extinction)
       model => model%next
    ENDDO
 END SUBROUTINE aed2_light_extinction
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_mobility(column, layer_idx, mobility)
+!-------------------------------------------------------------------------------
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: mobility(:)
+!
+!LOCALS
+   CLASS (aed2_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   !mobility = zero_ !MH leave this as is in case default settling vals provided
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%mobility(column, layer_idx, mobility)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed2_mobility
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
