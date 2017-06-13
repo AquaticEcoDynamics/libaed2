@@ -33,10 +33,6 @@ MODULE aed2_common
    USE aed2_core
 
    USE aed2_sedflux
-   USE aed2_land
-   USE aed2_ass
-   USE aed2_soilbgc
-!  USE aed2_cladophora
    USE aed2_chlorophylla
    USE aed2_oxygen
    USE ufz_oxygen
@@ -44,26 +40,11 @@ MODULE aed2_common
    USE aed2_carbon
    USE aed2_nitrogen
    USE aed2_phosphorus
-   USE aed2_macrophyte
-   USE aed2_macroalgae
    USE aed2_organic_matter
    USE aed2_phytoplankton
-   USE aed2_pathogens
-   USE aed2_iron
-   USE aed2_isotope
-   USE aed2_isotope_c
-   USE aed2_radon
-   USE aed2_sulfur
    USE aed2_zooplankton
-   USE aed2_bivalve
    USE aed2_tracer
-   USE aed2_geochemistry
-   USE aed2_seddiagenesis
-   USE aed2_vegetation
    USE aed2_totals
-   USE csiro_optical
-   USE aed2_test
-   USE aed2_habitat
 
    IMPLICIT NONE
 
@@ -78,8 +59,8 @@ MODULE aed2_common
    PUBLIC aed2_calculate, aed2_calculate_surface, aed2_calculate_benthic
    PUBLIC aed2_light_extinction, aed2_delete, aed2_equilibrate
    PUBLIC aed2_initialize, aed2_calculate_riparian, aed2_calculate_dry
-   PUBLIC aed2_rain_loss, aed2_light_shading, aed2_bio_drag, aed2_particle_bgc
-   PUBLIC aed2_mobility
+   PUBLIC aed2_mobility, aed2_rain_loss, aed2_light_shading
+   PUBLIC aed2_bio_drag, aed2_particle_bgc
 
    !# Re-export these from aed2_core.
    PUBLIC aed2_model_data_t, aed2_variable_t, aed2_column_t
@@ -112,12 +93,9 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
 
    SELECT CASE (modelname)
       CASE ('aed2_sedflux');        prefix = 'SDF'; ALLOCATE(aed2_sedflux_data_t::model)
-      CASE ('aed2_land');           prefix = 'LND'; ALLOCATE(aed2_land_data_t::model)
-      CASE ('aed2_ass');            prefix = 'ASS'; ALLOCATE(aed2_ass_data_t::model)
-      CASE ('aed2_soilbgc');        prefix = 'SBG'; ALLOCATE(aed2_soilbgc_data_t::model)
-!     CASE ('aed2_cladophora');     prefix = 'CLD'; ALLOCATE(aed2_cladophora_data_t::model)
       CASE ('aed2_chlorophylla');   prefix = 'CHL'; ALLOCATE(aed2_chla_data_t::model)
       CASE ('aed2_oxygen');         prefix = 'OXY'; ALLOCATE(aed2_oxygen_data_t::model)
+      CASE ('ufz_oxygen');          prefix = 'UOX'; ALLOCATE(ufz_oxygen_data_t::model)
       CASE ('aed2_silica');         prefix = 'SIL'; ALLOCATE(aed2_silica_data_t::model)
       CASE ('aed2_carbon');         prefix = 'CAR'; ALLOCATE(aed2_carbon_data_t::model)
       CASE ('aed2_nitrogen');       prefix = 'NIT'; ALLOCATE(aed2_nitrogen_data_t::model)
@@ -125,25 +103,9 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_organic_matter'); prefix = 'OGM'; ALLOCATE(aed2_organic_matter_data_t::model)
       CASE ('aed2_phytoplankton');  prefix = 'PHY'; ALLOCATE(aed2_phytoplankton_data_t::model)
       CASE ('aed2_zooplankton');    prefix = 'ZOO'; ALLOCATE(aed2_zooplankton_data_t::model)
-      CASE ('aed2_bivalve');        prefix = 'BIV'; ALLOCATE(aed2_bivalve_data_t::model)
-      CASE ('aed2_macrophyte');     prefix = 'MAC'; ALLOCATE(aed2_macrophyte_data_t::model)
-      CASE ('aed2_macroalgae');     prefix = 'MAG'; ALLOCATE(aed2_macroalgae_data_t::model)
-      CASE ('aed2_pathogens');      prefix = 'PAT'; ALLOCATE(aed2_pathogens_data_t::model)
-      CASE ('aed2_iron');           prefix = 'IRN'; ALLOCATE(aed2_iron_data_t::model)
-      CASE ('aed2_isotope');        prefix = 'ISO'; ALLOCATE(aed2_isotope_data_t::model)
-      CASE ('aed2_isotope_c');      prefix = 'ISC'; ALLOCATE(aed2_isotope_c_data_t::model)
-      CASE ('aed2_radon');          prefix = 'RAD'; ALLOCATE(aed2_radon_data_t::model)
-      CASE ('aed2_sulfur');         prefix = 'SLF'; ALLOCATE(aed2_sulfur_data_t::model)
       CASE ('aed2_tracer');         prefix = 'TRC'; ALLOCATE(aed2_tracer_data_t::model)
-      CASE ('aed2_geochemistry');   prefix = 'GEO'; ALLOCATE(aed2_geochemistry_data_t::model)
-      CASE ('aed2_seddiagenesis');  prefix = 'SDD'; ALLOCATE(aed2_seddiagenesis_data_t::model)
-      CASE ('aed2_vegetation');     prefix = 'VEG'; ALLOCATE(aed2_vegetation_data_t::model)
       CASE ('aed2_totals');         prefix = 'TOT'; ALLOCATE(aed2_totals_data_t::model)
-      CASE ('aed2_test');           prefix = 'TST'; ALLOCATE(aed2_test_data_t::model)
-      CASE ('aed2_habitat');        prefix = 'HAB'; ALLOCATE(aed2_habitat_data_t::model)
-      CASE ('csiro_optical');       prefix = 'OPT'; ALLOCATE(csiro_optical_data_t::model)
-      CASE ('ufz_oxygen');          prefix = 'UOX'; ALLOCATE(ufz_oxygen_data_t::model)
-      CASE DEFAULT;                 print *,'*** Unknown module ', modelname
+      CASE DEFAULT;                 CALL aed2_if_plus(modelname)
    END SELECT
 
    model%aed2_model_name = modelname
@@ -153,6 +115,47 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
    IF ( ASSOCIATED(last_model) ) last_model%next => model
    last_model => model
 END FUNCTION aed2_new_model
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_if_plus(modelname)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: modelname
+!LOCALS
+   LOGICAL :: is_plus
+!BEGIN
+   is_plus = .FALSE.
+#ifndef HAVE_PLUS
+   SELECT CASE (modelname)
+      CASE ('aed2_land');           is_plus = .TRUE.
+      CASE ('aed2_ass');            is_plus = .TRUE.
+      CASE ('aed2_soilbgc');        is_plus = .TRUE.
+!     CASE ('aed2_cladophora');     is_plus = .TRUE.
+      CASE ('aed2_macrophyte');     is_plus = .TRUE.
+      CASE ('aed2_macroalgae');     is_plus = .TRUE.
+      CASE ('aed2_iron');           is_plus = .TRUE.
+      CASE ('aed2_isotope');        is_plus = .TRUE.
+      CASE ('aed2_isotope_c');      is_plus = .TRUE.
+      CASE ('aed2_radon');          is_plus = .TRUE.
+      CASE ('aed2_sulfur');         is_plus = .TRUE.
+      CASE ('aed2_geochemistry');   is_plus = .TRUE.
+      CASE ('aed2_seddiagenesis');  is_plus = .TRUE.
+      CASE ('aed2_vegetation');     is_plus = .TRUE.
+      CASE ('aed2_habitat');        is_plus = .TRUE.
+      CASE ('csiro_optical');       is_plus = .TRUE.
+      CASE ('aed2_bivalve');        is_plus = .TRUE.
+      CASE ('aed2_pathogens');      is_plus = .TRUE.
+      CASE ('aed2_test');           is_plus = .TRUE.
+   END SELECT
+#endif
+   IF ( is_plus ) THEN
+      print*,"To use ',TRIM(modelname),' you will need aed2+"
+   ELSE
+      print *,'*** Unknown module ', modelname
+   ENDIF
+END SUBROUTINE aed2_if_plus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

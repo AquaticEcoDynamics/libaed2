@@ -43,7 +43,6 @@
              'aed2_organic_matter',
              'aed2_phytoplankton',
              'aed2_zooplankton',
-             'aed2_pathogens',
              'aed2_tracer',
              'aed2_totals'
 /
@@ -520,17 +519,6 @@
    pp_target_variable='OGM_pop'  ! particulate phosphorus target variable
    dc_target_variable='OGM_doc'  ! dissolved carbon target variable
    pc_target_variable='OGM_poc'  ! particulate carbon target variable
-/
-
-!-------------------------------------------------------------------------------
-! aed2_pathogens
-!  num_pathogens = number of pathogens to model
-!  the_pathogens = list of pathogens classes (referencing the pathogens database)
-!-------------------------------------------------------------------------------
-&aed2_pathogens
-   num_pathogens = 2
-   the_pathogens = 3,4
-!  dbase = 'aed2_pathogen_pars.nml'
 /
 
 !-------------------------------------------------------------------------------

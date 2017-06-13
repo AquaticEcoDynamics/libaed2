@@ -22,11 +22,15 @@ endif
 
 INCLUDES=-I${incdir}
 
+ifneq ("$(wildcard ../libaed2-plus/Makefile)","")
+  HAVEPLUS=-DHAVE_PLUS
+endif
+
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -warn all -module ${moddir} -i-static -mp1 -stand f03 -warn nounused $(DEFINES) $(INCLUDES)
+  FFLAGS=-fPIC -warn all -module ${moddir} -i-static -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check
   endif
@@ -65,7 +69,7 @@ ifeq ($(SINGLE),true)
 endif
 
 
-FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS)
+FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS) $(HAVEPLUS)
 
 
 OBJS = \
@@ -73,10 +77,6 @@ ${objdir}/aed2_core.o \
 ${objdir}/aed2_util.o \
 ${objdir}/aed2_csv_reader.o \
 ${objdir}/aed2_sedflux.o \
-${objdir}/aed2_riptypes.o \
-${objdir}/aed2_land.o \
-${objdir}/aed2_ass.o \
-${objdir}/aed2_soilbgc.o \
 ${objdir}/aed2_chlorophylla.o \
 ${objdir}/aed2_oxygen.o \
 ${objdir}/ufz_oxygen.o \
@@ -89,30 +89,8 @@ ${objdir}/aed2_bio_utils.o \
 ${objdir}/aed2_phytoplankton.o \
 ${objdir}/aed2_zoop_utils.o \
 ${objdir}/aed2_zooplankton.o \
-${objdir}/aed2_bivalve.o \
-${objdir}/aed2_macrophyte.o \
-${objdir}/aed2_macroalgae.o \
-${objdir}/aed2_pathogens.o \
-${objdir}/aed2_isotope.o \
-${objdir}/aed2_isotope_c.o \
-${objdir}/aed2_iron.o \
-${objdir}/aed2_sulfur.o \
 ${objdir}/aed2_tracer.o \
 ${objdir}/aed2_totals.o \
-${objdir}/aed2_gctypes.o \
-${objdir}/aed2_gclib.o \
-${objdir}/aed2_gcsolver.o \
-${objdir}/aed2_geochemistry.o \
-${objdir}/aed2_radon.o \
-${objdir}/aed2_sedvode.o \
-${objdir}/aed2_read_candi.o \
-${objdir}/aed2_sedcandi.o \
-${objdir}/aed2_sedeqsolver.o \
-${objdir}/aed2_seddiagenesis.o \
-${objdir}/aed2_vegetation.o \
-${objdir}/aed2_test.o \
-${objdir}/csiro_optical.o \
-${objdir}/aed2_habitat.o \
 ${objdir}/aed2_common.o
 
 

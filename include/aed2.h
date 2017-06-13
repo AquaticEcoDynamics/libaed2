@@ -13,7 +13,7 @@
 #ifndef _AED2_H_
 #define _AED2_H_
 
-#define AED2_VERSION  "1.3.0-dev01"
+#define AED2_VERSION  "1.2.1"
 
 #define MAX_MODELS 40
 
@@ -42,13 +42,6 @@
 
 #define INP_LINE_LEN 512
 #define STR_LEN       32
-#define REACTION_START_CH  '['
-#define REACTION_END_CH    ']'
-#define PLUS               '+'
-#define MINUS              '-'
-#define EQUALS             '='
-#define L_PAREN            '('
-#define R_PAREN            ')'
 
 !# for generic vertical settling/mobility approaches
 #define _MOB_OFF_ 0
@@ -74,6 +67,5 @@
 #define _FLUX_VAR_(id)    column(id)%flux_pel(layer_idx)
 #define _FLUX_VAR_T_(id)  column(id)%flux_atm
 #define _FLUX_VAR_B_(id)  column(id)%flux_ben
-#define _FLUX_VAR_R_(id)  column(id)%flux_rip
 
 #endif

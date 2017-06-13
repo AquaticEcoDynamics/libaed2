@@ -64,43 +64,23 @@
 		<File RelativePath="..\..\include\aed2.h"/></Filter>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-		<File RelativePath="..\..\src\aed2_ass.F90"/>
 		<File RelativePath="..\..\src\aed2_bio_utils.F90"/>
-		<File RelativePath="..\..\src\aed2_bivalve.F90"/>
 		<File RelativePath="..\..\src\aed2_carbon.F90"/>
 		<File RelativePath="..\..\src\aed2_chlorophylla.F90"/>
 		<File RelativePath="..\..\src\aed2_common.F90"/>
 		<File RelativePath="..\..\src\aed2_core.F90"/>
 		<File RelativePath="..\..\src\aed2_csv_reader.F90"/>
-		<File RelativePath="..\..\src\aed2_gclib.F90"/>
-		<File RelativePath="..\..\src\aed2_gcsolver.F90"/>
-		<File RelativePath="..\..\src\aed2_gctypes.F90"/>
-		<File RelativePath="..\..\src\aed2_geochemistry.F90"/>
-		<File RelativePath="..\..\src\aed2_iron.F90"/>
-		<File RelativePath="..\..\src\aed2_isotope.F90"/>
-		<File RelativePath="..\..\src\aed2_isotope_c.F90"/>
-		<File RelativePath="..\..\src\aed2_macrophyte.F90"/>
 		<File RelativePath="..\..\src\aed2_nitrogen.F90"/>
 		<File RelativePath="..\..\src\aed2_organic_matter.F90"/>
 		<File RelativePath="..\..\src\aed2_oxygen.F90"/>
-		<File RelativePath="..\..\src\aed2_pathogens.F90"/>
 		<File RelativePath="..\..\src\aed2_phosphorus.F90"/>
 		<File RelativePath="..\..\src\aed2_phytoplankton.F90"/>
-		<File RelativePath="..\..\src\aed2_radon.F90"/>
-		<File RelativePath="..\..\src\aed2_sedcandi.F90"/>
-		<File RelativePath="..\..\src\aed2_seddiagenesis.F90"/>
-		<File RelativePath="..\..\src\aed2_sedeqsolver.F90"/>
 		<File RelativePath="..\..\src\aed2_sedflux.F90"/>
-		<File RelativePath="..\..\src\aed2_sedvode.F90"/>
 		<File RelativePath="..\..\src\aed2_silica.F90"/>
-		<File RelativePath="..\..\src\aed2_sulfur.F90"/>
-		<File RelativePath="..\..\src\aed2_test.F90"/>
 		<File RelativePath="..\..\src\aed2_totals.F90"/>
 		<File RelativePath="..\..\src\aed2_tracer.F90"/>
 		<File RelativePath="..\..\src\aed2_util.F90"/>
-		<File RelativePath="..\..\src\aed2_vegetation.F90"/>
 		<File RelativePath="..\..\src\aed2_zoop_utils.F90"/>
 		<File RelativePath="..\..\src\aed2_zooplankton.F90"/>
-		<File RelativePath="..\..\src\csiro_optical.F90"/>
 		<File RelativePath="..\..\src\ufz_oxygen.F90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
