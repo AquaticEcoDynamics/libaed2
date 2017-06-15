@@ -29,7 +29,7 @@ MODULE aed2_util
 
    PRIVATE
 !
-   PUBLIC find_free_lun, qsort, make_dir_path
+   PUBLIC find_free_lun, qsort
    PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, aed2_n2o_sat, exp_integral
    PUBLIC aed2_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
@@ -63,57 +63,6 @@ INTEGER FUNCTION find_free_lun()
 
    find_free_lun = -1
 END FUNCTION find_free_lun
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-LOGICAL FUNCTION make_dir_path(dir)
-!-------------------------------------------------------------------------------
-! Create the directory path as specified
-!-------------------------------------------------------------------------------
-#ifdef __INTEL_COMPILER
-   USE ifport
-#endif
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: dir
-!LOCALS
-   INTEGER :: len, i, sys
-   CHARACTER(len=128) :: d
-   LOGICAL :: res = .TRUE.
-#  define DIRSEP "/"
-!BEGIN
-!-------------------------------------------------------------------------------
-   len = LEN_TRIM(dir)
-!print*,'making dir path at "',TRIM(dir),'"'
-   d(1:128) = ' '
-   DO i=1,len
-      IF ( dir(i:i) == '/' ) THEN
-         IF ( i > 1 ) THEN
-          ! CALL execute_command_line("mkdir " // TRIM(d), exitstat=sys)
-! print*,'making dir at "',TRIM(d),'"'
-#ifdef __INTEL_COMPILER
-             sys = system("mkdir " // TRIM(d))
-#else
-             CALL system("mkdir " // TRIM(d))
-#endif
-         ENDIF
-         d(i:i) = DIRSEP
-      ELSE
-         d(i:i) = dir(i:i)
-      ENDIF
-   ENDDO
-! MAKEDIRQQ is an intel fortran extension
-! MAKEDIRQQ can create only one directory at a time. You cannot create a new
-! directory and a subdirectory below it in a single command. MAKEDIRQQ does not
-! translate path delimiters. You can use either slash (/) or backslash (\) as
-! valid delimiters.
-!  CALL MAKEDIRQQ(d)
-!  if not intel ...
-!  CALL SYSTEM("mkdir "//d)
-!  but the f2008 standard introduces execute_command_line as a standard way
-!  however it seems the ifort version we have been using doesnt support it?
-   make_dir_path = res
-END FUNCTION make_dir_path
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
