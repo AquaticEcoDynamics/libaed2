@@ -497,7 +497,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_extc = aed2_locate_global('extc_coef')
    data%id_dens = aed2_locate_global('density')
    data%id_sedzone = aed2_locate_global_sheet('sed_zone')
- 
+
 END SUBROUTINE aed2_define_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -962,7 +962,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
    ! Process microphytobenthos
    IF ( data%do_mpb>0 ) THEN
      ! Get local conditions
-     matz = _STATE_VAR_S_(data%id_sedzone) ! local benthic type 
+     matz = _STATE_VAR_S_(data%id_sedzone) ! local benthic type
      mpb = _STATE_VAR_S_(data%id_mpb) ! local mpb density
      temp = _STATE_VAR_(data%id_tem)  ! local temperature
      extc = _STATE_VAR_(data%id_extc) ! cell extinction
@@ -990,7 +990,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
 !RETURN
      ! Resuspension (simple assumption here)
      Fsed_phy = zero_
-     IF( in_zone_set(matz,data%active_zones) ) THEN 
+     IF( in_zone_set(matz,data%active_zones) ) THEN
        Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * data%resuspension(1)
      ENDIF
      _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy

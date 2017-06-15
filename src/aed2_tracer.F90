@@ -296,7 +296,7 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
 
             !MH CORRONG account for low clay conetent in more sandy MTAZ
             matz = _STATE_VAR_S_(data%id_E_sedzone)
-            IF (matz >3) dummy_eps = dummy_eps* 0.3  
+            IF (matz >3) dummy_eps = dummy_eps* 0.3
 
          ENDIF
 
