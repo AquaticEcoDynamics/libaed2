@@ -52,7 +52,7 @@ MODULE aed2_common
 
    PRIVATE   !# By default make everything private
 
-   PUBLIC aed2_new_model, aed2_define_model, aed2_build_model
+   PUBLIC aed2_new_model, aed2_define_model, aed2_build_model, aed2_print_version
 
    !#---------------------------------------------------------------------------
 
@@ -86,6 +86,7 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
 !LOCALS
    CLASS (aed2_model_data_t),POINTER :: model
    CHARACTER(len=4) :: prefix
+   LOGICAL :: is_plus = .FALSE.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -105,30 +106,6 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_zooplankton');    prefix = 'ZOO'; ALLOCATE(aed2_zooplankton_data_t::model)
       CASE ('aed2_tracer');         prefix = 'TRC'; ALLOCATE(aed2_tracer_data_t::model)
       CASE ('aed2_totals');         prefix = 'TOT'; ALLOCATE(aed2_totals_data_t::model)
-      CASE DEFAULT;                 CALL aed2_if_plus(modelname)
-   END SELECT
-
-   model%aed2_model_name = modelname
-   model%aed2_model_prefix = prefix
-
-   IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
-   IF ( ASSOCIATED(last_model) ) last_model%next => model
-   last_model => model
-END FUNCTION aed2_new_model
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-SUBROUTINE aed2_if_plus(modelname)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: modelname
-!LOCALS
-   LOGICAL :: is_plus
-!BEGIN
-   is_plus = .FALSE.
-#ifndef HAVE_PLUS
-   SELECT CASE (modelname)
       CASE ('aed2_land');           is_plus = .TRUE.
       CASE ('aed2_ass');            is_plus = .TRUE.
       CASE ('aed2_soilbgc');        is_plus = .TRUE.
@@ -148,14 +125,31 @@ SUBROUTINE aed2_if_plus(modelname)
       CASE ('aed2_bivalve');        is_plus = .TRUE.
       CASE ('aed2_pathogens');      is_plus = .TRUE.
       CASE ('aed2_test');           is_plus = .TRUE.
+      CASE DEFAULT;                 print *,'*** Unknown module ', TRIM(modelname)
    END SELECT
-#endif
-   IF ( is_plus ) THEN
-      print*,"To use ',TRIM(modelname),' you will need aed2+"
-   ELSE
-      print *,'*** Unknown module ', modelname
+
+   IF ( is_plus ) &
+      print*,"To use ",TRIM(modelname)," you will need aed2+"
+
+   IF (ASSOCIATED(model)) THEN
+      model%aed2_model_name = modelname
+      model%aed2_model_prefix = prefix
+
+      IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
+      IF ( ASSOCIATED(last_model) ) last_model%next => model
+      last_model => model
    ENDIF
-END SUBROUTINE aed2_if_plus
+END FUNCTION aed2_new_model
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_print_version
+!-------------------------------------------------------------------------------
+!BEGIN
+   print*,"    libaed2 version ", TRIM(AED2_VERSION)
+   print*,"    libaed2+ not found "
+END SUBROUTINE aed2_print_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

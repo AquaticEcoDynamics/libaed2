@@ -22,9 +22,9 @@ endif
 
 INCLUDES=-I${incdir}
 
-ifneq ("$(wildcard ../libaed2-plus/Makefile)","")
-  HAVEPLUS=-DHAVE_PLUS
-endif
+#ifneq ("$(wildcard ../libaed2-plus/Makefile)","")
+#  HAVEPLUS=-DHAVE_PLUS
+#endif
 
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
