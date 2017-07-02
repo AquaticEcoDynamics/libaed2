@@ -326,8 +326,8 @@ SUBROUTINE aed2_initialize_sedflux(data, column, layer_idx)
 
 
 	!# Do this here because for the constant model these values never change.
-	IF ( data%sed_modl .EQ. 1 .OR. data%sed_modl .EQ. 3) THEN
-		  Fsed_oxy = data%Fsed_oxy
+        IF ( data%sed_modl .EQ. 1 .OR. data%sed_modl .EQ. 3) THEN
+                  Fsed_oxy = data%Fsed_oxy
 		  Fsed_rsi = data%Fsed_rsi
 		  Fsed_amm = data%Fsed_amm
 		  Fsed_nit = data%Fsed_nit
