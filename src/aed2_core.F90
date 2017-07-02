@@ -147,7 +147,7 @@ INTEGER FUNCTION aed2_init_core(dname)
 !#ifdef __GFORTRAN__
 !   nan_ = nan_ / tmpr;
 !#endif
-   print*,"    libaed2 version ", TRIM(AED2_VERSION)
+!  print*,"    libaed2 version ", TRIM(AED2_VERSION)
    aed2_init_core = 0
 END FUNCTION aed2_init_core
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

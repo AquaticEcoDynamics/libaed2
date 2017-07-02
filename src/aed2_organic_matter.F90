@@ -362,7 +362,6 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    data%use_oxy = doc_miner_reactant_variable .NE. '' !This means oxygen module switched on
    IF (data%use_oxy) &
      data%id_oxy = aed2_locate_variable(doc_miner_reactant_variable)
-
    data%use_dic = doc_miner_product_variable .NE. '' !This means carbon module switched on
    IF (data%use_dic) &
      data%id_dic = aed2_locate_variable(doc_miner_product_variable)
@@ -444,14 +443,14 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
      data%id_sed_don = aed2_define_sheet_diag_variable('sed_don','mmol/m**2/d',  'DON sediment flux')
      data%id_sed_pop = aed2_define_sheet_diag_variable('sed_pop','mmol/m**2/d',  'Net POP sediment flux')
      data%id_sed_dop = aed2_define_sheet_diag_variable('sed_dop','mmol/m**2/d',  'DOP sediment flux')
-!     data%id_poc_miner = aed2_define_diag_variable('poc_miner','mmol/m**3/d','POC mineralisation')
-!     data%id_doc_miner = aed2_define_diag_variable('doc_miner','mmol/m**3/d','DOC mineralisation')
-!     data%id_pon_miner = aed2_define_diag_variable('pon_miner','mmol/m**3/d','PON mineralisation')
-!     data%id_don_miner = aed2_define_diag_variable('don_miner','mmol/m**3/d','DON mineralisation')
-!     data%id_pop_miner = aed2_define_diag_variable('pop_miner','mmol/m**3/d','POP hydrolysis')
-!     data%id_dop_miner = aed2_define_diag_variable('dop_miner','mmol/m**3/d','DOP mineralisation')
-!
-!     data%id_bod = aed2_define_diag_variable('BOD5','mg O2/L',  'Biochemical Oxygen Demand (BOD)')
+     data%id_poc_miner = aed2_define_diag_variable('poc_miner','mmol/m**3/d','POC mineralisation')
+     data%id_doc_miner = aed2_define_diag_variable('doc_miner','mmol/m**3/d','DOC mineralisation')
+     data%id_pon_miner = aed2_define_diag_variable('pon_miner','mmol/m**3/d','PON mineralisation')
+     data%id_don_miner = aed2_define_diag_variable('don_miner','mmol/m**3/d','DON mineralisation')
+     data%id_pop_miner = aed2_define_diag_variable('pop_miner','mmol/m**3/d','POP hydrolysis')
+     data%id_dop_miner = aed2_define_diag_variable('dop_miner','mmol/m**3/d','DOP mineralisation')
+
+     data%id_bod = aed2_define_diag_variable('BOD5','mg O2/L',  'Biochemical Oxygen Demand (BOD)')
      IF ( simphotolysis .and. simRpools  ) data%id_photolysis = &
        aed2_define_diag_variable('photolysis','mmol C/m3/d',  'photolysis rate of breakdown of DOC')
    ENDIF
@@ -949,7 +948,6 @@ END FUNCTION fdon_miner
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
 !###############################################################################
 PURE AED_REAL FUNCTION fpop_miner(use_oxy,Rpop_miner,Kpop_miner,theta_pop_miner,oxy,temp)
 !-------------------------------------------------------------------------------
@@ -998,7 +996,6 @@ PURE AED_REAL FUNCTION fdop_miner(use_oxy,Rdop_miner,Kdop_miner,theta_dop_miner,
 
 END FUNCTION fdop_miner
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################

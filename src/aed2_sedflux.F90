@@ -52,13 +52,13 @@ MODULE aed2_sedflux
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_sedflux
+         PROCEDURE :: initialize        => aed2_initialize_sedflux
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_sedflux
 !        PROCEDURE :: mobility          => aed2_mobility_sedflux
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_sedflux
 !        PROCEDURE :: delete            => aed2_delete_sedflux
 
    END TYPE
-
 !===============================================================================
 CONTAINS
 
@@ -203,7 +203,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
       data%Fsed_ch4 = Fsed_ch4/secs_per_day
       data%Fsed_feii = Fsed_feii/secs_per_day
       data%sed_modl = 1
-   ELSEIF ( sedflux_model .EQ. "Spatially Variable" ) THEN
+   ELSEIF ( sedflux_model .EQ. "Constant2D" ) THEN
       data%id_zones = aed2_locate_global_sheet('sed_zone')
       data%sed_modl = 2
       CALL load_sed_zone_data(data,namlst)
@@ -221,11 +221,33 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
       IF (ALLOCATED(data%Fsed_dic_P)) Fsed_dic = data%Fsed_dic_P(1)
       IF (ALLOCATED(data%Fsed_ch4_P)) Fsed_dic = data%Fsed_ch4_P(1)
       IF (ALLOCATED(data%Fsed_feii_P)) Fsed_dic = data%Fsed_feii_P(1)
-   ENDIF
+   ELSEIF ( sedflux_model .EQ. "Dynamic" ) THEN
+      data%id_zones = aed2_locate_global_sheet('sed_zone')
+      data%sed_modl = 3
+       data%Fsed_oxy = 10./secs_per_day
+  ELSEIF ( sedflux_model .EQ. "Dynamic2D" ) THEN
+      data%id_zones = aed2_locate_global_sheet('sed_zone')
+      data%sed_modl = 4
+      CALL load_sed_zone_data(data,namlst)
+      IF (ALLOCATED(data%Fsed_oxy_P)) Fsed_oxy = data%Fsed_oxy_P(1)
+      IF (ALLOCATED(data%Fsed_rsi_P)) Fsed_rsi = data%Fsed_rsi_P(1)
+      IF (ALLOCATED(data%Fsed_amm_P)) Fsed_amm = data%Fsed_amm_P(1)
+      IF (ALLOCATED(data%Fsed_nit_P)) Fsed_nit = data%Fsed_nit_P(1)
+      IF (ALLOCATED(data%Fsed_frp_P)) Fsed_frp = data%Fsed_frp_P(1)
+      IF (ALLOCATED(data%Fsed_pon_P)) Fsed_pon = data%Fsed_pon_P(1)
+      IF (ALLOCATED(data%Fsed_don_P)) Fsed_don = data%Fsed_don_P(1)
+      IF (ALLOCATED(data%Fsed_pop_P)) Fsed_pop = data%Fsed_pop_P(1)
+      IF (ALLOCATED(data%Fsed_dop_P)) Fsed_dop = data%Fsed_dop_P(1)
+      IF (ALLOCATED(data%Fsed_poc_P)) Fsed_poc = data%Fsed_poc_P(1)
+      IF (ALLOCATED(data%Fsed_doc_P)) Fsed_doc = data%Fsed_doc_P(1)
+      IF (ALLOCATED(data%Fsed_dic_P)) Fsed_dic = data%Fsed_dic_P(1)
+      IF (ALLOCATED(data%Fsed_ch4_P)) Fsed_dic = data%Fsed_ch4_P(1)
+      IF (ALLOCATED(data%Fsed_feii_P)) Fsed_dic = data%Fsed_feii_P(1)
+ENDIF
 
    ! Register state variables
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
-   IF ( Fsed_oxy .GT. MISVAL ) &
+   IF ( data%Fsed_oxy .GT. MISVAL ) &
       data%id_Fsed_oxy = aed2_define_sheet_diag_variable('Fsed_oxy','mmol/m**2',   &
                                           'sedimentation rate of oxygen')
    IF ( Fsed_rsi .GT. MISVAL ) &
@@ -267,17 +289,18 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
    IF ( Fsed_feii .GT. MISVAL ) &
       data%id_Fsed_feii = aed2_define_sheet_diag_variable('Fsed_feii','mmol/m**2', &
                                           'sedimentation rate of iron')
+
 END SUBROUTINE aed2_define_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+
 !###############################################################################
-SUBROUTINE aed2_calculate_benthic_sedflux(data,column,layer_idx)
+SUBROUTINE aed2_initialize_sedflux(data, column, layer_idx)
 !-------------------------------------------------------------------------------
-! Calculate pelagic bottom fluxes and benthic sink and source terms of AED sediment.
-! Everything in units per surface area (not volume!) per time.
+! Routine to set initial state of SEDFLUX variables                            !
 !-------------------------------------------------------------------------------
-!ARGUMENTS
+ !ARGUMENTS
    CLASS (aed2_sedflux_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
@@ -285,6 +308,7 @@ SUBROUTINE aed2_calculate_benthic_sedflux(data,column,layer_idx)
 !LOCALS
    AED_REAL :: Rzone
    INTEGER  :: zone
+   !AED_REAL :: matz
    ! Temporary variables
    AED_REAL :: Fsed_oxy, Fsed_rsi
    AED_REAL :: Fsed_amm, Fsed_nit
@@ -299,67 +323,104 @@ SUBROUTINE aed2_calculate_benthic_sedflux(data,column,layer_idx)
    !# Constant model has nothing to do
    IF ( data%sed_modl .EQ. 0 ) RETURN
 
-   !# Do this here because for the constant model these values never change.
-   IF ( data%sed_modl .EQ. 1 ) THEN
-      Fsed_oxy = data%Fsed_oxy
-      Fsed_rsi = data%Fsed_rsi
-      Fsed_amm = data%Fsed_amm
-      Fsed_nit = data%Fsed_nit
-      Fsed_frp = data%Fsed_frp
-      Fsed_pon = data%Fsed_pon
-      Fsed_don = data%Fsed_don
-      Fsed_pop = data%Fsed_pop
-      Fsed_dop = data%Fsed_dop
-      Fsed_poc = data%Fsed_poc
-      Fsed_doc = data%Fsed_doc
-      Fsed_dic = data%Fsed_dic
-      Fsed_ch4 = data%Fsed_ch4
-      Fsed_feii = data%Fsed_feii
-!     data%sed_modl = 0 ! From now on, we don't need to do this
-!     Bother! can't do this because data is intent in
-   ENDIF
 
 
-   IF ( data%sed_modl .EQ. 2) THEN
-      !# Get the zone array dependency
-      !# select the material zone for this cell
-      !# set sediment values accordingly
-      Rzone = _STATE_VAR_S_(data%id_zones)
-      zone = Rzone
+	!# Do this here because for the constant model these values never change.
+        IF ( data%sed_modl .EQ. 1 .OR. data%sed_modl .EQ. 3) THEN
+                  Fsed_oxy = data%Fsed_oxy
+		  Fsed_rsi = data%Fsed_rsi
+		  Fsed_amm = data%Fsed_amm
+		  Fsed_nit = data%Fsed_nit
+		  Fsed_frp = data%Fsed_frp
+		  Fsed_pon = data%Fsed_pon
+		  Fsed_don = data%Fsed_don
+		  Fsed_pop = data%Fsed_pop
+		  Fsed_dop = data%Fsed_dop
+		  Fsed_poc = data%Fsed_poc
+		  Fsed_doc = data%Fsed_doc
+		  Fsed_dic = data%Fsed_dic
+		  Fsed_ch4 = data%Fsed_ch4
+		  Fsed_feii = data%Fsed_feii
+	!     data%sed_modl = 0 ! From now on, we don't need to do this
+	!     Bother! can't do this because data is intent in
 
-      IF (zone .LE. 0 .OR. zone .GT. data%n_zones ) zone = 1
+   	ELSEIF ( data%sed_modl .EQ. 2 .OR. data%sed_modl .EQ. 4) THEN
+		  !# Get the zone array dependency
+		  !# select the material zone for this cell
+		  !# set sediment values accordingly
+		  ! This sets the value to the values in &aed2_sed_const2d
+		  Rzone = _STATE_VAR_S_(data%id_zones)
+		  zone = Rzone
 
-      IF ( data%id_Fsed_oxy > 0) Fsed_oxy = data%Fsed_oxy_P(zone)
-      IF ( data%id_Fsed_rsi > 0) Fsed_rsi = data%Fsed_rsi_P(zone)
-      IF ( data%id_Fsed_amm > 0) Fsed_amm = data%Fsed_amm_P(zone)
-      IF ( data%id_Fsed_nit > 0) Fsed_nit = data%Fsed_nit_P(zone)
-      IF ( data%id_Fsed_frp > 0) Fsed_frp = data%Fsed_frp_P(zone)
-      IF ( data%id_Fsed_pon > 0) Fsed_pon = data%Fsed_pon_P(zone)
-      IF ( data%id_Fsed_don > 0) Fsed_don = data%Fsed_don_P(zone)
-      IF ( data%id_Fsed_pop > 0) Fsed_pop = data%Fsed_pop_P(zone)
-      IF ( data%id_Fsed_dop > 0) Fsed_dop = data%Fsed_dop_P(zone)
-      IF ( data%id_Fsed_poc > 0) Fsed_poc = data%Fsed_poc_P(zone)
-      IF ( data%id_Fsed_doc > 0) Fsed_doc = data%Fsed_doc_P(zone)
-      IF ( data%id_Fsed_dic > 0) Fsed_dic = data%Fsed_dic_P(zone)
-      IF ( data%id_Fsed_ch4 > 0) Fsed_ch4 = data%Fsed_ch4_P(zone)
-      IF ( data%id_Fsed_feii > 0) Fsed_feii = data%Fsed_feii_P(zone)
-   ENDIF
+		  IF (zone .LE. 0 .OR. zone .GT. data%n_zones ) zone = 1
 
-   !# Also store sediment flux as diagnostic variable.
-   IF ( data%id_Fsed_oxy > 0) _DIAG_VAR_S_(data%id_Fsed_oxy) =  Fsed_oxy
-   IF ( data%id_Fsed_rsi > 0) _DIAG_VAR_S_(data%id_Fsed_rsi) =  Fsed_rsi
-   IF ( data%id_Fsed_amm > 0) _DIAG_VAR_S_(data%id_Fsed_amm) =  Fsed_amm
-   IF ( data%id_Fsed_nit > 0) _DIAG_VAR_S_(data%id_Fsed_nit) =  Fsed_nit
-   IF ( data%id_Fsed_frp > 0) _DIAG_VAR_S_(data%id_Fsed_frp) =  Fsed_frp
-   IF ( data%id_Fsed_pon > 0) _DIAG_VAR_S_(data%id_Fsed_pon) =  Fsed_pon
-   IF ( data%id_Fsed_don > 0) _DIAG_VAR_S_(data%id_Fsed_don) =  Fsed_don
-   IF ( data%id_Fsed_pop > 0) _DIAG_VAR_S_(data%id_Fsed_pop) =  Fsed_pop
-   IF ( data%id_Fsed_dop > 0) _DIAG_VAR_S_(data%id_Fsed_dop) =  Fsed_dop
-   IF ( data%id_Fsed_poc > 0) _DIAG_VAR_S_(data%id_Fsed_poc) =  Fsed_poc
-   IF ( data%id_Fsed_doc > 0) _DIAG_VAR_S_(data%id_Fsed_doc) =  Fsed_doc
-   IF ( data%id_Fsed_dic > 0) _DIAG_VAR_S_(data%id_Fsed_dic) =  Fsed_dic
-   IF ( data%id_Fsed_ch4 > 0) _DIAG_VAR_S_(data%id_Fsed_ch4) =  Fsed_ch4
-   IF ( data%id_Fsed_feii > 0) _DIAG_VAR_S_(data%id_Fsed_feii) =  Fsed_feii
+		  IF ( data%id_Fsed_oxy > 0) Fsed_oxy = data%Fsed_oxy_P(zone)
+		  IF ( data%id_Fsed_rsi > 0) Fsed_rsi = data%Fsed_rsi_P(zone)
+		  IF ( data%id_Fsed_amm > 0) Fsed_amm = data%Fsed_amm_P(zone)
+		  IF ( data%id_Fsed_nit > 0) Fsed_nit = data%Fsed_nit_P(zone)
+		  IF ( data%id_Fsed_frp > 0) Fsed_frp = data%Fsed_frp_P(zone)
+		  IF ( data%id_Fsed_pon > 0) Fsed_pon = data%Fsed_pon_P(zone)
+		  IF ( data%id_Fsed_don > 0) Fsed_don = data%Fsed_don_P(zone)
+		  IF ( data%id_Fsed_pop > 0) Fsed_pop = data%Fsed_pop_P(zone)
+		  IF ( data%id_Fsed_dop > 0) Fsed_dop = data%Fsed_dop_P(zone)
+		  IF ( data%id_Fsed_poc > 0) Fsed_poc = data%Fsed_poc_P(zone)
+		  IF ( data%id_Fsed_doc > 0) Fsed_doc = data%Fsed_doc_P(zone)
+		  IF ( data%id_Fsed_dic > 0) Fsed_dic = data%Fsed_dic_P(zone)
+		  IF ( data%id_Fsed_ch4 > 0) Fsed_ch4 = data%Fsed_ch4_P(zone)
+		  IF ( data%id_Fsed_feii > 0) Fsed_feii = data%Fsed_feii_P(zone)
+
+	ENDIF ! End if sed_modl == 2
+
+	!# Also store sediment flux as diagnostic variable
+	! for constant options 1 and 2
+	IF ( data%id_Fsed_oxy > 0) _DIAG_VAR_S_(data%id_Fsed_oxy) =  Fsed_oxy
+	IF ( data%id_Fsed_rsi > 0) _DIAG_VAR_S_(data%id_Fsed_rsi) =  Fsed_rsi
+	IF ( data%id_Fsed_amm > 0) _DIAG_VAR_S_(data%id_Fsed_amm) =  Fsed_amm
+    IF ( data%id_Fsed_nit > 0) _DIAG_VAR_S_(data%id_Fsed_nit) =  Fsed_nit
+    IF ( data%id_Fsed_frp > 0) _DIAG_VAR_S_(data%id_Fsed_frp) =  Fsed_frp
+    IF ( data%id_Fsed_pon > 0) _DIAG_VAR_S_(data%id_Fsed_pon) =  Fsed_pon
+    IF ( data%id_Fsed_don > 0) _DIAG_VAR_S_(data%id_Fsed_don) =  Fsed_don
+    IF ( data%id_Fsed_pop > 0) _DIAG_VAR_S_(data%id_Fsed_pop) =  Fsed_pop
+    IF ( data%id_Fsed_dop > 0) _DIAG_VAR_S_(data%id_Fsed_dop) =  Fsed_dop
+    IF ( data%id_Fsed_poc > 0) _DIAG_VAR_S_(data%id_Fsed_poc) =  Fsed_poc
+    IF ( data%id_Fsed_doc > 0) _DIAG_VAR_S_(data%id_Fsed_doc) =  Fsed_doc
+    IF ( data%id_Fsed_dic > 0) _DIAG_VAR_S_(data%id_Fsed_dic) =  Fsed_dic
+    IF ( data%id_Fsed_ch4 > 0) _DIAG_VAR_S_(data%id_Fsed_ch4) =  Fsed_ch4
+    IF ( data%id_Fsed_feii > 0) _DIAG_VAR_S_(data%id_Fsed_feii) =  Fsed_feii
+
+END SUBROUTINE aed2_initialize_sedflux
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+!###############################################################################
+SUBROUTINE aed2_calculate_benthic_sedflux(data,column,layer_idx)
+!-------------------------------------------------------------------------------
+! Calculate pelagic bottom fluxes and benthic sink and source terms of AED sedflux
+! Everything in units per surface area (not volume!) per time.
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_sedflux_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   AED_REAL :: Rzone
+   INTEGER  :: zone
+   !AED_REAL :: matz
+   ! Temporary variables
+   AED_REAL :: Fsed_oxy, Fsed_rsi
+   AED_REAL :: Fsed_amm, Fsed_nit
+   AED_REAL :: Fsed_pon, Fsed_don
+   AED_REAL :: Fsed_pop, Fsed_dop
+   AED_REAL :: Fsed_poc, Fsed_doc
+   AED_REAL :: Fsed_dic, Fsed_frp
+   AED_REAL :: Fsed_ch4, Fsed_feii
+!
+!-------------------------------------------------------------------------------
+
+   RETURN
 
 END SUBROUTINE aed2_calculate_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
