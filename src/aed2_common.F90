@@ -149,6 +149,11 @@ SUBROUTINE aed2_print_version
 !BEGIN
    print*,"    libaed2 version ", TRIM(AED2_VERSION)
    print*,"    libaed2+ not found "
+#ifdef __INTEL_COMPILER
+   print*,"    libaed2 built using intel fortran version ", __INTEL_COMPILER
+#else
+   print*,"    libaed2 built using gfortran version ', __GNUC__, '.', __GNUC_MINOR__, '.', __GNUC_PATCHLEVEL__
+#endif
 END SUBROUTINE aed2_print_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
