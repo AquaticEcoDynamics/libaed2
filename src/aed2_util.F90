@@ -463,8 +463,8 @@ SUBROUTINE aed2_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kT
       ENDIF
 
       IF (kTn(group) < 0.1 .AND. bTn(group) > 100.0) THEN
-            PRINT *,'Cannot solve for fT for: ', name(group)
-            STOP
+         print *,'Cannot solve for fT for: ', name(group)
+         STOP
       ENDIF
 
     ENDDO
