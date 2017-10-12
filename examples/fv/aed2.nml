@@ -158,7 +158,7 @@
    Fsed_dic =     0.0
 /
 &aed2_sed_const2d
-   n_zones  = 5
+   n_zones  = 3
    Fsed_oxy =    -15.,-20.,-50.,-30.,-50.
    Fsed_amm =     0.2,0.5,1.2,0.5,1.9
    Fsed_nit =     1.,1.,3.,1.,2.
@@ -396,8 +396,8 @@
    Ksed_n2o = 100.0,
    theta_sed_amm = 1.08,
    theta_sed_nit = 1.08,
-   Fsed_amm_variable='SDF_Fsed_amm'
-   Fsed_nit_variable='SDF_Fsed_nit'
+   !Fsed_amm_variable='SDF_Fsed_amm'
+   !Fsed_nit_variable='SDF_Fsed_nit'
 /
 
 
@@ -448,7 +448,7 @@
    Ksed_frp = 80.0
    theta_sed_frp = 1.08
    phosphorus_reactant_variable ='OXY_oxy'
-   Fsed_frp_variable ='SDF_Fsed_frp'
+   !Fsed_frp_variable ='SDF_Fsed_frp'
    simPO4Adsorption = .true.
    ads_use_external_tss = .false.
    po4sorption_target_variable ='TRC_ss1'
@@ -621,8 +621,8 @@
 !-------------------------------------------------------------------------------
 &aed2_phytoplankton
 !-- Configure phytoplankton groups to simulate
-  num_phytos = 1
-  the_phytos = 1
+  num_phytos = 2
+  the_phytos = 3,7
   settling =   1
 !-- Benthic phytoplankton group (microphytobenthos)
   do_mpb = 1
@@ -713,25 +713,25 @@
               'NIT_amm',
               'OGM_don',
               'OGM_pon',
-              'PHY_grn'
+              'PHY_green'
    TN_varscale = 1.0, 1.0, 1.0, 1.0, 0.15
    TP_vars =  'PHS_frp',
               !'PHS_frp_ads',
               'OGM_dop',
               'OGM_pop',
-              'PHY_grn'
+              'PHY_green'
    TP_varscale = 1.0, 1.0, 1.0, 0.01
    TOC_vars = 'OGM_doc',
               'OGM_poc',
-              'PHY_grn'
+              'PHY_green'
    TOC_varscale = 1.0, 1.0, 1.0, 1.0
    TSS_vars = 'TRC_ss1',
               'OGM_poc',
-              'PHY_grn'
+              'PHY_green'
    TSS_varscale = 1,0.1,0.1            !,  <vector same length as TSS names>
    !TSS_varscale = 0.71,0.1,0.1            !,  <vector same length as TSS names>
    Turb_vars = 'TRC_ss1',
                'OGM_poc',
-               'PHY_grn' !, .... ! Matt
+               'PHY_green' !, .... ! Matt
    Turb_varscale = 1,0.01,0.01
 /
