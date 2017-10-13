@@ -51,7 +51,7 @@ else
   FFLAGS+=-fdefault-real-8 -fdefault-double-8
 endif
 
-ifeq ($(COMPILATION_MODE),debug)
+ifeq ($(DEBUG),true)
   DEBUG_CFLAGS=-g
   OPT_CFLAGS=
   OPT_FFLAGS=

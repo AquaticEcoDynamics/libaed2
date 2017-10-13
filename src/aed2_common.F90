@@ -200,7 +200,7 @@ SUBROUTINE aed2_define_model(modelname, namlst)
 !BEGIN
    NULLIFY(model)
    model => aed2_new_model(modelname)
-   CALL aed2_build_model(model, namlst, .TRUE.)
+   IF ( ASSOCIATED(model) ) CALL aed2_build_model(model, namlst, .TRUE.)
 END SUBROUTINE aed2_define_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -317,7 +317,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    AED_REAL           :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
    AED_REAL           :: min_rho, max_rho
    LOGICAL            :: extra_debug = .false.
-   INTEGER            :: do_mpb, n_zones
+   INTEGER            :: do_mpb, n_zones = 0
    AED_REAL           :: active_zones(1000)
 
    NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, settling,resuspension,&

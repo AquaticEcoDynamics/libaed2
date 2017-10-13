@@ -76,7 +76,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
 !  AED_REAL          :: FsedA_initial=0.01
 !  AED_REAL          :: FsedN_initial=0.01
 
-   INTEGER  :: n_zones
+   INTEGER  :: n_zones=0
    AED_REAL :: Fsed_oxy(_MAX_ZONES_) = MISVAL, Fsed_rsi(_MAX_ZONES_) = MISVAL, &
                Fsed_amm(_MAX_ZONES_) = MISVAL, Fsed_nit(_MAX_ZONES_) = MISVAL, &
                Fsed_frp(_MAX_ZONES_) = MISVAL, Fsed_pon(_MAX_ZONES_) = MISVAL, &
