@@ -987,10 +987,10 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
      IF (data%do_Cuptake) THEN
         _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
      ENDIF
-!RETURN
+
      ! Resuspension (simple assumption here)
      Fsed_phy = zero_
-     IF( in_zone_set(matz,data%active_zones) ) THEN
+     IF( in_zone_set(matz,data%active_zones) .AND. data%id_l_resus > 0 ) THEN
        Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * data%resuspension(1)
      ENDIF
      _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy
@@ -1000,11 +1000,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
      _DIAG_VAR_S_(data%id_d_mpb) = mpb
      _DIAG_VAR_S_(data%id_d_bpp) = mpb_flux * secs_per_day
      _DIAG_VAR_S_(data%id_d_mpbv)= (Psed_phy - Fsed_phy)* secs_per_day
-
    ENDIF
-
-
-
 END SUBROUTINE aed2_calculate_benthic_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

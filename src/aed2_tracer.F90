@@ -180,6 +180,8 @@ SUBROUTINE aed2_define_tracer(data, namlst)
             print *, "Macrophyte Link Variable ", TRIM(macrophyte_link_var), " is not defined."
             STOP
          ENDIF
+      ELSE
+         data%id_l_bot = 0
       ENDIF
    ENDIF
 
@@ -274,13 +276,11 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
 
 
    DO i=1,ubound(data%id_ss,1)
-
       ! Retrieve current (local) state variable values.
       ss = _STATE_VAR_(data%id_ss(i))
 
       ! Resuspension
       IF ( data%resuspension > 0 ) THEN
-
          !IF ( data%resuspension == 2 .AND. i == 1 ) THEN
          !   dummy_tau = _DIAG_VAR_S_(data%id_tau_0)
          !ELSE
@@ -288,7 +288,11 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
          !ENDIF
 
          IF ( data%resuspension == 2 ) THEN
-            dummy_tau = data%tau_0(i) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
+            IF (data%id_l_bot > 0) THEN
+               dummy_tau = data%tau_0(i) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
+            ELSE
+               dummy_tau = data%tau_0(i)
+            ENDIF
             dummy_eps = data%epsilon * _DIAG_VAR_S_(data%id_sfss(i))
          ELSE
             dummy_tau = data%tau_0(i)
@@ -297,7 +301,6 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
             !MH CORRONG account for low clay conetent in more sandy MTAZ
             matz = _STATE_VAR_S_(data%id_E_sedzone)
             IF (matz >3) dummy_eps = dummy_eps* 0.3
-
          ENDIF
 
          IF ( bottom_stress > dummy_tau ) THEN
@@ -313,7 +316,6 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
 
       ! Transfer sediment flux value to model.
       _FLUX_VAR_(data%id_ss(i)) = _FLUX_VAR_(data%id_ss(i)) + ss_flux + resus_flux
-
    ENDDO
 
 END SUBROUTINE aed2_calculate_benthic_tracer

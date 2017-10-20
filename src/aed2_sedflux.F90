@@ -203,7 +203,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
       data%Fsed_ch4 = Fsed_ch4/secs_per_day
       data%Fsed_feii = Fsed_feii/secs_per_day
       data%sed_modl = 1
-   ELSEIF ( sedflux_model .EQ. "Constant2D" ) THEN
+   ELSEIF ( sedflux_model .EQ. "Constant2D" .OR. sedflux_model .EQ. "Constant2d" ) THEN
       data%id_zones = aed2_locate_global_sheet('sed_zone')
       data%sed_modl = 2
       CALL load_sed_zone_data(data,namlst)
@@ -225,7 +225,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
       data%id_zones = aed2_locate_global_sheet('sed_zone')
       data%sed_modl = 3
        data%Fsed_oxy = 10./secs_per_day
-  ELSEIF ( sedflux_model .EQ. "Dynamic2D" ) THEN
+   ELSEIF ( sedflux_model .EQ. "Dynamic2D" .OR. sedflux_model .EQ. "Dynamic2d" ) THEN
       data%id_zones = aed2_locate_global_sheet('sed_zone')
       data%sed_modl = 4
       CALL load_sed_zone_data(data,namlst)
@@ -243,7 +243,9 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
       IF (ALLOCATED(data%Fsed_dic_P)) Fsed_dic = data%Fsed_dic_P(1)
       IF (ALLOCATED(data%Fsed_ch4_P)) Fsed_dic = data%Fsed_ch4_P(1)
       IF (ALLOCATED(data%Fsed_feii_P)) Fsed_dic = data%Fsed_feii_P(1)
-ENDIF
+   ELSE
+      PRINT*,"**ERROR : Unknown sedflux model type :", TRIM(sedflux_model)
+   ENDIF
 
    ! Register state variables
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
