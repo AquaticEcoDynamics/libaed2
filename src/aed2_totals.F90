@@ -145,42 +145,42 @@ SUBROUTINE aed2_define_totals(data, namlst)
    DO i=1,data%num_tn
       data%id_dep_tn(i) =  aed2_locate_variable(tn_vars(i))
       data%tn_varscale(i) =  tn_varscale(i)
-      print*,'TN : ', TRIM(tn_vars(i)), ' * ', data%tn_varscale(i)
+      print*,'          TN : ', TRIM(tn_vars(i)), ' * ', data%tn_varscale(i)
    ENDDO
    DO i=1,data%num_tkn
       data%id_dep_tkn(i) =  aed2_locate_variable(tkn_vars(i))
       data%tkn_varscale(i) =  tkn_varscale(i)
-     print*,'TKN : ', TRIM(tkn_vars(i)), ' * ', data%tkn_varscale(i)
+     print*,'          TKN : ', TRIM(tkn_vars(i)), ' * ', data%tkn_varscale(i)
    ENDDO
    DO i=1,data%num_tp
       data%id_dep_tp(i) =  aed2_locate_variable(tp_vars(i))
       data%tp_varscale(i) =  tp_varscale(i)
-     print*,'TP : ', TRIM(tp_vars(i)), ' * ', data%tp_varscale(i)
+     print*,'          TP : ', TRIM(tp_vars(i)), ' * ', data%tp_varscale(i)
    ENDDO
    DO i=1,data%num_toc
       data%id_dep_toc(i) = aed2_locate_variable(toc_vars(i))
       data%toc_varscale(i) = toc_varscale(i)
-     print*,'TOC : ', TRIM(toc_vars(i)), ' * ', data%toc_varscale(i)
+     print*,'          TOC : ', TRIM(toc_vars(i)), ' * ', data%toc_varscale(i)
    ENDDO
    DO i=1,data%num_tss
       data%id_dep_tss(i) = aed2_locate_variable(tss_vars(i))
       data%tss_varscale(i) = tss_varscale(i)
-     print*,'TSS : ', TRIM(tss_vars(i)), ' * ', data%tss_varscale(i)
+     print*,'          TSS : ', TRIM(tss_vars(i)), ' * ', data%tss_varscale(i)
    ENDDO
    DO i=1,data%num_turb
       data%id_dep_turb(i) = aed2_locate_variable(turb_vars(i))
       data%turb_varscale(i) = turb_varscale(i)
-     print*,'TURB : ', TRIM(turb_vars(i)), ' * ', data%turb_varscale(i)
+     print*,'          TURB : ', TRIM(turb_vars(i)), ' * ', data%turb_varscale(i)
    ENDDO
    DO i=1,data%num_tfe
       data%id_dep_tfe(i) =  aed2_locate_variable(tfe_vars(i))
       data%tfe_varscale(i) =  tfe_varscale(i)
-      print*,'TFE : ', TRIM(tfe_vars(i)), ' * ', data%tfe_varscale(i)
+      print*,'          TFE : ', TRIM(tfe_vars(i)), ' * ', data%tfe_varscale(i)
    ENDDO
    DO i=1,data%num_tal
       data%id_dep_tal(i) =  aed2_locate_variable(tal_vars(i))
       data%tal_varscale(i) =  tal_varscale(i)
-     print*,'TAL : ', TRIM(tal_vars(i)), ' * ', data%tal_varscale(i)
+      print*,'          TAL : ', TRIM(tal_vars(i)), ' * ', data%tal_varscale(i)
    ENDDO
 
    ! Register environmental dependencies

@@ -327,39 +327,37 @@ END FUNCTION exp_integral
 !###############################################################################
 SUBROUTINE aed2_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kTn, name)
 !-------------------------------------------------------------------------------
-! Numerically solver for continuos temperature function
+! Numerical solver for continuous temperature function based on CAEDYM method
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   INTEGER,INTENT(in)       :: numg        ! Number of groups
+   INTEGER,INTENT(in)       :: numg
    AED_REAL,INTENT(in)      :: theta(:)
    AED_REAL,INTENT(inout)   :: T_std(:), T_opt(:), T_max(:)
    AED_REAL,INTENT(out)     :: aTn(:), bTn(:), kTn(:)
    CHARACTER(64),INTENT(in) :: name(:)
 !
 !LOCALS
-   AED_REAL :: Ts     ! Min. temperature where fT(Ts)=I (usually 1)
-   AED_REAL :: To     ! Optimum temperature where d(fT(To))/dT=0
-   AED_REAL :: Tm     ! Maximum temperature where fT(Tm)=0
-   AED_REAL :: in     ! Constant for fT(Ts)=in
-   AED_REAL :: v      ! Constant v
-   AED_REAL :: k,a,b  ! Model constants
-   AED_REAL :: G      ! Function fT()
-   AED_REAL :: devG       ! Derivative of fT()
-   AED_REAL :: a0,a1,a2   ! Dummies
-   AED_REAL :: tol        ! Tolerance
-   INTEGER :: group       ! Group counter
-   INTEGER :: i           ! Counters
+   AED_REAL :: Ts       ! Min. temperature where fT(Ts)=I (usually 1)
+   AED_REAL :: To       ! Optimum temperature where d(fT(To))/dT=0
+   AED_REAL :: Tm       ! Maximum temperature where fT(Tm)=0
+   AED_REAL :: in       ! Constant for fT(Ts)=in
+   AED_REAL :: v        ! Constant v
+   AED_REAL :: k,a,b    ! Model constants
+   AED_REAL :: G        ! Function fT()
+   AED_REAL :: devG     ! Derivative of fT()
+   AED_REAL :: a0,a1,a2 ! Dummies
+   AED_REAL :: tol      ! Tolerance
+   INTEGER :: group     ! Group counter
+   INTEGER :: i         ! Counters
    AED_REAL,PARAMETER :: t20=20.0
    LOGICAL,PARAMETER :: curvef=.true. ! T : f(T)=v**(T-20) at T=Tsta
                                       ! F : f(T) = 1 at T=Tsta
-
    AED_REAL,ALLOCATABLE,DIMENSION(:,:) :: value
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-    write(*,"('Estimating temperature functions for phytoplankton - ')")
-    write(*,"(' Temperature function of the form :',/)")
-    write(*,"('    fT = v^(T-20)-v^(k(T-a))+b',/)")
+    write(*,"(11X,'Solving temperature functions for phytoplankton - ')")
+    write(*,"(11X,' using the form : f(T) = v^(T-20)-v^(k(T-a))+b')")
 
     tol   = 0.05
 
@@ -369,7 +367,7 @@ SUBROUTINE aed2_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kT
       v = theta(group)
 
       IF(v < 1.01) THEN
-        print "(/,2X,'WARNING: theta_growth for group ',I2,' < 1.01',/)",group
+        print "(/,5X,'WARNING: theta_growth for group ',I2,' < 1.01',/)",group
       ENDIF
 
       Tm = T_max(group)
