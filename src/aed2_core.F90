@@ -411,7 +411,8 @@ FUNCTION aed2_find_variable(name) RESULT(ret)
    DO ret=1,n_aed_vars
       IF ( all_vars(ret)%name == name ) RETURN
       IF ( trim(all_vars(ret)%model_name)//'_'//trim(all_vars(ret)%name) == name ) RETURN
-!print*,trim(name), ' is neither ', trim(all_vars(ret)%name), ' nor ',  trim(all_vars(ret)%model_name)//'_'//trim(all_vars(ret)%name)
+!print*,trim(name), ' is neither ', trim(all_vars(ret)%name), ' nor ',  &
+!       trim(all_vars(ret)%model_name)//'_'//trim(all_vars(ret)%name)
    ENDDO
    ret = 0
 END FUNCTION aed2_find_variable

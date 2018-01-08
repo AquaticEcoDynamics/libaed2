@@ -315,9 +315,11 @@ SUBROUTINE aed2_calculate_nitrogen(data,column,layer_idx)
    !-----------------------------------------------
    ! Set temporal derivatives
    _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) -nitrification - anammox + dnra
-   _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + nitrification - denitrification - anammox - dnra
+   _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + &
+                               nitrification - denitrification - anammox - dnra
    IF( data%simN2O ) &
-    _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o) + (denit_n2o_prod - denit_n2o_cons + nit_n2o_prod)
+    _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o) + &
+                                (denit_n2o_prod - denit_n2o_cons + nit_n2o_prod)
 
    ! If an externally maintained oxygen pool is linked, take nitrification from it
    IF (data%use_oxy) &
