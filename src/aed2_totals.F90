@@ -1,13 +1,42 @@
 !###############################################################################
+!                                                                              !
+!         .----------------.  .----------------.  .----------------.           !
+!         | .--------------. || .--------------. || .--------------. |         !
+!         | |  _________   | || |     ____     | || |  _________   | |         !
+!         | | |  _   _  |  | || |   .'    `.   | || | |  _   _  |  | |         !
+!         | | |_/ | | \_|  | || |  /  .--.  \  | || | |_/ | | \_|  | |         !
+!         | |     | |      | || |  | |    | |  | || |     | |      | |         !
+!         | |    _| |_     | || |  \  `--'  /  | || |    _| |_     | |         !
+!         | |   |_____|    | || |   `.____.'   | || |   |_____|    | |         !
+!         | |              | || |              | || |              | |         !
+!         | '--------------' || '--------------' || '--------------' |         !
+!         '----------------'  '----------------'  '----------------'           !
+!                                                                              !
+!###############################################################################
 !#                                                                             #
 !# aed2_totals.F90                                                             #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -22,8 +51,8 @@ MODULE aed2_totals
 !-------------------------------------------------------------------------------
 ! aed2_totals --- totals model
 !
-! The AED module "totals" contains only diagnostic variables to provide
-! totals of other variables (eg tss) or derived metrics of interest (eg turbidity)
+! The AED module "totals" contains only diagnostic variables to provide totals
+! of other variables (eg tn, tss) or derived metrics of interest (eg turbidity)
 !-------------------------------------------------------------------------------
    USE aed2_core
 
@@ -108,6 +137,9 @@ SUBROUTINE aed2_define_totals(data, namlst)
    toc_varscale = 1.0 ; tss_varscale = 1.0;  turb_varscale = 1.0
    tfe_varscale = 1.0 ; tal_varscale = 1.0
 
+   num_tn  = 0 ; num_tkn  = 0 ; num_tp  = 0 ; num_toc = 0
+   num_tss = 0 ; num_turb = 0 ; num_tfe = 0 ; num_tal = 0
+
    ! Read the namelist
    read(namlst,nml=aed2_totals,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_totals'
@@ -145,42 +177,42 @@ SUBROUTINE aed2_define_totals(data, namlst)
    DO i=1,data%num_tn
       data%id_dep_tn(i) =  aed2_locate_variable(tn_vars(i))
       data%tn_varscale(i) =  tn_varscale(i)
-      print*,'          TN : ', TRIM(tn_vars(i)), ' * ', data%tn_varscale(i)
+      !print*,'          TN : ', TRIM(tn_vars(i)), ' * ', data%tn_varscale(i)
    ENDDO
    DO i=1,data%num_tkn
       data%id_dep_tkn(i) =  aed2_locate_variable(tkn_vars(i))
       data%tkn_varscale(i) =  tkn_varscale(i)
-      print*,'          TKN : ', TRIM(tkn_vars(i)), ' * ', data%tkn_varscale(i)
+     !print*,'          TKN : ', TRIM(tkn_vars(i)), ' * ', data%tkn_varscale(i)
    ENDDO
    DO i=1,data%num_tp
       data%id_dep_tp(i) =  aed2_locate_variable(tp_vars(i))
       data%tp_varscale(i) =  tp_varscale(i)
-      print*,'          TP : ', TRIM(tp_vars(i)), ' * ', data%tp_varscale(i)
+      !print*,'          TP : ', TRIM(tp_vars(i)), ' * ', data%tp_varscale(i)
    ENDDO
    DO i=1,data%num_toc
       data%id_dep_toc(i) = aed2_locate_variable(toc_vars(i))
       data%toc_varscale(i) = toc_varscale(i)
-      print*,'          TOC : ', TRIM(toc_vars(i)), ' * ', data%toc_varscale(i)
+      !print*,'          TOC : ', TRIM(toc_vars(i)), ' * ', data%toc_varscale(i)
    ENDDO
    DO i=1,data%num_tss
       data%id_dep_tss(i) = aed2_locate_variable(tss_vars(i))
       data%tss_varscale(i) = tss_varscale(i)
-      print*,'          TSS : ', TRIM(tss_vars(i)), ' * ', data%tss_varscale(i)
+      !print*,'          TSS : ', TRIM(tss_vars(i)), ' * ', data%tss_varscale(i)
    ENDDO
    DO i=1,data%num_turb
       data%id_dep_turb(i) = aed2_locate_variable(turb_vars(i))
       data%turb_varscale(i) = turb_varscale(i)
-      print*,'          TURB : ', TRIM(turb_vars(i)), ' * ', data%turb_varscale(i)
+      !print*,'          TURB : ', TRIM(turb_vars(i)), ' * ', data%turb_varscale(i)
    ENDDO
    DO i=1,data%num_tfe
       data%id_dep_tfe(i) =  aed2_locate_variable(tfe_vars(i))
       data%tfe_varscale(i) =  tfe_varscale(i)
-      print*,'          TFE : ', TRIM(tfe_vars(i)), ' * ', data%tfe_varscale(i)
+      !print*,'          TFE : ', TRIM(tfe_vars(i)), ' * ', data%tfe_varscale(i)
    ENDDO
    DO i=1,data%num_tal
       data%id_dep_tal(i) =  aed2_locate_variable(tal_vars(i))
       data%tal_varscale(i) =  tal_varscale(i)
-      print*,'          TAL : ', TRIM(tal_vars(i)), ' * ', data%tal_varscale(i)
+      !print*,'          TAL : ', TRIM(tal_vars(i)), ' * ', data%tal_varscale(i)
    ENDDO
 
    ! Register environmental dependencies
@@ -259,18 +291,17 @@ SUBROUTINE aed2_calculate_totals(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   INTEGER  :: i,count
+   INTEGER  :: i, count
    AED_REAL :: val, tot
 
 !-------------------------------------------------------------------------------
 !BEGIN
-
    ! Sum over TN variables
    IF (data%num_tn>0) THEN
      tot = 0.
      count = ubound(data%id_dep_tn,1)
      DO i=1,count ; val = _STATE_VAR_(data%id_dep_tn(i)); tot = tot + (val*data%tn_varscale(i)) ; ENDDO
-     _DIAG_VAR_(data%id_totals_tn) =  tot
+     _DIAG_VAR_(data%id_totals_tn) = tot
    ENDIF
 
    ! Sum over TKN variables
@@ -278,7 +309,7 @@ SUBROUTINE aed2_calculate_totals(data,column,layer_idx)
      tot = 0.
      count = ubound(data%id_dep_tkn,1)
      DO i=1,count ; val = _STATE_VAR_(data%id_dep_tkn(i)); tot = tot + (val*data%tkn_varscale(i)) ; ENDDO
-     _DIAG_VAR_(data%id_totals_tkn) =  tot
+     _DIAG_VAR_(data%id_totals_tkn) = tot
    ENDIF
 
    ! Sum over TP variables
@@ -286,7 +317,7 @@ SUBROUTINE aed2_calculate_totals(data,column,layer_idx)
      tot = 0.
      count = ubound(data%id_dep_tp,1)
      DO i=1,count ; val = _STATE_VAR_(data%id_dep_tp(i)); tot = tot + (val*data%tp_varscale(i)) ; ENDDO
-     _DIAG_VAR_(data%id_totals_tp) =  tot
+     _DIAG_VAR_(data%id_totals_tp) = tot
    ENDIF
 
    ! Sum over TOC variables
@@ -329,7 +360,6 @@ SUBROUTINE aed2_calculate_totals(data,column,layer_idx)
      _DIAG_VAR_(data%id_tal) =  tot
    ENDIF
 
-
    ! Light and Extinction Coefficient
    IF (data%outputLight) THEN
      val = _STATE_VAR_(data%id_par)
@@ -339,7 +369,6 @@ SUBROUTINE aed2_calculate_totals(data,column,layer_idx)
      val = _STATE_VAR_(data%id_extc)
      _DIAG_VAR_(data%id_totals_extc) =   val
    END IF
-
 END SUBROUTINE aed2_calculate_totals
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

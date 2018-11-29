@@ -1,13 +1,42 @@
 !###############################################################################
+!                                                                              !
+!          .----------------.  .----------------.  .----------------.          !
+!          | .--------------. || .--------------. || .--------------. |        !
+!          | |   ______     | || |  ____  ____  | || |    _______   | |        !
+!          | |  |_   __ \   | || | |_   ||   _| | || |   /  ___  |  | |        !
+!          | |    | |__) |  | || |   | |__| |   | || |  |  (__ \_|  | |        !
+!          | |    |  ___/   | || |   |  __  |   | || |   '.___`-.   | |        !
+!          | |   _| |_      | || |  _| |  | |_  | || |  |`\____) |  | |        !
+!          | |  |_____|     | || | |____||____| | || |  |_______.'  | |        !
+!          | |              | || |              | || |              | |        !
+!          | '--------------' || '--------------' || '--------------' |        !
+!          '----------------'  '----------------'  '----------------'          !
+!                                                                              !
+!###############################################################################
 !#                                                                             #
 !# aed2_phosphorus.F90                                                         #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -17,14 +46,15 @@
 
 #include "aed2.h"
 
-!
+
 MODULE aed2_phosphorus
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------+
 ! aed2_phosphorus --- phosphorus biogeochemical model
 !
 ! The AED module phosphorus contains equations that describe exchange of
-! soluable reactive phosphorus across the air/water interface and sediment flux.
-!-------------------------------------------------------------------------------
+! soluable reactive phosphorus across the air/water interface, sediment flux
+! and sorption/desorption
+!------------------------------------------------------------------------------+
    USE aed2_core
    USE aed2_util, ONLY: PO4AdsorptionFraction
 
@@ -38,19 +68,22 @@ MODULE aed2_phosphorus
       !# Variable identifiers
       INTEGER  :: id_frp, id_frpads, id_oxy,  id_tss, id_pH
       INTEGER  :: id_Fsed_frp
-      INTEGER  :: id_temp, id_tssext
-      INTEGER  :: id_sed_frp, id_frpads_vvel
+      INTEGER  :: id_E_temp, id_E_rain, id_tssext
+      INTEGER  :: id_sed_frp, id_frpads_vvel, id_atm_dep
 
       !# Model parameters
       AED_REAL :: Fsed_frp,Ksed_frp,theta_sed_frp      ! Benthic
-      LOGICAL  :: ben_use_oxy,ben_use_aedsed
+      AED_REAL :: atm_pip_dd, atm_frp_conc             ! Deposition
       AED_REAL :: Kpo4p,Kadsratio,Qmax, w_po4ads       ! Adsorption
-      LOGICAL  :: simPO4Adsorption, ads_use_pH, ads_use_external_tss
+      LOGICAL  :: simDryDeposition,simWetDeposition
+      LOGICAL  :: ben_use_oxy,ben_use_aedsed
       INTEGER  :: PO4AdsorptionModel
+      LOGICAL  :: simPO4Adsorption, ads_use_pH, ads_use_external_tss
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_phosphorus
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_phosphorus
+         PROCEDURE :: calculate_surface => aed2_calculate_surface_phosphorus
          PROCEDURE :: equilibrate       => aed2_equilibrate_phosphorus
          PROCEDURE :: mobility          => aed2_mobility_phosphorus
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_phosphorus
@@ -66,12 +99,12 @@ CONTAINS
 
 !###############################################################################
 SUBROUTINE aed2_define_phosphorus(data, namlst)
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------+
 ! Initialise the AED model
 !
-!  Here, the aed namelist is read and te variables exported
+!  Here, the aed namelist is read and the variables to be simulated
 !  by the model are registered with AED2.
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------+
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
    CLASS (aed2_phosphorus_data_t),INTENT(inout) :: data
@@ -79,10 +112,10 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
-
+   ! Initial
    AED_REAL          :: frp_initial   = 4.5
-   AED_REAL          :: frp_min   = zero_
-   AED_REAL          :: frp_max   = nan_
+   AED_REAL          :: frp_min       = zero_
+   AED_REAL          :: frp_max       = nan_
    ! Benthic
    AED_REAL          :: Fsed_frp      = 3.5
    AED_REAL          :: Ksed_frp      = 30.0
@@ -92,22 +125,30 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
    ! Adsorption
    LOGICAL           :: simPO4Adsorption = .FALSE.
    LOGICAL           :: ads_use_external_tss = .FALSE.
-   LOGICAL           :: ads_use_pH = .FALSE.
-   AED_REAL          :: Kpo4p = 1.05
-   AED_REAL          :: Kadsratio = 1.05
-   AED_REAL          :: Qmax = 1.05
-   AED_REAL          :: w_po4ads = 0.00
-   INTEGER  :: PO4AdsorptionModel = 1
+   INTEGER           :: PO4AdsorptionModel = 1
+   LOGICAL           :: ads_use_pH   = .FALSE.
+   AED_REAL          :: Kpo4p        = 1.05
+   AED_REAL          :: Kadsratio    = 1.05
+   AED_REAL          :: Qmax         = 1.05
+   AED_REAL          :: w_po4ads     = zero_
    CHARACTER(len=64) :: po4sorption_target_variable=''
-   CHARACTER(len=64) :: pH_variable='CAR_pH'
+   CHARACTER(len=64) :: pH_variable  ='CAR_pH'
+   ! Atmospheric deposition
+   LOGICAL           :: simDryDeposition = .false.
+   LOGICAL           :: simWetDeposition = .false.
+   AED_REAL          :: atm_pip_dd   = zero_
+   AED_REAL          :: atm_frp_conc = zero_
 
-   NAMELIST /aed2_phosphorus/ frp_initial,frp_min,frp_max,Fsed_frp,Ksed_frp,theta_sed_frp, &
-                             phosphorus_reactant_variable,Fsed_frp_variable,   &
-                             simPO4Adsorption,ads_use_external_tss,            &
-                             po4sorption_target_variable, PO4AdsorptionModel,  &
-                             ads_use_pH,Kpo4p,Kadsratio,Qmax,w_po4ads, pH_variable
+   NAMELIST /aed2_phosphorus/ frp_initial,frp_min,frp_max,                     &
+                            Fsed_frp,Ksed_frp,theta_sed_frp,Fsed_frp_variable, &
+                            phosphorus_reactant_variable,                      &
+                            simPO4Adsorption,ads_use_external_tss,             &
+                            po4sorption_target_variable, PO4AdsorptionModel,   &
+                            ads_use_pH,Kpo4p,Kadsratio,Qmax,w_po4ads,pH_variable, &
+                            simDryDeposition, simWetDeposition,                &
+                            atm_pip_dd, atm_frp_conc
 !
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------+
 !BEGIN
    print *,"        aed2_phosphorus initialization"
 
@@ -115,7 +156,7 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
    read(namlst,nml=aed2_phosphorus,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_phosphorus'
 
-   ! Store parameter values in our own derived type
+   ! Store parameter values in the module level data object
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
    data%Fsed_frp             = Fsed_frp/secs_per_day
@@ -129,6 +170,10 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
    data%Kadsratio            = Kadsratio
    data%Qmax                 = Qmax
    data%w_po4ads             = w_po4ads/secs_per_day
+   data%atm_pip_dd           = MAX(zero_,atm_pip_dd/secs_per_day)
+   data%atm_frp_conc         = MAX(zero_,atm_frp_conc)
+   data%simDryDeposition     = simDryDeposition
+   data%simWetDeposition     = simWetDeposition
 
 
    ! Register main state variable
@@ -182,19 +227,25 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
    ! Register diagnostic variables
    data%id_sed_frp = aed2_define_sheet_diag_variable('sed_frp','mmol/m**2/d', &
                                          'PO4 exchange across sed/water interface')
+   IF( simWetDeposition .OR. simDryDeposition ) THEN
+    data%id_atm_dep = aed2_define_sheet_diag_variable('atm_dip_flux','mmol/m**2/d', &
+                                         'DIP atmospheric deposition flux')
+   ENDIF
 
    ! Register environmental dependencies
-   data%id_temp = aed2_locate_global('temperature')
+   data%id_E_temp = aed2_locate_global('temperature')
+   IF( simWetDeposition ) data%id_E_rain = aed2_locate_global_sheet('rain')
+
 END SUBROUTINE aed2_define_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
 SUBROUTINE aed2_equilibrate_phosphorus(data,column,layer_idx)
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------+
 ! Update partitioning of phosphate between dissolved and particulate pools
 ! after kinetic transformations are applied
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------+
 !ARGUMENTS
    CLASS (aed2_phosphorus_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
@@ -214,53 +265,109 @@ SUBROUTINE aed2_equilibrate_phosphorus(data,column,layer_idx)
 !BEGIN
    IF(.NOT. data%simPO4Adsorption) RETURN
 
-
    tss = zero_
 
    ! Retrieve current environmental conditions for the cell.
-   temp = _STATE_VAR_(data%id_temp) ! local temperature
+   temp = _STATE_VAR_(data%id_E_temp)    ! local temperature
    IF(data%ads_use_external_tss) THEN
      tss = _STATE_VAR_(data%id_tssext) ! externally supplied total susp solids
    END IF
 
-    ! Retrieve current (local) state variable values.
-   frp = _STATE_VAR_(data%id_frp)        ! dissolved PO4
-   frpads = _STATE_VAR_(data%id_frpads)  ! adsorped PO4
-   IF (.NOT.data%ads_use_external_tss) THEN
-      tss = _STATE_VAR_(data%id_tss)      ! local total susp solids
-   END IF
+   ! Retrieve current (local) state variable values.
+   frp = _STATE_VAR_(data%id_frp)            ! dissolved PO4
+   frpads = _STATE_VAR_(data%id_frpads)      ! adsorped PO4
+   IF (.NOT.data%ads_use_external_tss) &
+      tss = _STATE_VAR_(data%id_tss)         ! local total susp solids
 
    IF(data%ads_use_pH) THEN
-      pH = _STATE_VAR_(data%id_pH)
+     pH = _STATE_VAR_(data%id_pH)
 
-    CALL PO4AdsorptionFraction(data%PO4AdsorptionModel, &  ! Dependencies
-                                 frp+frpads,            &
-                                 tss,                   &
+     CALL PO4AdsorptionFraction(data%PO4AdsorptionModel,              &  ! Dependencies
+                                 frp+frpads,                          &
+                                 tss,                                 &
                                  data%Kpo4p,data%Kadsratio,data%Qmax, &
-                                 PO4dis,PO4par,         &
-                                 thepH=pH)                 ! Returning variables
+                                 PO4dis,PO4par,                       &  ! Returning variables
+                                 thepH=pH)
 
    ELSE
-    CALL PO4AdsorptionFraction(data%PO4AdsorptionModel, &  ! Dependecies
-                                 frp+frpads,            &
-                                 tss,                   &
+     CALL PO4AdsorptionFraction(data%PO4AdsorptionModel,              &  ! Dependecies
+                                 frp+frpads,                          &
+                                 tss,                                 &
                                  data%Kpo4p,data%Kadsratio,data%Qmax, &
-                                 PO4dis,PO4par)            ! Returning variables
+                                 PO4dis,PO4par)                          ! Returning variables
    ENDIF
 
-   _STATE_VAR_(data%id_frp) = PO4dis       ! Dissolved PO4
-   _STATE_VAR_(data%id_frpads) = PO4par    ! Adsorped PO4
+   _STATE_VAR_(data%id_frp)    = PO4dis    ! Dissolved PO4 (FRP)
+   _STATE_VAR_(data%id_frpads) = PO4par    ! Adsorped PO4  (PIP)
 
 END SUBROUTINE aed2_equilibrate_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
+SUBROUTINE aed2_calculate_surface_phosphorus(data,column,layer_idx)
+!------------------------------------------------------------------------------+
+! Air-water exchange for the aed phosphorus model. Includes wet/dry deposition,
+! depending on the configuration.
+!------------------------------------------------------------------------------+
+!ARGUMENTS
+   CLASS (aed2_phosphorus_data_t),INTENT(in) :: data
+   TYPE  (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   ! Environment
+   AED_REAL :: temp, salt, wind, vel, depth, rain
+   ! State
+   AED_REAL :: n2o, nox, no2, nh4
+   ! Temporary variables
+   AED_REAL :: n2o_atm_flux = zero_ ! N2O atmos exchange with water
+   AED_REAL :: Cn2o_air = zero_     ! N2O in the air phase
+   AED_REAL :: kn2o_trans = zero_   ! N2O piston velocity
+   AED_REAL :: wind_hgt             ! Height of wind data, for correction
+   AED_REAL :: f_pres = 1.0         ! Pressure correction function (currently
+                                    !  unsued but applicable at high altitudes)
+!
+!------------------------------------------------------------------------------+
+!BEGIN
+
+  !----------------------------------------------------------------------------+
+  !# Atmosphere loading of DIP to the water, due to dry or wet deposition
+  IF( data%simDryDeposition ) THEN
+    !-----------------------------------------------
+    ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+    _FLUX_VAR_T_(data%id_frpads) = data%atm_pip_dd
+  ENDIF
+
+  IF( data%simWetDeposition ) THEN
+    !-----------------------------------------------
+    ! Get the necessary environmental variables (from physical driver)
+    rain = _STATE_VAR_S_(data%id_E_rain) / secs_per_day   ! Rain (m/s)
+
+    !-----------------------------------------------
+    ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+    _FLUX_VAR_T_(data%id_frp) = _FLUX_VAR_T_(data%id_frp) &
+                              + rain * data%atm_frp_conc
+  ENDIF
+
+  IF( data%simDryDeposition .OR. data%simWetDeposition ) THEN
+    !-----------------------------------------------
+    ! Also store deposition across the atm/water interface as a
+    ! diagnostic variable (mmmol/m2/day).
+    _DIAG_VAR_S_(data%id_atm_dep) = _DIAG_VAR_S_(data%id_atm_dep) &
+        + (_FLUX_VAR_T_(data%id_frp) + _FLUX_VAR_T_(data%id_frpads)) * secs_per_day
+  ENDIF
+
+END SUBROUTINE aed2_calculate_surface_phosphorus
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed2_calculate_benthic_phosphorus(data,column,layer_idx)
-!-------------------------------------------------------------------------------
-! Calculate pelagic bottom fluxes and benthic sink and source terms of AED phosphorus.
+!------------------------------------------------------------------------------+
+! Calculate the bottom fluxes and benthic sink & source terms of AED phosphorus.
 ! Everything in units per surface area (not volume!) per time.
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------+
 !ARGUMENTS
    CLASS (aed2_phosphorus_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
@@ -280,7 +387,7 @@ SUBROUTINE aed2_calculate_benthic_phosphorus(data,column,layer_idx)
 !BEGIN
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
-   temp = _STATE_VAR_(data%id_temp) ! local temperature
+   temp = _STATE_VAR_(data%id_E_temp) ! local temperature
 
    ! Retrieve current (local) state variable values.
    frp = _STATE_VAR_(data%id_frp)! phosphorus
@@ -331,11 +438,8 @@ SUBROUTINE aed2_mobility_phosphorus(data,column,layer_idx,mobility)
 !-------------------------------------------------------------------------------
 !BEGIN
 
-!print *,'frpmob1',data%id_frpads_vvel
-!print *,'frpmob2',data%w_po4ads, _DIAG_VAR_(data%id_frpads_vvel)
-
-   ! default to zero_
    mobility(data%id_frpads) = zero_
+
    IF( data%id_frpads_vvel>0 ) THEN
      ! adopt vertical velocity of host particle
      mobility(data%id_frpads) = _DIAG_VAR_(data%id_frpads_vvel)

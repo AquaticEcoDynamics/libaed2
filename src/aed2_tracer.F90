@@ -1,13 +1,42 @@
 !###############################################################################
+!                                                                              !
+!         .----------------.  .----------------.  .----------------.           !
+!         | .--------------. || .--------------. || .--------------. |         !
+!         | |  _________   | || |  _______     | || |     ______   | |         !
+!         | | |  _   _  |  | || | |_   __ \    | || |   .' ___  |  | |         !
+!         | | |_/ | | \_|  | || |   | |__) |   | || |  / .'   \_|  | |         !
+!         | |     | |      | || |   |  __ /    | || |  | |         | |         !
+!         | |    _| |_     | || |  _| |  \ \_  | || |  \ `.___.'\  | |         !
+!         | |   |_____|    | || | |____| |___| | || |   `._____.'  | |         !
+!         | |              | || |              | || |              | |         !
+!         | '--------------' || '--------------' || '--------------' |         !
+!         '----------------'  '----------------'  '----------------'           !
+!                                                                              !
+!###############################################################################
 !#                                                                             #
 !# aed2_tracer.F90                                                             #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -23,7 +52,7 @@ MODULE aed2_tracer
 ! aed2_tracer --- tracer biogeochemical model
 !
 ! The AED2 module tracer contains equations that describe a
-! soluble or particle tracer, including decay, sediment interaction, and &
+! soluble or particle tracer, including decay, sediment interaction, and
 ! resupension and settling
 !-------------------------------------------------------------------------------
    USE aed2_core
@@ -38,8 +67,8 @@ MODULE aed2_tracer
 
    TYPE,extends(aed2_model_data_t) :: aed2_tracer_data_t
       !# Variable identifiers
-      INTEGER,ALLOCATABLE :: id_ss(:), id_sfss(:), id_ss_vvel(:)
-      INTEGER :: id_retain
+      INTEGER,ALLOCATABLE :: id_trc(:), id_sfss(:), id_trc_vvel(:)
+      INTEGER :: id_age
       INTEGER :: id_l_bot, id_tau_0, id_epsilon, id_resus
       INTEGER :: id_temp, id_taub, id_salt, id_rho
       INTEGER :: id_d_taub
@@ -138,7 +167,7 @@ SUBROUTINE aed2_define_tracer(data, namlst)
 
    ! Setup tracers
    IF ( num_tracers > 0 ) THEN
-      ALLOCATE(data%id_ss(num_tracers)) ; ALLOCATE(data%id_ss_vvel(num_tracers))
+      ALLOCATE(data%id_trc(num_tracers)) ; ALLOCATE(data%id_trc_vvel(num_tracers))
       ALLOCATE(data%decay(num_tracers)) ; data%decay(1:num_tracers) = decay(1:num_tracers)
       ALLOCATE(data%Fsed(num_tracers))  ; data%Fsed(1:num_tracers)  = Fsed(1:num_tracers)
       ALLOCATE(data%Ke_ss(num_tracers)) ; data%Ke_ss(1:num_tracers) = Ke_ss(1:num_tracers)
@@ -150,14 +179,14 @@ SUBROUTINE aed2_define_tracer(data, namlst)
       ALLOCATE(data%tau_0(num_tracers)) ; data%tau_0(1:num_tracers) = tau_0(1:num_tracers)
       ALLOCATE(data%fs(num_tracers))    ; data%fs(1:num_tracers)    = fs(1:num_tracers)
 
-      trac_name = 'ss0'
+      trac_name = 'tr0'
       ! Register state variables
       DO i=1,num_tracers
          trac_name(3:3) = CHAR(ICHAR('0') + i)
                                              ! divide settling by secs_per_day to convert m/d to m/s
-         data%id_ss(i) = aed2_define_variable(TRIM(trac_name),'mmol/m**3','tracer', &
+         data%id_trc(i) = aed2_define_variable(TRIM(trac_name),'mmol/m**3','tracer', &
                                               trace_initial,minimum=zero_,maximum=1e3,mobility=(w_ss(i)/secs_per_day))
-         data%id_ss_vvel(i) = aed2_define_diag_variable(TRIM(trac_name)//'_vvel','m/s','vertical velocity')
+         data%id_trc_vvel(i) = aed2_define_diag_variable(TRIM(trac_name)//'_vvel','m/s','vertical velocity')
       ENDDO
    ENDIF
 
@@ -185,12 +214,11 @@ SUBROUTINE aed2_define_tracer(data, namlst)
       ENDIF
    ENDIF
 
-
    ! Retention time
    IF (retention_time) THEN
-      data%id_retain = aed2_define_variable("ret",'sec','tracer',trace_initial,minimum=zero_)
+      data%id_age = aed2_define_variable("age",'sec','tracer',trace_initial,minimum=zero_)
    ELSE
-      data%id_retain = -1
+      data%id_age = -1
    ENDIF
 
    ! Register environmental dependencies
@@ -225,12 +253,12 @@ SUBROUTINE aed2_calculate_tracer(data,column,layer_idx)
 !-------------------------------------------------------------------------------
 !BEGIN
    DO i=1,data%num_tracers
-      trc = _STATE_VAR_(data%id_ss(i))
-      _FLUX_VAR_(data%id_ss(i)) = _FLUX_VAR_(data%id_ss(i)) + data%decay(i)*trc
+      trc = _STATE_VAR_(data%id_trc(i))
+      _FLUX_VAR_(data%id_trc(i)) = _FLUX_VAR_(data%id_trc(i)) + data%decay(i)*trc
    ENDDO
 
-   IF (data%id_retain < 1) RETURN
-   _FLUX_VAR_(data%id_retain) = _FLUX_VAR_(data%id_retain) + 1.0
+   IF (data%id_age < 1) RETURN
+   _FLUX_VAR_(data%id_age) = _FLUX_VAR_(data%id_age) + 1.0
 END SUBROUTINE aed2_calculate_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -260,7 +288,7 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   IF ( .NOT. ALLOCATED(data%id_ss) ) RETURN
+   IF ( .NOT. ALLOCATED(data%id_trc) ) RETURN
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
@@ -275,9 +303,9 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
       _DIAG_VAR_S_(data%id_tau_0) = data%tau_0(1) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
 
 
-   DO i=1,ubound(data%id_ss,1)
+   DO i=1,ubound(data%id_trc,1)
       ! Retrieve current (local) state variable values.
-      ss = _STATE_VAR_(data%id_ss(i))
+      ss = _STATE_VAR_(data%id_trc(i))
 
       ! Resuspension
       IF ( data%resuspension > 0 ) THEN
@@ -315,7 +343,7 @@ SUBROUTINE aed2_calculate_benthic_tracer(data,column,layer_idx)
       ss_flux = data%Fsed(i) * (theta_sed_ss**(temp-20.0))
 
       ! Transfer sediment flux value to model.
-      _FLUX_VAR_(data%id_ss(i)) = _FLUX_VAR_(data%id_ss(i)) + ss_flux + resus_flux
+      _FLUX_VAR_(data%id_trc(i)) = _FLUX_VAR_(data%id_trc(i)) + ss_flux + resus_flux
    ENDDO
 
 END SUBROUTINE aed2_calculate_benthic_tracer
@@ -339,9 +367,9 @@ SUBROUTINE aed2_light_extinction_tracer(data,column,layer_idx,extinction)
 !
 !-----------------------------------------------------------------------
 !BEGIN
-   DO ss_i=1,ubound(data%id_ss,1)
+   DO ss_i=1,ubound(data%id_trc,1)
       ! Retrieve current (local) state variable values.
-      ss = _STATE_VAR_(data%id_ss(ss_i))
+      ss = _STATE_VAR_(data%id_trc(ss_i))
 
       ! Self-shading with contribution from background tracer concentration.
       extinction = extinction + (data%Ke_ss(ss_i)*ss)
@@ -409,8 +437,8 @@ SUBROUTINE aed2_mobility_tracer(data,column,layer_idx,mobility)
 
       END SELECT
       ! set global mobility array
-      mobility(data%id_ss(i)) = vvel
-      _DIAG_VAR_(data%id_ss_vvel(i)) = vvel
+      mobility(data%id_trc(i)) = vvel
+      _DIAG_VAR_(data%id_trc_vvel(i)) = vvel
    ENDDO
 
 END SUBROUTINE aed2_mobility_tracer

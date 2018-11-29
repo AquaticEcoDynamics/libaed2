@@ -1,13 +1,42 @@
 !###############################################################################
+!                                                                              !
+!         .----------------.  .----------------.  .----------------.           !
+!         | .--------------. || .--------------. || .--------------. |         !
+!         | |   ________   | || |     ____     | || |     ____     | |         !
+!         | |  |  __   _|  | || |   .'    `.   | || |   .'    `.   | |         !
+!         | |  |_/  / /    | || |  /  .--.  \  | || |  /  .--.  \  | |         !
+!         | |     .'.' _   | || |  | |    | |  | || |  | |    | |  | |         !
+!         | |   _/ /__/ |  | || |  \  `--'  /  | || |  \  `--'  /  | |         !
+!         | |  |________|  | || |   `.____.'   | || |   `.____.'   | |         !
+!         | |              | || |              | || |              | |         !
+!         | '--------------' || '--------------' || '--------------' |         !
+!         '----------------'  '----------------'  '----------------'           !
+!                                                                              !
+!###############################################################################
 !#                                                                             #
 !# aed2_zooplankton.F90                                                        #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -296,6 +325,7 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   pon = 0.0 ; poc = 0.0 ; pop = 0.0  !## CAB [-Wmaybe-uninitialized]
 
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_tem)    ! local temperature
@@ -488,29 +518,39 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
 
       ! Zooplankton production / losses in mmolC/s
 
-      _FLUX_VAR_(data%id_zoo(zoop_i)) = _FLUX_VAR_(data%id_zoo(zoop_i)) + ( (data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality)*zoo )
+      _FLUX_VAR_(data%id_zoo(zoop_i)) = _FLUX_VAR_(data%id_zoo(zoop_i)) +           &
+                        ((data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality)*zoo)
 
       IF( data%simZoopFeedback ) THEN
       ! Now take food grazed by zooplankton from food pools in mmolC/s
       phy_i = 0
       DO prey_i = 1,data%zoops(zoop_i)%num_prey
-         _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) = _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) + ( -1.0 * grazing_prey(prey_i))
+         _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) =                            &
+                       _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) +              &
+                       ( -1.0 * grazing_prey(prey_i))
           IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey .EQ. _OGMPOC_) THEN
               IF (poc > zero_) THEN
-                 _FLUX_VAR_(data%id_Nmorttarget) = _FLUX_VAR_(data%id_Nmorttarget) + ( -1.0 * grazing_prey(prey_i) * pon/poc)
-                 _FLUX_VAR_(data%id_Pmorttarget) = _FLUX_VAR_(data%id_Pmorttarget) + ( -1.0 * grazing_prey(prey_i) * pop/poc)
+                 _FLUX_VAR_(data%id_Nmorttarget) =     &
+                          _FLUX_VAR_(data%id_Nmorttarget) + ( -1.0 * grazing_prey(prey_i) * pon/poc)
+                 _FLUX_VAR_(data%id_Pmorttarget) =     &
+                          _FLUX_VAR_(data%id_Pmorttarget) + ( -1.0 * grazing_prey(prey_i) * pop/poc)
               ENDIF
           ELSEIF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:_PHYLEN_).EQ. _PHYMOD_) THEN
             phy_i = phy_i + 1
-            _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) = _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) + ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_INcon(phy_i))
-            _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) = _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) + ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_IPcon(phy_i))
+            _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) =                         &
+                      _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) +               &
+                      ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_INcon(phy_i))
+            _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) =                         &
+                      _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) +               &
+                       ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_IPcon(phy_i))
          ENDIF
       ENDDO
 
 
       ! Now manage excretion contributions to DOM
       IF (data%simDCexcr) THEN
-         _FLUX_VAR_(data%id_Cexctarget) = _FLUX_VAR_(data%id_Cexctarget) + (data%zoops(zoop_i)%fexcr_zoo * respiration * zoo + doc_excr)
+         _FLUX_VAR_(data%id_Cexctarget) = _FLUX_VAR_(data%id_Cexctarget) +     &
+                        (data%zoops(zoop_i)%fexcr_zoo * respiration * zoo + doc_excr)
       ENDIF
       IF (data%simDNexcr) THEN
          _FLUX_VAR_(data%id_Nexctarget) = _FLUX_VAR_(data%id_Nexctarget) + (don_excr)

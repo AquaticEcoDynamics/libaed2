@@ -39,25 +39,6 @@
 				<Tool Name="VFCustomBuildTool"/>
 				<Tool Name="VFPreLinkEventTool"/>
 				<Tool Name="VFPreBuildEventTool"/>
-				<Tool Name="VFPostBuildEventTool"/></Configuration>
-		<Configuration Name="Release_SP|Win32" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\src\;..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="SINGLE=true" F2003Semantics="true" RealKIND="realKIND4"/>
-				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
-				<Tool Name="VFResourceCompilerTool"/>
-				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
-				<Tool Name="VFCustomBuildTool"/>
-				<Tool Name="VFPreLinkEventTool"/>
-				<Tool Name="VFPreBuildEventTool"/>
-				<Tool Name="VFPostBuildEventTool"/></Configuration>
-		<Configuration Name="Release_SP|x64" OutputDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" IntermediateDirectory="$(SolutionDir)\$(PlatformName)-$(ConfigurationName)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\src\;..\include\;.\$(PlatformName)-$(ConfigurationName)\" PreprocessorDefinitions="SINGLE=true" F2003Semantics="true" RealKIND="realKIND4"/>
-				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
-				<Tool Name="VFResourceCompilerTool"/>
-				<Tool Name="VFResourceCompilerTool"/>
-				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
-				<Tool Name="VFCustomBuildTool"/>
-				<Tool Name="VFPreLinkEventTool"/>
-				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration></Configurations>
 	<Files>
 		<Filter Name="Header Files" Filter="fi;fd">
@@ -71,6 +52,7 @@
 		<File RelativePath="..\src\aed2_core.F90"/>
 		<File RelativePath="..\src\aed2_csv_reader.F90"/>
 		<File RelativePath="..\src\aed2_nitrogen.F90"/>
+		<File RelativePath="..\src\aed2_noncohesive.F90"/>
 		<File RelativePath="..\src\aed2_organic_matter.F90"/>
 		<File RelativePath="..\src\aed2_oxygen.F90"/>
 		<File RelativePath="..\src\aed2_phosphorus.F90"/>

@@ -2,14 +2,27 @@
 !#                                                                             #
 !# aed2_common.F90                                                             #
 !#                                                                             #
-!#   -----------------------------------------------------------------------   #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -18,13 +31,6 @@
 !###############################################################################
 
 #include "aed2.h"
-
-!#define CELL_VAR    1
-!#define CELL_SV     2
-!#define CELL_DIAG   3
-!#define CELL_SD     4
-!#define CELL_EXTERN 5
-!#define CELL_SE     6
 
 
 !###############################################################################
@@ -44,6 +50,7 @@ MODULE aed2_common
    USE aed2_phytoplankton
    USE aed2_zooplankton
    USE aed2_tracer
+   USE aed2_noncohesive
    USE aed2_totals
 
    IMPLICIT NONE
@@ -105,6 +112,7 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_phytoplankton');  prefix = 'PHY'; ALLOCATE(aed2_phytoplankton_data_t::model)
       CASE ('aed2_zooplankton');    prefix = 'ZOO'; ALLOCATE(aed2_zooplankton_data_t::model)
       CASE ('aed2_tracer');         prefix = 'TRC'; ALLOCATE(aed2_tracer_data_t::model)
+      CASE ('aed2_noncohesive');    prefix = 'NCS'; ALLOCATE(aed2_noncohesive_data_t::model)
       CASE ('aed2_totals');         prefix = 'TOT'; ALLOCATE(aed2_totals_data_t::model)
       CASE ('aed2_land');           is_plus = .TRUE.
       CASE ('aed2_ass');            is_plus = .TRUE.
@@ -152,7 +160,7 @@ SUBROUTINE aed2_print_version
 #ifdef __INTEL_COMPILER
    print*,"    libaed2 built using intel fortran version ", __INTEL_COMPILER
 #else
-   print*,"    libaed2 built using gfortran version ', __GNUC__, '.', __GNUC_MINOR__, '.', __GNUC_PATCHLEVEL__
+   print*,"    libaed2 built using gfortran version ", __GNUC__, '.', __GNUC_MINOR__, '.', __GNUC_PATCHLEVEL__
 #endif
 END SUBROUTINE aed2_print_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -460,11 +468,12 @@ END SUBROUTINE aed2_bio_drag
 
 
 !###############################################################################
-SUBROUTINE aed2_particle_bgc(column, layer_idx, ppid)
+SUBROUTINE aed2_particle_bgc(column, layer_idx, ppid, partcl)
 !-------------------------------------------------------------------------------
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
+   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
 !
 !LOCALS
    CLASS (aed2_model_data_t),POINTER :: model
@@ -472,7 +481,7 @@ SUBROUTINE aed2_particle_bgc(column, layer_idx, ppid)
    ppid = 0
    model => model_list
    DO WHILE (ASSOCIATED(model))
-      CALL model%particle_bgc(column, layer_idx, ppid)
+      CALL model%particle_bgc(column, layer_idx, ppid, partcl)
       model => model%next
    ENDDO
 END SUBROUTINE aed2_particle_bgc

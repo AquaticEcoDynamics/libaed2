@@ -2,12 +2,27 @@
 !#                                                                             #
 !# aed2_util.F90                                                               #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -67,33 +82,40 @@ END FUNCTION find_free_lun
 
 
 !###############################################################################
-PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_model)
+PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
+                                                LA,schmidt_model,piston_model)
 !-------------------------------------------------------------------------------
-! Atmospheric-surface water exchange piston velocity for O2, CO2 etc
+! Atmospheric-surface water exchange piston velocity for O2, CO2, N2O, CH4 etc
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   AED_REAL,INTENT(IN) :: wshgt,wind
-   AED_REAL,INTENT(in) :: tem,sal
-   AED_REAL,INTENT(in),OPTIONAL :: LA
-   INTEGER,INTENT(in),OPTIONAL  :: schmidt_model
+   AED_REAL,INTENT(IN)           :: wshgt,wind
+   AED_REAL,INTENT(IN)           :: tem,sal
+   AED_REAL,INTENT(IN),OPTIONAL  :: vel,depth
+   AED_REAL,INTENT(IN),OPTIONAL  :: LA
+   INTEGER, INTENT(IN),OPTIONAL  :: schmidt_model, piston_model
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x
-   INTEGER  :: schmidt_model_l
+   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,windsp
+   INTEGER  :: schmidt_model_l,piston_model_l
    ! Parameters
    AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   k_wind = 0.  ! default to zero
 
    !-----------------------------------------------
-   ! Decide on Sc equation to apply
-   schmidt_model_l = 2 !default
+   ! Decide on models to apply
+   schmidt_model_l = 2 ! default
    IF (PRESENT(schmidt_model)) schmidt_model_l = schmidt_model
+   piston_model_l  = 1 ! default
+   IF (PRESENT(piston_model)) piston_model_l = piston_model
 
+   ! These parameterizations assume 10m windspeed, and must be scaled by hgtCorrx
    ! Adjust the windspeed if the sensor height is not 10m
    hgtCorrx =  LOG(10.00 / roughLength) / LOG(wshgt / roughLength)
+   windsp = wind * hgtCorrx
 
    !-----------------------------------------------
    ! Compute k_wind
@@ -102,17 +124,17 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_mo
       ! New option for the calculation of k_wind. Note that this has a
       ! "lake area" (LA) variable included in it.
 
-      ! Valchon & Prairie 2013: The ecosystem size and shape dependence of gas transfer
-      !                              velocity versus wind speed relationships in lakes
+      ! Valchon & Prairie 2013: The ecosystem size and shape dependence of
+      !           gas transfer velocity versus wind speed relationships in lakes
       ! k600 = 2.51 (±0.99) + 1.48 (±0.34) · U10 + 0.39 (±0.08) · U10 · log10 LA
 
-      k_wind = 2.51 + 1.48*wind*hgtCorrx  +  0.39*wind*hgtCorrx*log10(LA)
+      k_wind = 2.51 + 1.48*windsp  +  0.39*windsp*log10(LA)
 
    ELSE
       temp=tem
       salt=sal
-      IF (temp < 0.0)       temp = 0.0; IF (temp > 38.0)      temp = 38.0
-      IF (salt < 0.0)       salt = 0.0; IF (salt > 75.0)      salt = 75.0
+      IF (temp < 0.0) temp = 0.0;   IF (temp > 38.0) temp = 38.0
+      IF (salt < 0.0) salt = 0.0;   IF (salt > 75.0) salt = 75.0
 
       ! Schmidt, Sc
       ! control value : Sc = 590 at 20°C and 35 psu
@@ -132,28 +154,77 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,LA,schmidt_mo
          ! CH4 one from Arianto Santoso <abs11@students.waikato.ac.nz>
          schmidt = 2039.2 - (120.31*temp) + (3.4209*temp*temp) - (0.040437*temp*temp*temp)
          schmidt = schmidt / 600
-       CASE (5)
+      CASE (5)
          ! CH4 from Sturm et al. 2014 (ex Wanninkhof, 1992)
          schmidt = 1897.8 - (114.28*temp) + (3.2902*temp*temp) - (0.039061*temp*temp*temp)
-       CASE (6)
+      CASE (6)
          ! N2O from Sturm et al. 2014 (ex Wanninkhof, 1992)
          schmidt = 2055.6 - (137.11*temp) + (4.3173*temp*temp) - (0.054350*temp*temp*temp)
       END SELECT
 
+
       ! Gas transfer velocity (cm/hr)
-      ! k = a u^2 (Sc/600)^-x
-      ! This parameterization assumes 10m windspeed, and must be scaled by hgtCorrx
-      a = 0.31
-      x = 0.50
-      IF( wind*hgtCorrx <3.) x = 0.66
-      k_wind = a * (wind*hgtCorrx)*(wind*hgtCorrx) * (schmidt/600.0)**(-x)
+      SELECT CASE (piston_model_l)
+      CASE (1)
+        ! k = a u^2 (Sc/660)^-x : Wanninkhof 1992
+        a = 0.31
+        x = 0.50
+        IF( windsp <3.) x = 0.66
+        k_wind = a * (windsp**2) * (schmidt/660.0)**(-x)
+      CASE (2)
+        ! k = a u^2 (Sc/660)^-x : Wanninkhof 2014
+        a = 0.251
+        x = 0.50
+        k_wind = a * (windsp**2) * (schmidt/660.0)**(-x)
+      CASE (3)
+        ! k = a u^2 (Sc/600)^-x : Ho et al., 2011
+        a = 0.26
+        x = 0.50
+        k_wind = a * (windsp**2) * (schmidt/600.0)**(-x)
+      CASE (4)
+        ! k = K (Sc/600)^-x : Ho et al., 2016
+        a = 0.266
+        x = 0.50
+        k_wind = ((0.77*vel**x)*(depth**(-x)) + a*(windsp)**2) * (schmidt/600.0)**(-x)
+      CASE (5)
+        ! k = K (Sc/600)^-x : Raymond and Cole, 2001
+        a = 1.91
+        x = 0.50
+        k_wind = 1.91*exp(0.35*windsp) * (schmidt/600.0)**(-x)
+      CASE (6)
+        ! k = K (Sc/600)^-x : Borge et al., 2004
+        a = 2.58
+        x = 0.50
+        k_wind = (1.0 + (1.719*vel**x)*(depth**x) + a*windsp) * (schmidt/600.0)**(-x)
+      CASE (7)
+        ! k = K (Sc/600)^-x : Rosentreter et al., 2016 CO2
+        x = 0.50
+        k_wind = (-0.08 + 0.26*vel + 0.83*windsp +0.59*depth ) * (schmidt/600.0)**(-x)
+      CASE (8)
+        ! k = K (Sc/600)^-x : Rosentreter et al., 2016 CH4
+        x = 0.50
+        k_wind = (-1.07 + 0.36*vel + 0.99*windsp +0.87*depth ) * (schmidt/600.0)**(-x)
+      CASE (9)
+        ! k = K (Sc/600)^-x : Liss and Merlivat, 1986
+        x = 0.50
+        IF (windsp <3) THEN
+          a = 0.17*windsp
+        ELSE IF (windsp <13) THEN
+          a = 2.85*windsp - 9.65
+        ELSE
+          a = 5.9*windsp - 49.3
+        ENDIF
+        k_wind = a * (schmidt/600.0)**(-x)
+      END SELECT
+
    ENDIF
+
    ! convert to m/s
    k_wind = k_wind / 3.6e5
 
    !-----------------------------------------------
    ! Compute k_flow
-   k_flow = zero_ !(vel**0.5)*(depth**(-0.5))
+   k_flow = zero_   ! The above options are including flow in estuary ones.
 
    !-----------------------------------------------
    ! piston velocity is the sum due to flow and wind
@@ -638,9 +709,7 @@ SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
      !   water quality and sediment associated processes with application
      !   to a Mississippi delta lake. J. Environ. Manage. 91 p1456-1466.
      IF(PRESENT(thepH)) THEN
-       pH = thepH
-       IF(thepH > 11.) pH = 11.0
-       IF(thepH < 3.)  pH = 3.0
+       pH = MIN(MAX(2.0,thepH),12.0)
 
        ! -0.0094x2 + 0.0428x + 0.9574
        ! (ursula.salmon@uwa.edu.au: fPH for PO4 sorption to Fe in Mine Lakes)
@@ -781,6 +850,8 @@ AED_REAL FUNCTION fSal_function(salinity, minS, Smin, Smax, maxS )
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   fSal_function = zero_  !## CAB [-Wmaybe-uninitialized]
+
    !-- Check for non-sensical salinity values
 
    ! Salinity is non-limiting for sals > Smin and <Smax

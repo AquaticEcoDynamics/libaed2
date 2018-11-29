@@ -1,13 +1,42 @@
 !###############################################################################
+!                                                                              !
+!         .----------------.  .----------------.  .----------------.           !
+!         | .--------------. || .--------------. || .--------------. |         !
+!         | |     ____     | || |  ____  ____  | || |  ____  ____  | |         !
+!         | |   .'    `.   | || | |_  _||_  _| | || | |_  _||_  _| | |         !
+!         | |  /  .--.  \  | || |   \ \  / /   | || |   \ \  / /   | |         !
+!         | |  | |    | |  | || |    > `' <    | || |    \ \/ /    | |         !
+!         | |  \  `--'  /  | || |  _/ /'`\ \_  | || |    _|  |_    | |         !
+!         | |   `.____.'   | || | |____||____| | || |   |______|   | |         !
+!         | |              | || |              | || |              | |         !
+!         | '--------------' || '--------------' || '--------------' |         !
+!         '----------------'  '----------------'  '----------------'           !
+!                                                                              !
+!###############################################################################
 !#                                                                             #
 !# aed2_oxygen.F90                                                             #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -43,6 +72,7 @@ MODULE aed2_oxygen
       INTEGER  :: id_oxy_sat !, id_atm_oxy_exch3d
       INTEGER  :: id_atm_oxy_exch
       INTEGER  :: id_sed_oxy
+      INTEGER  :: id_larea, id_lht
 
       !# Model parameters
       AED_REAL :: Fsed_oxy,Ksed_oxy,theta_sed_oxy
@@ -55,6 +85,7 @@ MODULE aed2_oxygen
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_oxygen
 !        PROCEDURE :: mobility          => aed2_mobility_oxygen
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_oxygen
+         PROCEDURE :: particle_bgc      => aed2_particle_bgc_oxygen
 !        PROCEDURE :: delete            => aed2_delete_oxygen
 
    END TYPE
@@ -134,6 +165,8 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    data%id_salt = aed2_locate_global('salinity') ! Salinity (psu)
 !  data%id_pres = aed2_locate_global_sheet('pressure') ! Pressure (dbar = 10 kPa)
    data%id_wind = aed2_locate_global_sheet('wind_speed') ! Wind speed at 10 m above surface (m/s)
+   data%id_larea = aed2_locate_global_sheet('layer_area')
+   data%id_lht = aed2_locate_global('layer_ht')
 
 END SUBROUTINE aed2_define_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -188,11 +221,11 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
    ! Get the oxygen flux
    oxy_atm_flux = koxy_trans * (Coxy_air - oxy)
 
-   ! Transfer surface exchange value to AED2 (mmmol/m2) converted by driver.
+   ! Transfer surface exchange value to AED2 (mmmol/m2/s) converted by driver.
    _FLUX_VAR_T_(data%id_oxy) = oxy_atm_flux
 
-   ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2).
-   _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux
+   ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2/day).
+   _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
    _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
 END SUBROUTINE aed2_calculate_surface_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -270,7 +303,8 @@ SUBROUTINE aed2_calculate_benthic_oxygen(data,column,layer_idx)
    oxy = _STATE_VAR_(data%id_oxy)! oxygen
 
    IF (data%use_sed_model) THEN
-       Fsed_oxy = _STATE_VAR_S_(data%id_Fsed_oxy)
+       !Fsed_oxy = _STATE_VAR_S_(data%id_Fsed_oxy)
+       Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy)
    ELSE
        Fsed_oxy = data%Fsed_oxy
    ENDIF
@@ -290,6 +324,41 @@ SUBROUTINE aed2_calculate_benthic_oxygen(data,column,layer_idx)
    _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
 
 END SUBROUTINE aed2_calculate_benthic_oxygen
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_particle_bgc_oxygen(data,column,layer_idx,ppid,partcl)
+!ARGUMENTS
+   CLASS (aed2_oxygen_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   INTEGER,INTENT(inout) :: ppid
+   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
+!
+!LOCALS
+   AED_REAL k, mass, pod
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+!print*,"aed2_particle_bgc_oxygen ", trim(data%aed2_model_name)
+   k = 1   !* for now
+
+   mass = partcl(15) ! I think this is mass [CAB]
+   pod = mass * k
+
+!  _STATE_VAR_(data%id_oxy) = pod / ( _STATE_VAR_(data%id_lht) * _STATE_VAR_S_(data%id_larea) )
+
+!  _DIAG_VAR_(data%id_ptm_n) = -pod * (???)
+
+!  ! work out oxygen consumption by an individual particle, if its active
+!  IF(ptm%group(g)%particle(p)%istat ==1)
+!     oxy_decay = ptm%group(g)%particle(p)%mass * data%coef_something
+
+!  ! add to generic flux doo-daddy, for returning
+!  flux_part (id_oxy) = flux_part (id_oxy) + oxy_decay
+
+END SUBROUTINE aed2_particle_bgc_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

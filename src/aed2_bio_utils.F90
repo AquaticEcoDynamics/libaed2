@@ -2,12 +2,27 @@
 !#                                                                             #
 !# aed2_bio_utils.F90                                                          #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -462,6 +477,7 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   fSal = zero_  !## CAB [-Wmaybe-uninitialized]
 
    IF (phytos(group)%salTol == 0) THEN
       fSal = 1.0
@@ -488,12 +504,12 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
    ELSEIF (phytos(group)%salTol == 3) THEN
       ! f(S) = 1 at S=S_opt, f(S) = S_bep at S=0 and 2*S_opt.
       IF (salinity < phytos(group)%S_opt) THEN
-      fSal = (phytos(group)%S_bep-1.0)*(salinity**2.0)/(phytos(group)%S_opt**2.0)-  &
+         fSal = (phytos(group)%S_bep-1.0)*(salinity**2.0)/(phytos(group)%S_opt**2.0)-  &
                       2.0*(phytos(group)%S_bep-1.0)*salinity/phytos(group)%S_opt+phytos(group)%S_bep
       ENDIF
       IF ((salinity>phytos(group)%S_maxsp) .AND. (salinity<(phytos(group)%S_maxsp + phytos(group)%S_opt))) THEN
          fSal = (phytos(group)%S_bep - wq_one)*(phytos(group)%S_maxsp + phytos(group)%S_opt - salinity)**2  &
-             / (phytos(group)%S_opt**2) -                                                                             &
+             / (phytos(group)%S_opt**2) -                                                                   &
              2 * (phytos(group)%S_bep - wq_one) * (phytos(group)%S_maxsp + phytos(group)%S_opt - salinity)  &
              / phytos(group)%S_opt + phytos(group)%S_bep
       ENDIF

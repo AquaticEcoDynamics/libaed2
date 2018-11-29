@@ -2,12 +2,27 @@
 !#                                                                             #
 !# aed2_core.F90                                                               #
 !#                                                                             #
-!# Developed by :                                                              #
-!#     AquaticEcoDynamics (AED) Group                                          #
-!#     School of Earth & Environment                                           #
-!# (C) The University of Western Australia                                     #
+!#  Developed by :                                                             #
+!#      AquaticEcoDynamics (AED) Group                                         #
+!#      School of Agriculture and Environment                                  #
+!#      The University of Western Australia                                    #
 !#                                                                             #
-!# Copyright by the AED-team @ UWA under the GNU Public License - www.gnu.org  #
+!#      http://aquatic.science.uwa.edu.au/                                     #
+!#                                                                             #
+!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#                                                                             #
+!#   GLM is free software: you can redistribute it and/or modify               #
+!#   it under the terms of the GNU General Public License as published by      #
+!#   the Free Software Foundation, either version 3 of the License, or         #
+!#   (at your option) any later version.                                       #
+!#                                                                             #
+!#   GLM is distributed in the hope that it will be useful,                    #
+!#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+!#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+!#   GNU General Public License for more details.                              #
+!#                                                                             #
+!#   You should have received a copy of the GNU General Public License         #
+!#   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
@@ -109,19 +124,7 @@ MODULE aed2_core
    AED_REAL,PARAMETER :: secs_per_day = 86400.
    AED_REAL,PARAMETER :: misval_ = -9999.
 
-!# We need a NaN for initialisation purposes, but gfortran wont compile (it sees
-!# we are creating a NaN and stops) so for gfortran we use a regular variable
-!# rather than constant and start with one, then in init divide it by 0.
-!# [There may be a flag that turns this into a warning rather than an error, but
-!#  so far I haven't found it]
-!# The preprocessor symbols predefined by compilers are :
-!#   __GFORTRAN__      for gfortran
-!#   __INTEL_COMPILER  for intel fortran (ifort)
-!#ifdef __GFORTRAN__
-!   AED_REAL           :: nan_ = zero_
-!#else
    AED_REAL,PARAMETER :: nan_ = zero_ / zero_
-!#endif
 
 !===============================================================================
 CONTAINS
@@ -144,10 +147,6 @@ INTEGER FUNCTION aed2_init_core(dname)
    n_aed_vars = 0 ; a_vars = 0
    n_vars = 0;  n_sheet_vars = 0
    n_diags = 0; n_sheet_diags = 0
-!#ifdef __GFORTRAN__
-!   nan_ = nan_ / tmpr;
-!#endif
-!  print*,"    libaed2 version ", TRIM(AED2_VERSION)
    aed2_init_core = 0
 END FUNCTION aed2_init_core
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -734,11 +733,12 @@ END SUBROUTINE aed2_light_extinction
 
 
 !###############################################################################
-SUBROUTINE aed2_particle_bgc(data,column,layer_idx,ppid)
+SUBROUTINE aed2_particle_bgc(data,column,layer_idx,ppid,partcl)
    CLASS (aed2_model_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
+   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
 !-------------------------------------------------------------------------------
 !print*,"Default aed2_particle_bgc ", trim(data%aed2_model_name)
 END SUBROUTINE aed2_particle_bgc
