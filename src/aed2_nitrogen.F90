@@ -273,6 +273,8 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    IF (.NOT.data%use_ph) data%simNitrfpH = .false. !Disable if no link possible
    IF (data%simNitrfpH) data%id_ph = aed2_locate_variable(nitrif_ph_variable)
 
+   data%id_Fsed_amm = -1 ; data%id_Fsed_nit = -1
+   data%id_Fsed_n2o = -1 ; data%id_Fsed_no2 = -1
    data%use_sed_model_amm = Fsed_amm_variable .NE. ''
    IF (data%use_sed_model_amm) &
      data%id_Fsed_amm = aed2_locate_global_sheet(Fsed_amm_variable)

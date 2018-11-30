@@ -44,6 +44,7 @@ MODULE aed2_core
           aed2_locate_sheet_variable,  aed2_locate_variable,          &
           aed2_define_diag_variable,   aed2_define_sheet_diag_variable
    PUBLIC aed2_locate_global, aed2_locate_global_sheet
+   PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC cur_model_name
 
@@ -119,6 +120,8 @@ MODULE aed2_core
    CHARACTER(len=80) :: base_aed_directory = '.'
    CHARACTER(len=64) :: cur_model_name = ''
 
+   LOGICAL :: host_has_cell_vel = .false.
+
 !CONSTANTS
    AED_REAL,PARAMETER :: zero_ = 0., one_ = 1.
    AED_REAL,PARAMETER :: secs_per_day = 86400.
@@ -131,12 +134,13 @@ CONTAINS
 
 
 !###############################################################################
-INTEGER FUNCTION aed2_init_core(dname)
+INTEGER FUNCTION aed2_init_core(dname,have_cell_vel)
 !-------------------------------------------------------------------------------
 ! Initialise the aed model library core routines
 !-------------------------------------------------------------------------------
 !ARGUMENTS - none
    CHARACTER(len=*) :: dname
+   LOGICAL,OPTIONAL :: have_cell_vel
 !
 !LOCAL
 !   AED_REAL :: tmpr = zero_
@@ -147,6 +151,7 @@ INTEGER FUNCTION aed2_init_core(dname)
    n_aed_vars = 0 ; a_vars = 0
    n_vars = 0;  n_sheet_vars = 0
    n_diags = 0; n_sheet_diags = 0
+   IF (PRESENT(have_cell_vel)) host_has_cell_vel = have_cell_vel
    aed2_init_core = 0
 END FUNCTION aed2_init_core
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -484,6 +489,10 @@ FUNCTION aed2_locate_global(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   IF ( TRIM(name) == "cell_vel" ) THEN
+       ret = -1
+       IF ( .NOT. host_has_cell_vel ) RETURN
+   ENDIF
    ret = aed2_find_variable(name)
    IF ( ret == 0 ) THEN
 !     print *,"variable ",trim(name)," not found"
