@@ -389,6 +389,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
 
    ! Register external state variable dependencies
    !-- oxygen & oxidants
+   data%use_nit = .FALSE. ; data%use_no2 = .FALSE. ; data%use_n2o = .FALSE.
    data%use_oxy = dom_miner_oxy_reactant_var .NE. '' !This means oxygen module switched on
    IF (data%use_oxy) &
      data%id_oxy = aed2_locate_variable(dom_miner_oxy_reactant_var)
@@ -396,8 +397,6 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
      data%use_nit = dom_miner_nit_reactant_var .NE. ''
      IF (data%use_nit) THEN
        data%id_nit = aed2_locate_variable(dom_miner_nit_reactant_var)
-     ELSE
-       data%use_nit = .FALSE.
      ENDIF
    ELSEIF( simDenitrification==2 ) THEN
        data%use_nit = dom_miner_nit_reactant_var .NE. ''
@@ -406,8 +405,6 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
        IF (data%use_no2) data%id_no2 = aed2_locate_variable(dom_miner_no2_reactant_var)
        data%use_n2o = dom_miner_n2o_reactant_var .NE. ''
        IF (data%use_n2o) data%id_n2o = aed2_locate_variable(dom_miner_n2o_reactant_var)
-   ELSE
-     data%use_nit = .FALSE. ; data%use_no2 = .FALSE. ; data%use_n2o = .FALSE.
    ENDIF
    IF( simFeReduction==1 ) THEN
      data%use_fe3 = dom_miner_fe3_reactant_var .NE. ''
