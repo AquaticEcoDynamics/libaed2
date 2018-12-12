@@ -58,6 +58,15 @@ ifeq ($(F90),ifort)
   else
     FFLAGS+=-real-size 64
   endif
+else ifeq ($(F90),pgfortran)
+  INCLUDES+=-I/usr/include
+  DEBUG_FFLAGS=-g
+  OPT_FFLAGS=-O3
+  FFLAGS=-fPIC -module ${moddir} $(DEFINES) $(INCLUDES)
+  ifeq ($(WITH_CHECKS),true)
+    FFLAGS+=-Mbounds
+  endif
+  FFLAGS+=-r8
 else
   INCLUDES+=-I/usr/include
   DEBUG_FFLAGS=-g -fbacktrace

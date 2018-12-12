@@ -160,7 +160,11 @@ SUBROUTINE aed2_print_version
 #ifdef __INTEL_COMPILER
    print*,"    libaed2 built using intel fortran version ", __INTEL_COMPILER
 #else
+# ifdef __PGI
+   print*,"    libaed2 built using pgfortran version ", __PGIC__, '.', __PGIC_MINOR__, '.', __PGIC_PATCHLEVEL__
+# else
    print*,"    libaed2 built using gfortran version ", __GNUC__, '.', __GNUC_MINOR__, '.', __GNUC_PATCHLEVEL__
+# endif
 #endif
 END SUBROUTINE aed2_print_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
