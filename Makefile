@@ -59,7 +59,6 @@ ifeq ($(F90),ifort)
     FFLAGS+=-real-size 64
   endif
 else ifeq ($(F90),pgfortran)
-  INCLUDES+=-I/usr/include
   DEBUG_FFLAGS=-g
   OPT_FFLAGS=-O3
   FFLAGS=-fPIC -module ${moddir} $(DEFINES) $(INCLUDES)
@@ -68,7 +67,6 @@ else ifeq ($(F90),pgfortran)
   endif
   FFLAGS+=-r8
 else
-  INCLUDES+=-I/usr/include
   DEBUG_FFLAGS=-g -fbacktrace
   OPT_FFLAGS=-O3
   FFLAGS=-fPIC -Wall -J ${moddir} -ffree-line-length-none -std=f2008 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused -Wno-unused-dummy-argument -fno-range-check -Wno-integer-division
