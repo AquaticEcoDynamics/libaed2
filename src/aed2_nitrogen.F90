@@ -212,9 +212,9 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    data%Kdnra_oxy        = Kdnra_oxy
    data%Kpart_ammox      = Kpart_ammox
    data%Kin_deamm        = Kin_deamm
-   data%Rno2o2           = Rno2o2
-   data%Rnh4o2           = Rnh4o2
-   data%Rnh4no2          = Rnh4no2
+   data%Rno2o2           = Rno2o2/secs_per_day
+   data%Rnh4o2           = Rnh4o2/secs_per_day
+   data%Rnh4no2          = Rnh4no2/secs_per_day
    data%theta_nitrif     = theta_nitrif
    data%theta_denit      = theta_denit
 
@@ -549,11 +549,11 @@ SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
 
      !-----------------------------------------------
      ! Get the N2O flux:    [ mmol/m2/s = m/s * mmol/m3 ]
-     n2o_atm_flux = kn2o_trans * (Cn2o_air - n2o) * f_pres
+     n2o_atm_flux = kn2o_trans * (n2o - Cn2o_air) * f_pres
 
      !-----------------------------------------------
      ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
-     _FLUX_VAR_T_(data%id_n2o) = n2o_atm_flux
+     _FLUX_VAR_T_(data%id_n2o) = -n2o_atm_flux
 
      !-----------------------------------------------
      ! Also store N2O flux across the atm/water interface as a

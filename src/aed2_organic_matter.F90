@@ -788,7 +788,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
      ammonium_release      = (denitratation + denitritation + denitrousation) * MIN(don/MAX(doc,1e-2),one_) ! data%X_nc
 
      _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) - denitratation
-     _FLUX_VAR_(data%id_no2) = _FLUX_VAR_(data%id_no2) + denitritation - denitritation
+     _FLUX_VAR_(data%id_no2) = _FLUX_VAR_(data%id_no2) + denitratation - denitritation
      _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o) + nitrous_denitritation - denitrousation
      _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + dnra + ammonium_release
    ENDIF
