@@ -72,7 +72,8 @@ MODULE aed2_oxygen
       INTEGER  :: id_oxy_sat !, id_atm_oxy_exch3d
       INTEGER  :: id_atm_oxy_exch
       INTEGER  :: id_sed_oxy
-      INTEGER  :: id_larea, id_lht
+      INTEGER  :: id_larea, id_lht, id_cell_vel
+      INTEGER  :: oxy_piston_model
 
       !# Model parameters
       AED_REAL :: Fsed_oxy,Ksed_oxy,theta_sed_oxy
@@ -111,16 +112,17 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
+   INTEGER  :: oxy_piston_model =1
    AED_REAL :: oxy_initial=300.
    AED_REAL :: oxy_min=0.
    AED_REAL :: oxy_max=nan_
-   AED_REAL :: Fsed_oxy = 48.0
+   AED_REAL :: Fsed_oxy = -20.0
    AED_REAL :: Ksed_oxy = 30.0
    AED_REAL :: theta_sed_oxy = 1.0
    CHARACTER(len=64) :: Fsed_oxy_variable=''
 
    NAMELIST /aed2_oxygen/ oxy_initial,oxy_min,oxy_max,Fsed_oxy,Ksed_oxy,theta_sed_oxy,  &
-                         Fsed_oxy_variable
+                         Fsed_oxy_variable,oxy_piston_model
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -134,10 +136,11 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
 
-   data%Fsed_oxy = Fsed_oxy/secs_per_day
    data%Ksed_oxy = Ksed_oxy
+   data%Fsed_oxy = Fsed_oxy/secs_per_day
    data%theta_sed_oxy = theta_sed_oxy
    data%use_sed_model = Fsed_oxy_variable .NE. ''
+   data%oxy_piston_model = oxy_piston_model
 
    ! Register state variables
    data%id_oxy = aed2_define_variable('oxy','mmol/m**3','oxygen',   &
@@ -167,6 +170,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    data%id_wind = aed2_locate_global_sheet('wind_speed') ! Wind speed at 10 m above surface (m/s)
    data%id_larea = aed2_locate_global_sheet('layer_area')
    data%id_lht = aed2_locate_global('layer_ht')
+   IF( oxy_piston_model>3 )data%id_cell_vel= aed2_locate_global('cell_vel')! needed for k600
 
 END SUBROUTINE aed2_define_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -188,45 +192,58 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp, salt, wind
+   AED_REAL :: temp, salt, wind, vel, depth
 
    ! State
    AED_REAL :: oxy
 
    ! Temporary variables
-   AED_REAL :: oxy_atm_flux = zero_
-   AED_REAL :: Coxy_air = zero_ !Dissolved oxygen in the air phase
-   AED_REAL :: koxy_trans = zero_
-   AED_REAL :: windHt !, Tabs
-   AED_REAL :: f_pres  = 1.0      ! Pressure correction function only applicable at high altitudes
+   AED_REAL :: oxy_atm_flux = zero_  ! Surface atm flux of O2
+   AED_REAL :: Coxy_air = zero_      ! Dissolved oxygen in the air phase
+   AED_REAL :: koxy_trans = zero_    ! k600 for O2
+   AED_REAL :: windHt  = 10.0        ! Height of U10 sensor
+   AED_REAL :: f_pres  = 1.0         ! Pressure correction, only applicable at high altitudes
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    !Get dependent state variables from physical driver
-   temp = _STATE_VAR_(data%id_temp)    ! Temperature (degrees Celsius)
-   salt = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
-   wind = _STATE_VAR_S_(data%id_wind) ! Wind speed at 10 m above surface (m/s)
-   windHt = 10.
+   temp  = _STATE_VAR_(data%id_temp)    ! Temperature (degrees Celsius)
+   salt  = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
+   wind  = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10 m above surface (m/s)
+   windHt= 10.
+   depth = MAX( _STATE_VAR_(data%id_lht), one_ )
+   IF (data%id_cell_vel > 0 ) THEN
+     vel = _STATE_VAR_(data%id_cell_vel)
+   ELSE
+     vel = 0.0001
+   ENDIF
 
     ! Retrieve current (local) state variable values.
    oxy = _STATE_VAR_(data%id_oxy)! Concentration of oxygen in surface layer
 
-   koxy_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt)
+  !koxy_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt)
+   koxy_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt,               &
+                                         vel=vel,                             &
+                                         depth=depth,                         &
+                                         schmidt_model=2,                     &
+                                         piston_model=data%oxy_piston_model)
 
-   ! First get the oxygen concentration in the air phase at interface
-   ! Taken from Riley and Skirrow (1974)
+
+   ! First get the oxygen concentration in the air phase at the interface
+   ! (taken from Riley and Skirrow, 1974)
    f_pres = 1.0
    Coxy_air = f_pres * aed2_oxygen_sat(salt,temp)
 
    ! Get the oxygen flux
    oxy_atm_flux = koxy_trans * (Coxy_air - oxy)
 
-   ! Transfer surface exchange value to AED2 (mmmol/m2/s) converted by driver.
+   ! Transfer surface exchange value to AED2 (mmmol/m2/s) converted by driver
    _FLUX_VAR_T_(data%id_oxy) = oxy_atm_flux
 
-   ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2/day).
+   ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2/day)
    _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
    _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
+   
 END SUBROUTINE aed2_calculate_surface_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

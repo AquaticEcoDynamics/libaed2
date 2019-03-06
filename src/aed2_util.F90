@@ -96,7 +96,7 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,windsp
+   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,windsp,vel_l
    INTEGER  :: schmidt_model_l,piston_model_l
    ! Parameters
    AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
@@ -111,6 +111,8 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
    IF (PRESENT(schmidt_model)) schmidt_model_l = schmidt_model
    piston_model_l  = 1 ! default
    IF (PRESENT(piston_model)) piston_model_l = piston_model
+   vel_l = zero_
+   IF (PRESENT(vel)) vel_l = vel
 
    ! These parameterizations assume 10m windspeed, and must be scaled by hgtCorrx
    ! Adjust the windspeed if the sensor height is not 10m
@@ -185,7 +187,7 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
         ! k = K (Sc/600)^-x : Ho et al., 2016
         a = 0.266
         x = 0.50
-        k_wind = ((0.77*vel**x)*(depth**(-x)) + a*(windsp)**2) * (schmidt/600.0)**(-x)
+        k_wind = ((0.77*vel_l**x)*(depth**(-x)) + a*(windsp)**2) * (schmidt/600.0)**(-x)
       CASE (5)
         ! k = K (Sc/600)^-x : Raymond and Cole, 2001
         a = 1.91
@@ -195,15 +197,15 @@ PURE AED_REAL FUNCTION aed2_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
         ! k = K (Sc/600)^-x : Borge et al., 2004
         a = 2.58
         x = 0.50
-        k_wind = (1.0 + (1.719*vel**x)*(depth**x) + a*windsp) * (schmidt/600.0)**(-x)
+        k_wind = (1.0 + (1.719*vel_l**x)*(depth**x) + a*windsp) * (schmidt/600.0)**(-x)
       CASE (7)
         ! k = K (Sc/600)^-x : Rosentreter et al., 2016 CO2
         x = 0.50
-        k_wind = (-0.08 + 0.26*vel + 0.83*windsp +0.59*depth ) * (schmidt/600.0)**(-x)
+        k_wind = (-0.08 + 0.26*vel_l + 0.83*windsp +0.59*depth ) * (schmidt/600.0)**(-x)
       CASE (8)
         ! k = K (Sc/600)^-x : Rosentreter et al., 2016 CH4
         x = 0.50
-        k_wind = (-1.07 + 0.36*vel + 0.99*windsp +0.87*depth ) * (schmidt/600.0)**(-x)
+        k_wind = (-1.07 + 0.36*vel_l + 0.99*windsp +0.87*depth ) * (schmidt/600.0)**(-x)
       CASE (9)
         ! k = K (Sc/600)^-x : Liss and Merlivat, 1986
         x = 0.50
