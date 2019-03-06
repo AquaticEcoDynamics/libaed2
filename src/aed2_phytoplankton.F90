@@ -85,7 +85,7 @@ MODULE aed2_phytoplankton
       INTEGER :: id_tem, id_sal, id_dz, id_dens
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP
-      INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_mpbv
+      INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_BCP, id_d_mpbv
       INTEGER :: id_NUP, id_NUP2, id_PUP, id_CUP
 
       !# Model parameters
@@ -518,8 +518,9 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_TIN = aed2_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed2_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
    IF(do_mpb>0) THEN
-     data%id_d_MPB = aed2_define_sheet_diag_variable('MPB','mmol/m**2', 'microphytobenthos')
-     data%id_d_BPP = aed2_define_sheet_diag_variable('BPP','mmol/m**2/d', 'benthic productivity')
+     data%id_d_MPB = aed2_define_sheet_diag_variable('MPB','mmol/m**2', 'microphytobenthos density')
+     data%id_d_BPP = aed2_define_sheet_diag_variable('BPP','mmol/m**2/d', 'benthic gross productivity')
+     data%id_d_BCP = aed2_define_sheet_diag_variable('BCP','mmol/m**2/d', 'benthic net productivity')
      data%id_d_mpbv= aed2_define_sheet_diag_variable('MPBV','mmol/m**2/d', 'mpb vertical exchange')
    ENDIF
 
@@ -1062,7 +1063,8 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
 
      ! Update the diagnostic variables
      _DIAG_VAR_S_(data%id_d_mpb) = mpb
-     _DIAG_VAR_S_(data%id_d_bpp) = mpb_flux * secs_per_day
+     _DIAG_VAR_S_(data%id_d_bpp) = (mpb_prod)*mpb * secs_per_day
+     _DIAG_VAR_S_(data%id_d_bcp) = mpb_flux * secs_per_day
      _DIAG_VAR_S_(data%id_d_mpbv)= (Psed_phy - Fsed_phy)* secs_per_day
    ENDIF
 END SUBROUTINE aed2_calculate_benthic_phytoplankton
