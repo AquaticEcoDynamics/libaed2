@@ -86,7 +86,7 @@ MODULE aed2_phytoplankton
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP
       INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_mpbv
-      INTEGER :: id_NUP, id_PUP, id_CUP
+      INTEGER :: id_NUP, id_NUP2, id_PUP, id_CUP
 
       !# Model parameters
       INTEGER  :: num_phytos
@@ -97,7 +97,7 @@ MODULE aed2_phytoplankton
       LOGICAL  :: do_Pmort, do_Nmort, do_Cmort, do_Simort
       LOGICAL  :: do_Pexc, do_Nexc, do_Cexc, do_Siexc
       INTEGER  :: do_mpb, n_zones
-      AED_REAL :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
+      AED_REAL :: R_mpbg, R_mpbr, I_Kmpb, mpb_max, theta_mpb_growth, theta_mpb_resp
       INTEGER  :: nnup, npup
       AED_REAL :: dic_per_n
       AED_REAL :: min_rho,max_rho
@@ -344,6 +344,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    CHARACTER(len=128) :: dbase='aed2_phyto_pars.nml'
    AED_REAL           :: zerolimitfudgefactor = 0.9 * 3600
    AED_REAL           :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
+   AED_REAL           :: theta_mpb_growth,theta_mpb_resp
    AED_REAL           :: min_rho, max_rho
    LOGICAL            :: extra_debug = .false.
    INTEGER            :: do_mpb, n_zones = 0
@@ -361,7 +362,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                       si_uptake_target_variable,                               &
                     dbase, zerolimitfudgefactor, extra_debug, extra_diag,      &
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
-                    resus_link, n_zones, active_zones
+                    resus_link, n_zones, active_zones,                         &
+                    theta_mpb_growth,theta_mpb_resp
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_phytoplankton initialization"
@@ -369,6 +371,9 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    ! Default settings
    settling = _MOB_CONST_
    resuspension = zero_
+   theta_mpb_growth = 1.05 ;  theta_mpb_resp = 1.05
+   R_mpbg = 0.; R_mpbr =0.; I_Kmpb=100.; mpb_max=1000.;
+   min_rho = 900; max_rho=1200
 
    ! Read the namelist, and set module parameters
    read(namlst,nml=aed2_phytoplankton,iostat=status)
@@ -376,10 +381,12 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    dtlim = zerolimitfudgefactor
    IF( extra_debug ) extra_diag = .true.       ! legacy use of extra_debug
 
+   ! Set module parameters
    data%min_rho = min_rho ; data%max_rho = max_rho
    data%do_mpb = do_mpb
    data%R_mpbg = R_mpbg/secs_per_day   ; data%R_mpbr = R_mpbr/secs_per_day
    data%I_Kmpb = I_Kmpb   ; data%mpb_max = mpb_max
+   data%theta_mpb_growth = theta_mpb_growth   ; data%theta_mpb_resp = theta_mpb_resp
    ALLOCATE(data%resuspension(num_phytos)); data%resuspension = resuspension(1:num_phytos)
    data%n_zones = n_zones
    IF( n_zones>0 ) THEN
@@ -389,7 +396,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
      ENDDO
    ENDIF
 
-   ! Store parameter values in our own derived type
+   ! Store species parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    !     and are converted in here to values per second.
    CALL aed2_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,settling,resuspension)
@@ -500,7 +507,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_PPR = aed2_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
    data%id_NPR = aed2_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
 
-   data%id_NUP = aed2_define_diag_variable('NUP','mmol/m**3/d','nitrogen uptake')
+   data%id_NUP = aed2_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
+   data%id_NUP2= aed2_define_diag_variable('NUP_nh4','mmol/m**3/d','nitrogen (NH4) uptake')
    data%id_PUP = aed2_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
    data%id_CUP = aed2_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
@@ -755,8 +763,8 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       _DIAG_VAR_(data%id_NtoP(phy_i)) =  INi/IPi
 
       IF (extra_diag) THEN
-         _DIAG_VAR_(data%id_fT(phy_i)) =  fT
-         _DIAG_VAR_(data%id_fI(phy_i)) =  fI
+         _DIAG_VAR_(data%id_fT(phy_i))   =  fT
+         _DIAG_VAR_(data%id_fI(phy_i))   =  fI
          _DIAG_VAR_(data%id_fNit(phy_i)) =  fNit
          _DIAG_VAR_(data%id_fPho(phy_i)) =  fPho
          _DIAG_VAR_(data%id_fSil(phy_i)) =  fSil
@@ -898,8 +906,8 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
       IF (data%do_Cuptake) THEN
          _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) +           &
                        (  cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy )
-         net_cuptake = net_cuptake + (cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy)
       ENDIF
+      net_cuptake = net_cuptake + (cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy)
       IF (data%do_DOuptake) THEN
          _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) +         &
                    ( -cuptake(phy_i) + respiration(phy_i)*data%phytos(phy_i)%k_fres*phy )
@@ -962,7 +970,8 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
    _DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
    _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
    _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
-   _DIAG_VAR_(data%id_NUP) =  sum(nuptake)*secs_per_day
+   _DIAG_VAR_(data%id_NUP) =  sum(nuptake(:,1))*secs_per_day
+   _DIAG_VAR_(data%id_NUP2)=  sum(nuptake(:,2))*secs_per_day
    _DIAG_VAR_(data%id_PUP) =  sum(puptake)*secs_per_day
    _DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
 
@@ -1020,17 +1029,25 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
 
      ! Compute photosynthesis and respiration
      fI = photosynthesis_irradiance(3,data%I_Kmpb,data%I_Kmpb,par,extc,Io,dz)
-     mpb_prod = data%R_mpbg*fI*(1.05**(temp-20.))*(1.-(MIN(mpb,data%mpb_max)/data%mpb_max))
-     mpb_resp = (data%R_mpbr*(1.05**(temp-20.)))           !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
+     mpb_prod = data%R_mpbg*fI*(data%theta_mpb_growth**(temp-20.))*(1.-(MIN(mpb,data%mpb_max)/data%mpb_max))
+     mpb_resp = (data%R_mpbr*(data%theta_mpb_resp**(temp-20.)))           !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
      mpb_flux = (mpb_prod-mpb_resp)*mpb
 
-     ! Update the MPB biomass, and O2/CO2 fluxes
+     ! Update the MPB biomass, and O2/CO2 fluxes (mmol/m2/day)
      _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux + Psed_phy
      IF (data%do_DOuptake) THEN
         _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + mpb_flux
      ENDIF
      IF (data%do_Cuptake) THEN
         _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
+     ENDIF
+     ! A quick and dirty nutrient uptak by MPB; needs cleaning to accoutn for limtation and excretion of DOM
+     IF (data%do_Nuptake) THEN
+        _FLUX_VAR_(data%id_Nupttarget(1)) = _FLUX_VAR_(data%id_Nupttarget(1)) - mpb_flux * (16./106.) *0.5
+        _FLUX_VAR_(data%id_Nupttarget(2)) = _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * (16./106.) *0.5
+     ENDIF
+     IF (data%do_Puptake) THEN
+        _FLUX_VAR_(data%id_Pupttarget(1)) = _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
      ENDIF
 
      ! Resuspension (simple assumption here)
