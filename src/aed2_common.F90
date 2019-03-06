@@ -482,7 +482,7 @@ SUBROUTINE aed2_particle_bgc(column, layer_idx, ppid, partcl)
 !LOCALS
    CLASS (aed2_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
-   ppid = 0
+   !ppid = 0
    model => model_list
    DO WHILE (ASSOCIATED(model))
       CALL model%particle_bgc(column, layer_idx, ppid, partcl)
