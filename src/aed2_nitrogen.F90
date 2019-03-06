@@ -496,16 +496,17 @@ SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp, salt, wind, vel, depth, rain
+   AED_REAL :: temp, salt, wind, depth, rain
+   AED_REAL :: vel = 0.0001
    ! State
    AED_REAL :: n2o, nox, no2, nh4
    ! Temporary variables
    AED_REAL :: n2o_atm_flux = zero_ ! N2O atmos exchange with water
    AED_REAL :: Cn2o_air = zero_     ! N2O in the air phase
    AED_REAL :: kn2o_trans = zero_   ! N2O piston velocity
-   AED_REAL :: wind_hgt             ! Height of wind data, for correction
-   AED_REAL :: f_pres = 1.0         ! Pressure correction function (currently
-                                    !   unused but needed for high altitudes)
+   AED_REAL :: wind_hgt = 10.       ! Height of wind data, for correction
+   AED_REAL :: f_pres = 1.          ! Pressure correction function (currently
+                                    !     unused but needed for high altitudes)
 !
 !------------------------------------------------------------------------------+
 !BEGIN
@@ -521,13 +522,7 @@ SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
      temp = _STATE_VAR_(data%id_temp)    ! Temperature (degrees Celsius)
      salt = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
      depth = MAX( _STATE_VAR_(data%id_E_depth), one_ )
-     IF (data%id_cell_vel > 0 ) THEN
-       vel = _STATE_VAR_(data%id_cell_vel)
-     ELSE
-      ! vel  = SQRT(_STATE_VAR_(data%id_E_tau)/_STATE_VAR_(data%id_E_dens))
-      ! vel = vel/0.41 * log(depth/0.01)
-       vel = 0.0001
-     ENDIF
+     IF (data%id_cell_vel > 0 ) vel = _STATE_VAR_(data%id_cell_vel)
 
      !-----------------------------------------------
      ! Retrieve current (local) state variable values.
@@ -543,7 +538,7 @@ SUBROUTINE aed2_calculate_surface_nitrogen(data,column,layer_idx)
      !-----------------------------------------------
      ! First get the N2O concentration in the air-phase at atm interface
      ! C_N2O = F x P ; Capone (2008) pg 56
-     f_pres = 1.0
+     f_pres = 1.0 ! add function here for altitude correction.
      Cn2o_air = data%atm_n2o
      Cn2o_air = Cn2o_air * aed2_n2o_sat(salt,temp)
 

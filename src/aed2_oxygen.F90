@@ -192,7 +192,8 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp, salt, wind, vel, depth
+   AED_REAL :: temp, salt, wind, depth
+   AED_REAL :: vel = 0.0001
 
    ! State
    AED_REAL :: oxy
@@ -212,14 +213,11 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
    wind  = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10 m above surface (m/s)
    windHt= 10.
    depth = MAX( _STATE_VAR_(data%id_lht), one_ )
-   IF (data%id_cell_vel > 0 ) THEN
-     vel = _STATE_VAR_(data%id_cell_vel)
-   ELSE
-     vel = 0.0001
-   ENDIF
+   IF (data%id_cell_vel > 0 )  vel = _STATE_VAR_(data%id_cell_vel)
 
-    ! Retrieve current (local) state variable values.
-   oxy = _STATE_VAR_(data%id_oxy)! Concentration of oxygen in surface layer
+
+   ! Retrieve current (local) state variable values.
+   oxy = _STATE_VAR_(data%id_oxy) ! Concentration of oxygen in surface layer
 
   !koxy_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt)
    koxy_trans = aed2_gas_piston_velocity(windHt,wind,temp,salt,               &
@@ -243,7 +241,7 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
    ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2/day)
    _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
    _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
-   
+
 END SUBROUTINE aed2_calculate_surface_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
