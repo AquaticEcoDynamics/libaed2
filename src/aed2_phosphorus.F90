@@ -191,6 +191,8 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
      data%id_Fsed_frp = aed2_locate_global_sheet(Fsed_frp_variable)
    ENDIF
 
+   data%id_frpads = -1
+   data%id_frpads_vvel = -1
    ! Check if particles and PO4 adsorption are simulated
    IF (data%simPO4Adsorption) THEN
      IF (data%ads_use_external_tss) THEN
@@ -198,7 +200,6 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
          data%id_tssext = aed2_locate_global('tss')
      ELSE
        IF (po4sorption_target_variable .NE. '' ) THEN
-          data%id_frpads_vvel = -1
           print *,'          PO4 is adsorbing to ',TRIM(po4sorption_target_variable)
           print *,'          ... found'
           data%id_tss = aed2_locate_variable(po4sorption_target_variable)
@@ -336,6 +337,7 @@ SUBROUTINE aed2_calculate_surface_phosphorus(data,column,layer_idx)
   IF( data%simDryDeposition ) THEN
     !-----------------------------------------------
     ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+   IF (data%simPO4Adsorption) & !# id_frpads is not set unless simPO4Adsorption is true
     _FLUX_VAR_T_(data%id_frpads) = data%atm_pip_dd
   ENDIF
 
@@ -354,6 +356,7 @@ SUBROUTINE aed2_calculate_surface_phosphorus(data,column,layer_idx)
     !-----------------------------------------------
     ! Also store deposition across the atm/water interface as a
     ! diagnostic variable (mmmol/m2/day).
+   IF (data%simPO4Adsorption) & !# id_frpads is not set unless simPO4Adsorption is true
     _DIAG_VAR_S_(data%id_atm_dep) = _DIAG_VAR_S_(data%id_atm_dep) &
         + (_FLUX_VAR_T_(data%id_frp) + _FLUX_VAR_T_(data%id_frpads)) * secs_per_day
   ENDIF
@@ -437,6 +440,8 @@ SUBROUTINE aed2_mobility_phosphorus(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+!  id_frpads is not set unless data%simPO4Adsorption is true
+   IF(.NOT. data%simPO4Adsorption) RETURN
 
    mobility(data%id_frpads) = zero_
 
