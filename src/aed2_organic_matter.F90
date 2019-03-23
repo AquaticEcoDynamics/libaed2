@@ -79,12 +79,12 @@ MODULE aed2_organic_matter
       INTEGER  :: id_photolysis           ! photolysis
 
       INTEGER  :: id_oxy,id_dic
-      INTEGER  :: id_nit,id_no2,id_n2o,id_amm,id_frp,id_fe3,id_ch4,id_so4
+      INTEGER  :: id_nit,id_no2,id_n2o,id_amm,id_frp,id_fe,id_ch4,id_so4
       INTEGER  :: id_Fsed_pon, id_Fsed_don ! sed. rate organic nitrogen
       INTEGER  :: id_Fsed_pop, id_Fsed_dop ! sed. rate organic phosphorus
       INTEGER  :: id_Fsed_poc, id_Fsed_doc ! sed. rate organic carbon
       INTEGER  :: id_Psed_poc, id_Psed_pon, id_Psed_pop, id_Psed_cpom ! sedimentation rates
-      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_rho
+      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_extc, id_rho, id_dz
 
       INTEGER  :: id_pon_miner, id_don_miner
       INTEGER  :: id_pop_miner, id_dop_miner
@@ -108,7 +108,8 @@ MODULE aed2_organic_matter
                   Rdoc_minerl, Rdon_minerl, Rdop_minerl, Rdom_minerl, &
                   theta_hydrol, theta_minerl, Kpom_hydrol, Kdom_minerl, f_an
       AED_REAL :: Rdomr_minerl, Rcpom_bdown, X_cpom_n, X_cpom_p
-      AED_REAL :: Ko2_0,Kin_denitrat,Kin_denitrit,Kin_denitrous,K_nit,Klim_denitrous,Klim_denitrit,Kpart_denitrit
+      AED_REAL :: Ko2_0,Kin_denitrat,Kin_denitrit,Kin_denitrous,Klim_denitrous,Klim_denitrit,Kpart_denitrit
+      AED_REAL :: K_nit,K_so4,K_fe
       AED_REAL :: KeDOM, KePOM, KeDOMR, KeCPOM, photo_fmin
       AED_REAL :: w_pom, d_pom, rho_pom, w_cpom, d_cpom, rho_cpom
       AED_REAL :: sedimentOMfrac, Xsc, Xsn, Xsp
@@ -409,7 +410,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    IF( simFeReduction==1 ) THEN
      data%use_fe3 = dom_miner_fe3_reactant_var .NE. ''
      IF (data%use_fe3) THEN
-       data%id_fe3 = aed2_locate_variable(dom_miner_fe3_reactant_var)
+       data%id_fe = aed2_locate_variable(dom_miner_fe3_reactant_var)
      ELSE
        simFeReduction = 0
      ENDIF
@@ -503,6 +504,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
      data%id_vis= aed2_locate_global('par')
      data%id_uva= aed2_locate_global('uva')
      data%id_uvb= aed2_locate_global('uvb')
+     data%id_extc=aed2_locate_global('extc_coef')
+     data%id_dz=  aed2_locate_global('layer_ht')
    ENDIF
 
    ! Register diagnostic variables
@@ -594,7 +597,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: poc,pon,pop
    AED_REAL :: doc,don,dop
    AED_REAL :: docr,donr,dopr,cpom,cdom
-   AED_REAL :: dic,amm,oxy,nit,no2,n2o,frp,temp
+   AED_REAL :: temp,dic,amm,oxy,nit,no2,n2o,frp,feiii,so4,ch4
    AED_REAL :: pom_hydrolysis, dom_mineralisation
    AED_REAL :: pon_hydrolysis, don_mineralisation
    AED_REAL :: pop_hydrolysis, dop_mineralisation
@@ -603,8 +606,9 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: dopr_mineralisation, cpom_breakdown
    AED_REAL :: denitrification, denitratation, denitritation
    AED_REAL :: denitrousation, dnra, nitrous_denitritation, ammonium_release
-   AED_REAL :: photolysis, vis, uva, uvb, photo_fmin, cdoc
+   AED_REAL :: photolysis, vis, uva, uvb, photo_fmin, cdoc, att
    AED_REAL :: doc_min_aerobic, doc_min_anaerobic
+   AED_REAL :: fereduction, so4reduction, methanogenesis, fso4, fnit, ffe
 
 !-----------------------------------------------------------------------
 !BEGIN
@@ -638,9 +642,10 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
       dopr = _STATE_VAR_(data%id_dopr)
       cpom = _STATE_VAR_(data%id_cpom)
 
-      vis = _STATE_VAR_(data%id_vis)
-      uva = _STATE_VAR_(data%id_uva)
-      uvb = _STATE_VAR_(data%id_uvb)
+      att = EXP( -_STATE_VAR_(data%id_extc) * _STATE_VAR_(data%id_dz)/2. )
+      vis = _STATE_VAR_(data%id_vis) * att
+      uva = _STATE_VAR_(data%id_uva) * att
+      uvb = _STATE_VAR_(data%id_uvb) * att
       cdom = _DIAG_VAR_(data%id_cdom)
    ENDIF
 
@@ -675,6 +680,21 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    ENDIF
    IF (data%use_frp) THEN
       frp = _STATE_VAR_(data%id_frp)! phosphate
+   ENDIF
+   IF (data%use_fe3) THEN
+      feiii = _STATE_VAR_(data%id_fe)
+   ELSE
+      feiii = 0.
+   ENDIF
+   IF (data%use_so4) THEN
+      so4 = _STATE_VAR_(data%id_so4)
+   ELSE
+      so4 = 100.
+   ENDIF
+   IF (data%use_ch4) THEN
+      ch4 = _STATE_VAR_(data%id_ch4)
+   ELSE
+      ch4 = 0.
    ENDIF
 
    !---------------------------------------------------------------------------+
@@ -755,6 +775,8 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    doc_min_aerobic   = doc_mineralisation * (oxy/(data%Kdom_minerl+oxy))
    doc_min_anaerobic = doc_mineralisation - doc_min_aerobic
 
+   fnit = one_; ffe = one_; fso4 = one_
+
    IF (data%use_oxy) THEN
      !# Aerobic mineralisation : O2 consumption
      _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) - doc_min_aerobic
@@ -763,6 +785,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
      !# De-nitrification : simple denitrification, using NO3
      denitrification = doc_min_anaerobic * nit/(data%K_nit+nit)
      _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) - denitrification
+     fnit = data%K_nit/(data%K_nit+nit)
 
    ELSEIF( data%simDenitrification==2 ) THEN
      !# De-nitrification : complex model involving NO2, NO3, N2O
@@ -791,17 +814,33 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
      _FLUX_VAR_(data%id_no2) = _FLUX_VAR_(data%id_no2) + denitratation - denitritation
      _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o) + nitrous_denitritation - denitrousation
      _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + dnra + ammonium_release
+
+     fnit = data%K_nit/(data%K_nit+(nit+no2))
    ENDIF
    doc_min_anaerobic = doc_min_anaerobic - denitrification
+
    IF( data%simFeReduction>0 ) THEN
-
+     !# Iron reduction : anaerobic breakdown, after denitrification etc
+     fereduction = doc_min_anaerobic * feiii/(data%K_fe+feiii) * fnit
+     ffe  = data%K_fe/(data%K_fe+feiii)
+     _FLUX_VAR_(data%id_fe) = _FLUX_VAR_(data%id_fe) - fereduction ! stoich
    ENDIF
+   doc_min_anaerobic = doc_min_anaerobic - fereduction
+
    IF( data%simSO4Reduction>0 ) THEN
-
+     !# Sulfate reduction : anaerobic breakdown, after denitrification etc
+     so4reduction = doc_min_anaerobic * so4/(data%K_so4+so4) * ffe * fnit
+     fso4 = so4/(data%K_so4+so4)
+     _FLUX_VAR_(data%id_so4) = _FLUX_VAR_(data%id_so4) - so4reduction ! stoich
    ENDIF
+   doc_min_anaerobic = doc_min_anaerobic - so4reduction
+
    IF( data%simMethanogenesis>0 ) THEN
-
+     !# Methanogenesis : anaerobic breakdown, after all other pathways
+     methanogenesis = doc_min_anaerobic * fso4 * ffe * fnit
+     _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) - methanogenesis  ! stoich
    ENDIF
+   doc_min_anaerobic = doc_min_anaerobic - methanogenesis
 
    !---------------------------------------------------------------------------+
    ! Set temporal derivatives : Products of mineralisation
@@ -852,14 +891,15 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
      IF ( data%simphotolysis ) &
         _DIAG_VAR_(data%id_photolysis) = photolysis*secs_per_day
 
-     IF ( data%simDenitrification>0 ) &
+     ! Anaerobic OM mineralisation
+     _DIAG_VAR_(data%id_denit)     = denitrification*secs_per_day
+     _DIAG_VAR_(data%id_anaerobic) = doc_min_anaerobic*secs_per_day
+
+     IF ( data%simDenitrification>1 ) &
         _DIAG_VAR_(data%id_denit) = denitratation + denitritation + denitrousation
 
-      ! Anaerobic OM mineralisation
-      _DIAG_VAR_(data%id_denit)     = denitrification*secs_per_day
-      _DIAG_VAR_(data%id_anaerobic) = doc_min_anaerobic*secs_per_day
-
    ENDIF
+
 END SUBROUTINE aed2_calculate_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
