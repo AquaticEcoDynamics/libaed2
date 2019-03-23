@@ -84,7 +84,7 @@ MODULE aed2_organic_matter
       INTEGER  :: id_Fsed_pop, id_Fsed_dop ! sed. rate organic phosphorus
       INTEGER  :: id_Fsed_poc, id_Fsed_doc ! sed. rate organic carbon
       INTEGER  :: id_Psed_poc, id_Psed_pon, id_Psed_pop, id_Psed_cpom ! sedimentation rates
-      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_rho
+      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_extc, id_rho, id_dz
 
       INTEGER  :: id_pon_miner, id_don_miner
       INTEGER  :: id_pop_miner, id_dop_miner
@@ -503,6 +503,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
      data%id_vis= aed2_locate_global('par')
      data%id_uva= aed2_locate_global('uva')
      data%id_uvb= aed2_locate_global('uvb')
+     data%id_extc=aed2_locate_global('extc')
+     data%id_dz=  aed2_locate_global('layer_ht')
    ENDIF
 
    ! Register diagnostic variables
@@ -603,7 +605,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: dopr_mineralisation, cpom_breakdown
    AED_REAL :: denitrification, denitratation, denitritation
    AED_REAL :: denitrousation, dnra, nitrous_denitritation, ammonium_release
-   AED_REAL :: photolysis, vis, uva, uvb, photo_fmin, cdoc
+   AED_REAL :: photolysis, vis, uva, uvb, photo_fmin, cdoc, att
    AED_REAL :: doc_min_aerobic, doc_min_anaerobic
 
 !-----------------------------------------------------------------------
@@ -638,9 +640,10 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
       dopr = _STATE_VAR_(data%id_dopr)
       cpom = _STATE_VAR_(data%id_cpom)
 
-      vis = _STATE_VAR_(data%id_vis)
-      uva = _STATE_VAR_(data%id_uva)
-      uvb = _STATE_VAR_(data%id_uvb)
+      att = EXP( -_STATE_VAR_(data%id_extc) * _STATE_VAR_(data%id_dz)/2. )
+      vis = _STATE_VAR_(data%id_vis) * att
+      uva = _STATE_VAR_(data%id_uva) * att
+      uvb = _STATE_VAR_(data%id_uvb) * att
       cdom = _DIAG_VAR_(data%id_cdom)
    ENDIF
 
