@@ -602,13 +602,13 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: pon_hydrolysis, don_mineralisation
    AED_REAL :: pop_hydrolysis, dop_mineralisation
    AED_REAL :: poc_hydrolysis, doc_mineralisation
-   AED_REAL :: docr_mineralisation, donr_mineralisation
-   AED_REAL :: dopr_mineralisation, cpom_breakdown
-   AED_REAL :: denitrification, denitratation, denitritation
-   AED_REAL :: denitrousation, dnra, nitrous_denitritation, ammonium_release
+   AED_REAL :: docr_mineralisation = 0., donr_mineralisation = 0.
+   AED_REAL :: dopr_mineralisation = 0., cpom_breakdown = 0.
+   AED_REAL :: denitrification, denitratation = 0., denitritation = 0.
+   AED_REAL :: denitrousation = 0., dnra, nitrous_denitritation, ammonium_release
    AED_REAL :: photolysis, vis, uva, uvb, photo_fmin, cdoc, att
    AED_REAL :: doc_min_aerobic, doc_min_anaerobic
-   AED_REAL :: fereduction, so4reduction, methanogenesis, fso4, fnit, ffe
+   AED_REAL :: fereduction = 0., so4reduction = 0., methanogenesis = 0., fso4, fnit, ffe
 
 !-----------------------------------------------------------------------
 !BEGIN
@@ -714,7 +714,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
    !doc_mineralisation = fdoc_miner(data%use_oxy,data%Rdoc_minerl,data%Kdom_minerl,data%theta_minerl,oxy,temp)
    !don_mineralisation = fdon_miner(data%use_oxy,data%Rdon_minerl,data%Kdom_minerl,data%theta_minerl,oxy,temp)
    !dop_mineralisation = fdop_miner(data%use_oxy,data%Rdop_minerl,data%Kdom_minerl,data%theta_minerl,oxy,temp)
-   IF(data%simRPools) THEN
+   IF (data%simRPools) THEN
       cpom_breakdown = cpom*fpoc_miner(data%use_oxy,data%Rcpom_bdown,data%Kpom_hydrol,data%theta_hydrol,oxy,temp)
 
       dom_mineralisation  = R_dom(data%Rdomr_minerl,data%Kdom_minerl,data%f_an,data%theta_minerl,oxy,temp)
@@ -751,7 +751,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
 
    !---------------------------------------------------------------------------+
    ! Set temporal derivatives : Refractory Pools
-   IF(data%simRPools) THEN
+   IF (data%simRPools) THEN
       docr = MAX(1.e-3,docr)
       _FLUX_VAR_(data%id_docr) = _FLUX_VAR_(data%id_docr) - docr_mineralisation - photolysis
       _FLUX_VAR_(data%id_doc)  = _FLUX_VAR_(data%id_doc)  +  &

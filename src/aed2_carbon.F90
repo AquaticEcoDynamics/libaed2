@@ -427,10 +427,10 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	     ELSEIF( data%alk_mode == 3 ) THEN
+         ELSEIF( data%alk_mode == 3 ) THEN
          p00 =      -258.8
          p10 =       34.59
          p01 =      0.9923
@@ -444,10 +444,10 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	     ELSEIF( data%alk_mode == 4 ) THEN
+         ELSEIF( data%alk_mode == 4 ) THEN
          p00 =      -47.51
          p10 =      -17.21
          p01 =        1.32
@@ -461,10 +461,10 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	     ELSEIF( data%alk_mode == 5 ) THEN
+         ELSEIF( data%alk_mode == 5 ) THEN
          p00 =       157.7
          p10 =       4.298
          p01 =      0.6448
@@ -478,7 +478,7 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
        ENDIF
@@ -502,8 +502,8 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
 
      ENDIF
 
-	   !_DIAG_VAR_(data%id_c_pco2) = pCO2
-	   !_STATE_VAR_(data%id_pH)  =  pH
+       !_DIAG_VAR_(data%id_c_pco2) = pCO2
+       !_STATE_VAR_(data%id_pH)  =  pH
 
      !# Now compute piston velocity, k
      kCO2 = aed2_gas_piston_velocity(windHt,wind,temp,salt,  &
@@ -698,7 +698,7 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
     temp = _STATE_VAR_(data%id_temp) ! Concentration of DIC in the cell
 
 
-    IF( data%co2_model == 1 ) THEN
+    IF ( data%co2_model == 1 ) THEN
       !# Use the Haltafall CO2 code for computing pCO2 & pH
 
       S=salt; T=temp
@@ -720,13 +720,47 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
         talk  = talk / 1.0D6      ! change unit to mol/kgSW
         TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	    ELSEIF( data%alk_mode == 2 ) THEN
-         p00  =       1063
-         p10  =      1.751
-         p01  =   -0.05369
-         p20  =     0.2266
-         p11  =  -0.001252
-         p02  =  0.0002546
+      ELSEIF( data%alk_mode == 2 ) THEN
+        p00  =       1063
+        p10  =      1.751
+        p01  =   -0.05369
+        p20  =     0.2266
+        p11  =  -0.001252
+        p02  =  0.0002546
+        a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
+        b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
+        c    =  4.8314d-4
+        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
+                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
+
+        talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
+        TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+
+      ELSEIF( data%alk_mode == 3 ) THEN
+        p00 =      -258.8
+        p10 =       34.59
+        p01 =      0.9923
+        p20 =      0.8186
+        p11 =    -0.03101
+        p02 =   0.0001045
+        a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
+        b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
+        c    =  4.8314d-4
+        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
+                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
+
+        talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
+        talk = talk / 1.0D6      ! change unit to mol/kgSW
+        TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+
+       ELSEIF( data%alk_mode == 4 ) THEN
+         p00 =      -47.51
+         p10 =      -17.21
+         p01 =        1.32
+         p20 =      0.1439
+         p11 =     0.01224
+         p02 =  -0.0002055
          a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
          b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
          c    =  4.8314d-4
@@ -734,16 +768,16 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
+         talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	   ELSEIF( data%alk_mode == 3 ) THEN
-       p00 =      -258.8
-       p10 =       34.59
-       p01 =      0.9923
-       p20 =      0.8186
-       p11 =    -0.03101
-       p02 =   0.0001045
+       ELSEIF( data%alk_mode == 5 ) THEN
+         p00 =       157.7
+         p10 =       4.298
+         p01 =      0.6448
+         p20 =      0.2107
+         p11 =   -0.002072
+         p02 =   0.0001239
          a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
          b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
          c    =  4.8314d-4
@@ -751,48 +785,14 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
-
-	    ELSEIF( data%alk_mode == 4 ) THEN
-       p00 =      -47.51
-       p10 =      -17.21
-       p01 =        1.32
-       p20 =      0.1439
-       p11 =     0.01224
-       p02 =  -0.0002055
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
-         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
-
-	    ELSEIF( data%alk_mode == 5 ) THEN
-       p00 =       157.7
-       p10 =       4.298
-       p01 =      0.6448
-       p20 =      0.2107
-       p11 =   -0.002072
-       p02 =   0.0001239
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
-         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		     talk = talk / 1.0D6      ! change unit to mol/kgSW
+         talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
       ENDIF
 
       !CALL CO2DYN ( TCO2, talk, T, S, pCO2, pH, HENRY, ca, bc, cb)
 
-	    CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
+      CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
     ENDIF
 
@@ -909,7 +909,7 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
   REAL,    INTENT(IN)   :: TC0, TA0
   REAL,    INTENT(OUT)  :: fCO2xx,pH00
   ! LOCAL
-  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi, K1, K2, TB, TP, TS, TF, TSi, TC, TA
+  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi = 0., K1, K2, TB, TP, TS, TF, TSi, TC, TA
 
   !===========Initialize the conditions =========================!
 
