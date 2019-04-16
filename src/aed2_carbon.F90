@@ -67,25 +67,24 @@ MODULE aed2_carbon
 !
    TYPE,extends(aed2_model_data_t) :: aed2_carbon_data_t
       !# Variable identifiers
-      INTEGER  :: id_dic, id_pH, id_ch4, id_oxy, id_talk
+      INTEGER  :: id_dic, id_pH, id_ch4, id_oxy, id_talk, id_ch4_bub
       INTEGER  :: id_Fsed_dic, id_Fsed_ch4
       INTEGER  :: id_temp, id_salt
       INTEGER  :: id_wind, id_vel, id_depth
       INTEGER  :: id_ch4ox, id_pco2
-      INTEGER  :: id_sed_dic
-      INTEGER  :: id_atm_co2, id_atm_ch4
-      INTEGER  :: id_par, id_extc, id_dz
-	  INTEGER  :: id_c_pco2 ! added by PHuang
+      INTEGER  :: id_sed_dic, id_sed_ch4, id_sed_ch4_ebb
+      INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb
+      INTEGER  :: id_par, id_extc, id_dz, id_tau
 
       !# Model parameters
       AED_REAL :: Fsed_dic, Ksed_dic, theta_sed_dic
-      AED_REAL :: Fsed_ch4, Ksed_ch4, theta_sed_ch4
+      AED_REAL :: Fsed_ch4, Ksed_ch4, theta_sed_ch4, Fsed_ch4_ebb, ch4_bub_tau0
       AED_REAL :: Rch4ox, Kch4ox, vTch4ox, atm_co2, atm_ch4, ionic
       AED_REAL :: maxMPBProdn, IkMPB
 
+      !# Model options
       LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4
-      LOGICAL  :: simDIC, simCH4
-
+      LOGICAL  :: simDIC, simCH4, simCH4ebb
       INTEGER  :: alk_mode, co2_model, co2_piston_model, ch4_piston_model
 
      CONTAINS
@@ -118,9 +117,7 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    INTEGER,INTENT(in) :: namlst
 !
 !LOCALS
-
-   INTEGER  :: status
-
+   INTEGER           :: status
    INTEGER           :: co2_model        = 1
    INTEGER           :: alk_mode         = 1
    INTEGER           :: co2_piston_model = 1
@@ -148,17 +145,28 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    AED_REAL :: maxMPBProdn =  40.0   ! mmolC/m2/day
    AED_REAL :: IkMPB       = 180.0   ! Light sensitivity of MPB
 
+   LOGICAL           :: simCH4ebb
+   AED_REAL          :: Fsed_ch4_ebb  = zero_
+   AED_REAL          :: ch4_bub_tau0  = one_
+
    NAMELIST /aed2_carbon/ dic_initial,pH_initial,ch4_initial,ionic,         &
                          Fsed_dic,Ksed_dic,theta_sed_dic,Fsed_dic_variable, &
                          Fsed_ch4,Ksed_ch4,theta_sed_ch4,Fsed_ch4_variable, &
                          atm_co2,atm_ch4,Rch4ox,Kch4ox,vTch4ox,             &
-                         methane_reactant_variable, &
-                         maxMPBProdn, IkMPB, &
-                         co2_model, alk_mode, co2_piston_model, ch4_piston_model
+                         methane_reactant_variable,                         &
+                         maxMPBProdn, IkMPB,                                &
+                         co2_model, alk_mode,                               &
+                         co2_piston_model, ch4_piston_model,                &
+                         simCH4ebb, Fsed_ch4_ebb, ch4_bub_tau0
 
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_carbon initialization"
+
+   !# Set defaults
+   data%simCH4ebb     = .false.
+   data%simDIC        = .false.
+   data%simCH4        = .false.
 
    !# Read the namelist
    read(namlst,nml=aed2_carbon,iostat=status)
@@ -170,31 +178,35 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    !# Store parameter values in our own derived type
    !  NB: all rates must be provided in values per day,
    !  and are converted here to values per second.
-   data%Fsed_dic      = Fsed_dic/secs_per_day
-   data%Ksed_dic      = Ksed_dic
-   data%theta_sed_dic = theta_sed_dic
-   data%ionic         = ionic
-   data%Fsed_ch4      = Fsed_ch4/secs_per_day
-   data%Ksed_ch4      = Ksed_ch4
-   data%theta_sed_ch4 = theta_sed_ch4
-   data%Rch4ox        = Rch4ox/secs_per_day
-   data%Kch4ox        = Kch4ox
-   data%vTch4ox       = vTch4ox
-   data%atm_co2        = atm_co2
-   data%atm_ch4        = atm_ch4
-   data%simDIC        = .false.
-   data%simCH4        = .false.
-   data%maxMPBProdn   = maxMPBProdn
-   data%IkMPB         = IkMPB
-   data%co2_model     = co2_model
-   data%alk_mode      = alk_mode
+   data%Fsed_dic         = Fsed_dic/secs_per_day
+   data%Ksed_dic         = Ksed_dic
+   data%theta_sed_dic    = theta_sed_dic
+   data%ionic            = ionic
+   data%co2_model        = co2_model
+   data%alk_mode         = alk_mode
+   data%atm_co2          = atm_co2
    data%co2_piston_model = co2_piston_model
+
+   data%Fsed_ch4         = Fsed_ch4/secs_per_day
+   data%Ksed_ch4         = Ksed_ch4
+   data%theta_sed_ch4    = theta_sed_ch4
+   data%Rch4ox           = Rch4ox/secs_per_day
+   data%Kch4ox           = Kch4ox
+   data%vTch4ox          = vTch4ox
+   data%atm_ch4          = atm_ch4
    data%ch4_piston_model = ch4_piston_model
+   data%simCH4ebb        = simCH4ebb
+   data%Fsed_ch4_ebb     = Fsed_ch4_ebb
+   data%ch4_bub_tau0     = ch4_bub_tau0
+
+   data%maxMPBProdn      = maxMPBProdn
+   data%IkMPB            = IkMPB
+
 
 
    !# Register state variables
    IF (dic_initial>MISVAL) THEN
-      data%id_dic = aed2_define_variable('dic','mmol/m**3','dissolved inorganic carbon',     &
+      data%id_dic = aed2_define_variable('dic','mmol/m**3','dissolved inorganic carbon', &
                                        dic_initial,minimum=zero_)
       data%simDIC = .true.
       data%id_pH = aed2_define_variable('pH','-','pH',     &
@@ -202,9 +214,13 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    ENDIF
 
    IF (ch4_initial>MISVAL) THEN
+      data%simCH4 = .true.
       data%id_ch4 = aed2_define_variable('ch4','mmol/m**3','methane',    &
                                      ch4_initial,minimum=zero_)
-      data%simCH4 = .true.
+      IF( data%simCH4ebb ) THEN
+        data%id_ch4_bub = aed2_define_variable('ch4_bub','mmol/m**3', &
+                                     'methane bubbles',zero_,minimum=zero_)
+      ENDIF
    ENDIF
 
    !# Register external state variable dependencies
@@ -224,25 +240,37 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    !# Register diagnostic variables
    data%id_pco2 = aed2_define_diag_variable('pCO2','atm', 'pCO2')
 
-   data%id_ch4ox = aed2_define_diag_variable('ch4ox','mmol/m**3/d', 'methane oxidation rate')
-   data%id_sed_dic = aed2_define_sheet_diag_variable('sed_dic','mmol/m**2/d',        &
-                                                      'CO2 exchange across sed/water interface')
+   data%id_sed_dic = aed2_define_sheet_diag_variable('sed_dic','mmol/m**2/d', &
+                            'CO2 exchange across sed/water interface')
 
-   data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2_flux',            &
-                             'mmol/m**2/d', 'CO2 exchange across atm/water interface')
-   data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4_flux',            &
-                             'mmol/m**2/d', 'CH4 exchange across atm/water interface')
+   data%id_atm_co2 = aed2_define_sheet_diag_variable('atm_co2_flux',          &
+                            'mmol/m**2/d', 'CO2 exchange across atm/water interface')
+
+   IF( data%simCH4 ) THEN
+     data%id_ch4ox   = aed2_define_diag_variable('ch4ox','mmol/m**3/d', 'methane oxidation rate')
+     data%id_sed_ch4 = aed2_define_sheet_diag_variable('sed_ch4','mmol/m**2/d', &
+                            'CH4 exchange across sed/water interface')
+     data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4_flux',        &
+                            'mmol/m**2/d', 'CH4 exchange across atm/water interface')
+     IF( data%simCH4ebb ) THEN
+       data%id_sed_ch4_ebb = aed2_define_sheet_diag_variable('sed_ch4_ebb','mmol/m**2/d', &
+                            'CH4 ebullition across sed/water interface')
+       data%id_atm_ch4_ebb = aed2_define_sheet_diag_variable('atm_ch4_ebb_flux', &
+                            'mmol/m**2/d', 'CH4 ebullition across atm/water interface')
+
+     ENDIF
+   ENDIF
 
    !# Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature')
    data%id_salt = aed2_locate_global('salinity')
-   data%id_wind = aed2_locate_global_sheet('wind_speed')
    data%id_extc = aed2_locate_global('extc_coef')
    data%id_par  = aed2_locate_global('par')
    data%id_dz   = aed2_locate_global('layer_ht')
-   data%id_vel  = aed2_locate_global('cell_vel') ! needed for k600
+   data%id_vel  = aed2_locate_global('cell_vel')           ! needed for k600
    data%id_depth= aed2_locate_global('layer_ht')
-   data%id_c_pco2 = aed2_locate_global(carbon_pco2_link) ! added by PHuang
+   data%id_wind = aed2_locate_global_sheet('wind_speed')
+   IF( data%simCH4ebb ) data%id_tau  = aed2_locate_global_sheet('taub')
 
 END SUBROUTINE aed2_define_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -401,16 +429,16 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	   ELSEIF( data%alk_mode == 3 ) THEN
-       p00 =      -258.8
-       p10 =       34.59
-       p01 =      0.9923
-       p20 =      0.8186
-       p11 =    -0.03101
-       p02 =   0.0001045
+         ELSEIF( data%alk_mode == 3 ) THEN
+         p00 =      -258.8
+         p10 =       34.59
+         p01 =      0.9923
+         p20 =      0.8186
+         p11 =    -0.03101
+         p02 =   0.0001045
          a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
          b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
          c    =  4.8314d-4
@@ -418,16 +446,16 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	   ELSEIF( data%alk_mode == 4 ) THEN
-       p00 =      -47.51
-       p10 =      -17.21
-       p01 =        1.32
-       p20 =      0.1439
-       p11 =     0.01224
-       p02 =  -0.0002055
+         ELSEIF( data%alk_mode == 4 ) THEN
+         p00 =      -47.51
+         p10 =      -17.21
+         p01 =        1.32
+         p20 =      0.1439
+         p11 =     0.01224
+         p02 =  -0.0002055
          a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
          b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
          c    =  4.8314d-4
@@ -435,16 +463,16 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	  ELSEIF( data%alk_mode == 5 ) THEN
-       p00 =       157.7
-       p10 =       4.298
-       p01 =      0.6448
-       p20 =      0.2107
-       p11 =   -0.002072
-       p02 =   0.0001239
+         ELSEIF( data%alk_mode == 5 ) THEN
+         p00 =       157.7
+         p10 =       4.298
+         p01 =      0.6448
+         p20 =      0.2107
+         p11 =   -0.002072
+         p02 =   0.0001239
          a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
          b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
          c    =  4.8314d-4
@@ -452,21 +480,23 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
        ENDIF
 
        CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
-         ! Adjust outputs back to units used in the parent model code (e.g. mmol/m3) if appropriate
-         ! note the output pCO2 is in unit of ATM
-!       pCO2 = pCO2*1.0D6   ! partial pressure of co2 in water
-!       _STATE_VAR_(data%id_talk) = talk*(1.0D6)           ! total alkalinity (umol/kg)
+       ! Adjust outputs back to units used in the parent model code (e.g. mmol/m3) if appropriate
+       ! note the output pCO2 is in unit of ATM
+       ! pCO2 = pCO2*1.0D6   ! partial pressure of co2 in water
+       ! _STATE_VAR_(data%id_talk) = talk*(1.0D6)           ! total alkalinity (umol/kg)
+       _DIAG_VAR_(data%id_pco2) = pCO2
 
      ELSEIF ( data%co2_model == 2 ) THEN
        !# Use the Butler CO2 code for computing pCO2 & pH
        pCO2 = aed2_carbon_co2(data%ionic,temp,dic,ph)*1e-6 / Ko  !(=atm), use Yanti's script for pCO2
+       _DIAG_VAR_(data%id_pco2) = pCO2
 
      ELSEIF ( data%co2_model == 0 ) THEN
        !# Use the aed2_geochem module for computing pCO2 & pH
@@ -474,7 +504,8 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
 
      ENDIF
 
-     _DIAG_VAR_(data%id_pco2) = pCO2
+       !_DIAG_VAR_(data%id_c_pco2) = pCO2
+       !_STATE_VAR_(data%id_pH)  =  pH
 
 	 _DIAG_VAR_(data%id_c_pco2) = pCO2
 	 _STATE_VAR_(data%id_pH)  =  pH
@@ -488,8 +519,8 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
      ! FCO2 = kCO2 * Ko * (pCO2 - PCO2a)
      ! pCO2a = 367e-6 atm (Keeling & Wharf, 1999)
      ! mmol/m2/s = m/s * mmol/m3/atm * atm
-     FCO2 = kCO2 * (1e6*Ko) * (pCO2 - data%atm_co2)
      ! FCO2 = - kCO2 * Ko*1e6 * ((pCO2 * 1e-6) - data%atm_co2) ! dCO2/dt
+     FCO2 = kCO2 * (1e6*Ko) * (pCO2 - data%atm_co2)
 
      !--------------------------------------------------------------------------
      !# Transfer surface exchange value to AED2 (mmmol/m2/s) converted by driver
@@ -672,7 +703,7 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
     temp = _STATE_VAR_(data%id_temp) ! Concentration of DIC in the cell
 
 
-    IF( data%co2_model == 1 ) THEN
+    IF ( data%co2_model == 1 ) THEN
       !# Use the Haltafall CO2 code for computing pCO2 & pH
 
       S=salt; T=temp
@@ -694,13 +725,47 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
         talk  = talk / 1.0D6      ! change unit to mol/kgSW
         TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	  ELSEIF( data%alk_mode == 2 ) THEN
-         p00  =       1063
-         p10  =      1.751
-         p01  =   -0.05369
-         p20  =     0.2266
-         p11  =  -0.001252
-         p02  =  0.0002546
+      ELSEIF( data%alk_mode == 2 ) THEN
+        p00  =       1063
+        p10  =      1.751
+        p01  =   -0.05369
+        p20  =     0.2266
+        p11  =  -0.001252
+        p02  =  0.0002546
+        a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
+        b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
+        c    =  4.8314d-4
+        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
+                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
+
+        talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
+             talk = talk / 1.0D6      ! change unit to mol/kgSW
+        TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+
+      ELSEIF( data%alk_mode == 3 ) THEN
+        p00 =      -258.8
+        p10 =       34.59
+        p01 =      0.9923
+        p20 =      0.8186
+        p11 =    -0.03101
+        p02 =   0.0001045
+        a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
+        b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
+        c    =  4.8314d-4
+        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
+                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
+
+        talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
+        talk = talk / 1.0D6      ! change unit to mol/kgSW
+        TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+
+       ELSEIF( data%alk_mode == 4 ) THEN
+         p00 =      -47.51
+         p10 =      -17.21
+         p01 =        1.32
+         p20 =      0.1439
+         p11 =     0.01224
+         p02 =  -0.0002055
          a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
          b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
          c    =  4.8314d-4
@@ -708,16 +773,16 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
+         talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-	  ELSEIF( data%alk_mode == 3 ) THEN
-       p00 =      -258.8
-       p10 =       34.59
-       p01 =      0.9923
-       p20 =      0.8186
-       p11 =    -0.03101
-       p02 =   0.0001045
+       ELSEIF( data%alk_mode == 5 ) THEN
+         p00 =       157.7
+         p10 =       4.298
+         p01 =      0.6448
+         p20 =      0.2107
+         p11 =   -0.002072
+         p02 =   0.0001239
          a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
          b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
          c    =  4.8314d-4
@@ -725,47 +790,14 @@ SUBROUTINE aed2_equilibrate_carbon(data,column,layer_idx)
                       - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
 
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
-
-	   ELSEIF( data%alk_mode == 4 ) THEN
-       p00 =      -47.51
-       p10 =      -17.21
-       p01 =        1.32
-       p20 =      0.1439
-       p11 =     0.01224
-       p02 =  -0.0002055
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
-         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
-
-	   ELSEIF( data%alk_mode == 5 ) THEN
-       p00 =       157.7
-       p10 =       4.298
-       p01 =      0.6448
-       p20 =      0.2107
-       p11 =   -0.002072
-       p02 =   0.0001239
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
-         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-		 talk = talk / 1.0D6      ! change unit to mol/kgSW
+         talk = talk / 1.0D6      ! change unit to mol/kgSW
          TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
       ENDIF
 
       !CALL CO2DYN ( TCO2, talk, T, S, pCO2, pH, HENRY, ca, bc, cb)
-	  CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
+
+      CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
     ENDIF
 
@@ -882,7 +914,7 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
   REAL,    INTENT(IN)   :: TC0, TA0
   REAL,    INTENT(OUT)  :: fCO2xx,pH00
   ! LOCAL
-  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi, K1, K2, TB, TP, TS, TF, TSi, TC, TA
+  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi = 0., K1, K2, TB, TP, TS, TF, TSi, TC, TA
 
   !===========Initialize the conditions =========================!
 
