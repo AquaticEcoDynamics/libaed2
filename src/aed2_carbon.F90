@@ -504,12 +504,6 @@ SUBROUTINE aed2_calculate_surface_carbon(data,column,layer_idx)
 
      ENDIF
 
-       !_DIAG_VAR_(data%id_c_pco2) = pCO2
-       !_STATE_VAR_(data%id_pH)  =  pH
-
-	 _DIAG_VAR_(data%id_c_pco2) = pCO2
-	 _STATE_VAR_(data%id_pH)  =  pH
-
      !# Now compute piston velocity, k
      kCO2 = aed2_gas_piston_velocity(windHt,wind,temp,salt,  &
          vel=vel,depth=depth,schmidt_model=2,piston_model=data%co2_piston_model)
