@@ -1042,10 +1042,12 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
      IF (data%do_Cuptake) THEN
         _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
      ENDIF
-     ! A quick and dirty nutrient uptak by MPB; needs cleaning to accoutn for limtation and excretion of DOM
+     ! A quick and dirty nutrient uptake by MPB; needs cleaning to account for limitation and excretion of DOM
      IF (data%do_Nuptake) THEN
-        _FLUX_VAR_(data%id_Nupttarget(1)) = _FLUX_VAR_(data%id_Nupttarget(1)) - mpb_flux * (16./106.) *0.5
-        _FLUX_VAR_(data%id_Nupttarget(2)) = _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * (16./106.) *0.5
+        _FLUX_VAR_(data%id_Nupttarget(1)) = &
+                           _FLUX_VAR_(data%id_Nupttarget(1)) - mpb_flux * (16./106.) *0.5
+        _FLUX_VAR_(data%id_Nupttarget(2)) = &
+                           _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * (16./106.) *0.5
      ENDIF
      IF (data%do_Puptake) THEN
         _FLUX_VAR_(data%id_Pupttarget(1)) = _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
