@@ -52,6 +52,7 @@ MODULE aed2_common
    USE aed2_tracer
    USE aed2_noncohesive
    USE aed2_totals
+   USE aed2_dummy
 
    IMPLICIT NONE
 
@@ -114,6 +115,7 @@ FUNCTION aed2_new_model(modelname) RESULT(model)
       CASE ('aed2_tracer');         prefix = 'TRC'; ALLOCATE(aed2_tracer_data_t::model)
       CASE ('aed2_noncohesive');    prefix = 'NCS'; ALLOCATE(aed2_noncohesive_data_t::model)
       CASE ('aed2_totals');         prefix = 'TOT'; ALLOCATE(aed2_totals_data_t::model)
+      CASE ('aed2_dummy');          prefix = 'DUM'; ALLOCATE(aed2_dummy_data_t::model)
       CASE ('aed2_land');           is_plus = .TRUE.
       CASE ('aed2_ass');            is_plus = .TRUE.
       CASE ('aed2_soilbgc');        is_plus = .TRUE.

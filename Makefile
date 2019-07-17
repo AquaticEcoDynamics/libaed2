@@ -117,6 +117,7 @@ ${objdir}/aed2_zooplankton.o \
 ${objdir}/aed2_tracer.o \
 ${objdir}/aed2_noncohesive.o \
 ${objdir}/aed2_totals.o \
+${objdir}/aed2_dummy.o \
 ${objdir}/aed2_common.o
 
 
