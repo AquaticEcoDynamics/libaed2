@@ -1,18 +1,4 @@
 !###############################################################################
-!                                                                              !
-!         .----------------.  .----------------.  .----------------.           !
-!         | .--------------. || .--------------. || .--------------. |         !
-!         | |  ________    | || | ____    ____ | || | ____    ____ | |         !
-!         | | |_   ___ `.  | || ||_  |    |  _|| || ||_   \  /   _|| |         !
-!         | |   | |   `. \ | || |  | |    | |  | || |  |   \/   |  | |         !
-!         | |   | |    | | | || |  | |    , |  | || |  | |\  /| |  | |         !
-!         | |  _| |___.' / | || |  | `.__.  ,  | || | _| |_\/_| |_ | |         !
-!         | | |________.'  | || |  |_______.   | || ||_____||_____|| |         !
-!         | |              | || |              | || |              | |         !
-!         | '--------------' || '--------------' || '--------------' |         !
-!         '----------------'  '----------------'  '----------------'           !
-!                                                                              !
-!###############################################################################
 !#                                                                             #
 !# aed2_dummy.F90                                                              #
 !#                                                                             #
@@ -42,6 +28,20 @@
 !#                                                                             #
 !# Created July 2019                                                           #
 !#                                                                             #
+!###############################################################################
+!                                                                              !
+!         .----------------.  .----------------.  .----------------.           !
+!         | .--------------. || .--------------. || .--------------. |         !
+!         | |  ________    | || | ____    ____ | || | ____    ____ | |         !
+!         | | |_   ___ `.  | || ||_  |    |  _|| || ||_   \  /   _|| |         !
+!         | |   | |   `. \ | || |  | |    | |  | || |  |   \/   |  | |         !
+!         | |   | |    | | | || |  | |    , |  | || |  | |\  /| |  | |         !
+!         | |  _| |___.' / | || |  | `.__.  ,  | || | _| |_\/_| |_ | |         !
+!         | | |________.'  | || |  |_______.   | || ||_____||_____|| |         !
+!         | |              | || |              | || |              | |         !
+!         | '--------------' || '--------------' || '--------------' |         !
+!         '----------------'  '----------------'  '----------------'           !
+!                                                                              !
 !###############################################################################
 
 #include "aed2.h"
@@ -101,9 +101,7 @@ SUBROUTINE aed2_define_dummy(data, namlst)
    CHARACTER(len=40) :: dm_vars(100),  dm_dvars(100)
    CHARACTER(len=40) :: dm_svars(100), dm_dsvars(100)
    AED_REAL          :: dm_max(100),   dm_min(100),   dm_init(100)
-   AED_REAL          :: dm_dmax(100),  dm_dmin(100),  dm_dinit(100)
    AED_REAL          :: dm_smax(100),  dm_smin(100),  dm_sinit(100)
-   AED_REAL          :: dm_dsmax(100), dm_dsmin(100), dm_dsinit(100)
 
    NAMELIST /aed2_dummy/ dm_vars, dm_max, dm_min, dm_init,             &
                          dm_dvars,                                     &
@@ -114,10 +112,10 @@ SUBROUTINE aed2_define_dummy(data, namlst)
 !BEGIN
    print *,"        aed2_dummy initialization"
 
-   dm_vars = ''   ; dm_dvars = ''
-   dm_max = NaN_  ; dm_min = NaN_  ; dm_init = NaN_
-   dm_svars = ''  ; dm_dsvars = ''
-   dm_smax = NaN_ ; dm_smin = NaN_ ; dm_sinit = NaN_
+   dm_vars = ''    ; dm_dvars = ''
+   dm_max = NaN_   ; dm_min = NaN_   ; dm_init = 0
+   dm_svars = ''   ; dm_dsvars = ''
+   dm_smax = NaN_  ; dm_smin = NaN_  ; dm_sinit = 0
 
    num_v = 0 ; num_dv = 0 ; num_sv = 0 ; num_dsv = 0
 
@@ -144,11 +142,11 @@ SUBROUTINE aed2_define_dummy(data, namlst)
 
    ! Register state variables
    DO i=1,data%num_v
-      data%id_dummy_v(i) = aed2_define_variable(dm_vars(i), '', '', 0., 0., 0., 0.)
+      data%id_dummy_v(i) = aed2_define_variable(dm_vars(i), '', '', dm_init(i), dm_min(i), dm_max(i), 0.)
    ENDDO
 
    DO i=1,data%num_sv
-      data%id_dummy_sv(i) = aed2_define_sheet_variable(dm_svars(i), '', '', 0., 0., 0., .FALSE.)
+      data%id_dummy_sv(i) = aed2_define_sheet_variable(dm_svars(i), '', '', dm_sinit(i), dm_smin(i), dm_smax(i), .FALSE.)
    ENDDO
 
    DO i=1,data%num_dv
