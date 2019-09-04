@@ -170,6 +170,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    data%id_wind = aed2_locate_global_sheet('wind_speed') ! Wind speed at 10 m above surface (m/s)
    data%id_larea = aed2_locate_global_sheet('layer_area')
    data%id_lht = aed2_locate_global('layer_ht')
+   data%id_cell_vel = -1
    IF( oxy_piston_model>3 )data%id_cell_vel= aed2_locate_global('cell_vel')! needed for k600
 
 END SUBROUTINE aed2_define_oxygen
