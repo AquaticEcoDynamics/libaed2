@@ -463,7 +463,8 @@ END FUNCTION bio_respiration
 FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !-------------------------------------------------------------------------------
 ! Salinity tolerance of phytoplankton
-! Implmentation based on Griffin et al 2001; Robson and Hamilton, 2004
+! CAEDYM Implmentation based on Griffin et al 2001; Robson and Hamilton, 2004,
+! and Lassiter option also
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
@@ -472,8 +473,7 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !
 !LOCALS
    AED_REAL :: fSal ! Returns the salinity function
-   AED_REAL :: tmp1,tmp2,tmp3
-   AED_REAL,PARAMETER :: wq_one = 1.0
+   AED_REAL :: tmp1,tmp2,tmp3, fSa,fSb,fSc,fSo
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -508,16 +508,31 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
                       2.0*(phytos(group)%S_bep-1.0)*salinity/phytos(group)%S_opt+phytos(group)%S_bep
       ENDIF
       IF ((salinity>phytos(group)%S_maxsp) .AND. (salinity<(phytos(group)%S_maxsp + phytos(group)%S_opt))) THEN
-         fSal = (phytos(group)%S_bep - wq_one)*(phytos(group)%S_maxsp + phytos(group)%S_opt - salinity)**2  &
+         fSal = (phytos(group)%S_bep - one_)*(phytos(group)%S_maxsp + phytos(group)%S_opt - salinity)**2  &
              / (phytos(group)%S_opt**2) -                                                                   &
-             2 * (phytos(group)%S_bep - wq_one) * (phytos(group)%S_maxsp + phytos(group)%S_opt - salinity)  &
+             2 * (phytos(group)%S_bep - one_) * (phytos(group)%S_maxsp + phytos(group)%S_opt - salinity)  &
              / phytos(group)%S_opt + phytos(group)%S_bep
       ENDIF
       IF ( (salinity >= phytos(group)%S_opt) .AND. (salinity <= phytos(group)%S_maxsp) ) fSal = 1
       IF ( salinity >= (phytos(group)%S_maxsp + phytos(group)%S_opt) ) fSal = phytos(group)%S_bep
+    ELSEIF (phytos(group)%salTol == 4) THEN
+       ! Lassiter
+       fSa = phytos(group)%S_bep
+       fSb = 1.
+       fSc = phytos(group)%S_maxsp
+       fSo = phytos(group)%S_opt
+
+       IF(salinity>fSc)THEN
+         fSal = zero_
+       ELSE
+         fSal = fSb*EXP(fSa*(salinity-fSo))*((fSc-salinity)/(fSc-fSo))**(fSa*(fSc-fSo))
+       ENDIF
    ELSE
       PRINT *,'STOP: Unsupported salTol flag for group: ',group,'=', phytos(group)%salTol
    ENDIF
+
+
+
 
    IF( fSal < zero_ ) fSal = zero_
 
