@@ -713,13 +713,17 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
                            (1.0-a_nfix(phy_i))*(1.0-data%phytos(phy_i)%k_nfix))
       ENDIF
 
-
+      !------------------------------------------------------------------------+
       ! Respiration and general metabolic loss
       respiration(phy_i) = bio_respiration(data%phytos(phy_i)%R_resp,data%phytos(phy_i)%theta_resp,temp)
 
-      ! Salinity stress effect on respiration
+      ! Salinity stress effect on respiration (or growth)
       fSal =  phyto_salinity(data%phytos,phy_i,salinity)
-      respiration(phy_i) = respiration(phy_i) * fSal
+      IF( data%phytos(phy_i)%salTol >= 4) THEN
+        primprod(phy_i) = primprod(phy_i) * fSal   ! growth limtation rather than mortality enhancement
+      ELSE
+        respiration(phy_i) = respiration(phy_i) * fSal
+      ENDIF
 
       ! photo-exudation
       exudation(phy_i) = primprod(phy_i)*data%phytos(phy_i)%f_pr
@@ -733,7 +737,7 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
 
       ! write(*,"(4X,'limitations (fT,fI,fN,fP,fSi,Io, par, mu): ',9F9.2)")fT,fI,fNit,fPho,fSil,Io,par,primprod*secs_per_day
 
-
+      !------------------------------------------------------------------------+
       ! Carbon uptake and excretion
       cuptake(phy_i)    = -primprod(phy_i) * phy
       cexcretion(phy_i) = (data%phytos(phy_i)%k_fdom*(1.0-data%phytos(phy_i)%k_fres)*respiration(phy_i)+exudation(phy_i)) * phy
@@ -760,6 +764,7 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
          simortality(phy_i) = zero_
       ENDIF
 
+      !------------------------------------------------------------------------+
       ! Diagnostic info
       _DIAG_VAR_(data%id_NtoP(phy_i)) =  INi/IPi
 

@@ -1014,12 +1014,12 @@ SUBROUTINE aed2_calculate_benthic_organic_matter(data,column,layer_idx)
 
    ! Also store net sediment fluxes as diagnostic variable.
    IF (data%extra_diag) THEN
-      _DIAG_VAR_S_(data%id_sed_poc) = Fsed_poc + Psed_poc ! resus & settling
-      _DIAG_VAR_S_(data%id_sed_doc) = Fsed_doc            ! dissolved flux
-      _DIAG_VAR_S_(data%id_sed_pon) = Fsed_poc + Psed_poc
-      _DIAG_VAR_S_(data%id_sed_don) = Fsed_don
-      _DIAG_VAR_S_(data%id_sed_pop) = Fsed_poc + Psed_poc
-      _DIAG_VAR_S_(data%id_sed_dop) = Fsed_dop
+      _DIAG_VAR_S_(data%id_sed_poc) = Fsed_poc + Psed_poc  ! resus & settling
+      _DIAG_VAR_S_(data%id_sed_doc) = Fsed_doc             ! dissolved flux
+      _DIAG_VAR_S_(data%id_sed_pon) = Fsed_pon + Psed_pon  ! resus & settling
+      _DIAG_VAR_S_(data%id_sed_don) = Fsed_don             ! dissolved flux
+      _DIAG_VAR_S_(data%id_sed_pop) = Fsed_pop + Psed_pop  ! resus & settling
+      _DIAG_VAR_S_(data%id_sed_dop) = Fsed_dop             ! dissolved flux
    ENDIF
 END SUBROUTINE aed2_calculate_benthic_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
