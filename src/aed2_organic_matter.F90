@@ -658,9 +658,9 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
       oxy = 300.0
    ENDIF
    IF (data%use_nit) THEN
-      oxy = _STATE_VAR_(data%id_nit)! nitrate
+      nit = _STATE_VAR_(data%id_nit)! nitrate
    ELSE
-      oxy = 300.0
+      nit = 300.0
    ENDIF
    IF (data%use_no2) THEN
       no2 = _STATE_VAR_(data%id_no2)! nitrite
@@ -850,7 +850,7 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
                                     _FLUX_VAR_(data%id_dic) + photolysis*(1.-photo_fmin)
    ENDIF
    IF (data%use_amm) THEN
-      !amm now done above _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don*don_mineralisation)
+      _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
       IF ( data%simRPools )  &
          _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + &
                                        photolysis*(1.-photo_fmin)*MIN(donr/MAX(docr,1e-2),one_)
