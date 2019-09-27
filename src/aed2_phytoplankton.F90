@@ -974,15 +974,15 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
    ! Set diagnostic arrays for combined assemblage properties
    _DIAG_VAR_(data%id_GPP) =  sum(cuptake)*secs_per_day
    _DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
-   _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
-   _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
+   IF (extra_diag) _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
+   IF (extra_diag) _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
    _DIAG_VAR_(data%id_NUP) =  sum(nuptake(:,1))*secs_per_day
    _DIAG_VAR_(data%id_NUP2)=  sum(nuptake(:,2))*secs_per_day
    _DIAG_VAR_(data%id_PUP) =  sum(puptake)*secs_per_day
    _DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
 
-   _DIAG_VAR_(data%id_dPAR) =  par
-   _DIAG_VAR_(data%id_TCHLA)=  tchla
+   IF (extra_diag) _DIAG_VAR_(data%id_dPAR) =  par
+   IF (extra_diag) _DIAG_VAR_(data%id_TCHLA)=  tchla
    _DIAG_VAR_(data%id_TPHY) =  tphy
    _DIAG_VAR_(data%id_TIN)  =  tin
    _DIAG_VAR_(data%id_TIP)  =  tip
