@@ -23,7 +23,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -319,10 +319,12 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
 !LOCALS
    INTEGER  :: status,i
 
+!  %% NAMELIST
+   ! Default settings
    INTEGER  :: num_phytos
    INTEGER  :: the_phytos(MAX_PHYTO_TYPES)
-   INTEGER  :: settling(MAX_PHYTO_TYPES)
-   AED_REAL :: resuspension(MAX_PHYTO_TYPES)
+   INTEGER  :: settling(MAX_PHYTO_TYPES)     = _MOB_CONST_
+   AED_REAL :: resuspension(MAX_PHYTO_TYPES) = 0.
    CHARACTER(len=64)  :: resus_link=''
    CHARACTER(len=64)  :: p_excretion_target_variable=''
    CHARACTER(len=64)  :: p_mortality_target_variable=''
@@ -343,12 +345,18 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    CHARACTER(len=64)  :: si_uptake_target_variable=''
    CHARACTER(len=128) :: dbase='aed2_phyto_pars.nml'
    AED_REAL           :: zerolimitfudgefactor = 0.9 * 3600
-   AED_REAL           :: R_mpbg, R_mpbr, I_Kmpb, mpb_max
-   AED_REAL           :: theta_mpb_growth,theta_mpb_resp
-   AED_REAL           :: min_rho, max_rho
+   AED_REAL           :: R_mpbg = 0.
+   AED_REAL           :: R_mpbr = 0.
+   AED_REAL           :: I_Kmpb = 100.
+   AED_REAL           :: mpb_max = 1000.
+   AED_REAL           :: theta_mpb_growth = 1.05
+   AED_REAL           :: theta_mpb_resp   = 1.05
+   AED_REAL           :: min_rho = 900.
+   AED_REAL           :: max_rho = 1200.
    LOGICAL            :: extra_debug = .false.
    INTEGER            :: do_mpb, n_zones = 0
    AED_REAL           :: active_zones(1000)
+!  %% END NAMELIST
 
    NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, settling,resuspension,&
                     p_excretion_target_variable,p_mortality_target_variable,   &
@@ -367,13 +375,6 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_phytoplankton initialization"
-
-   ! Default settings
-   settling = _MOB_CONST_
-   resuspension = zero_
-   theta_mpb_growth = 1.05 ;  theta_mpb_resp = 1.05
-   R_mpbg = 0.; R_mpbr =0.; I_Kmpb=100.; mpb_max=1000.;
-   min_rho = 900; max_rho=1200
 
    ! Read the namelist, and set module parameters
    read(namlst,nml=aed2_phytoplankton,iostat=status)

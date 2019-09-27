@@ -120,21 +120,30 @@ SUBROUTINE aed2_define_noncohesive(data, namlst)
 !
 !LOCALS
    INTEGER  :: status,i
-   INTEGER  :: resuspension = 0
-   INTEGER  :: settling = 0
-   INTEGER  :: num_ss = 0
-   LOGICAL  :: simSedimentMass = .FALSE.
-   AED_REAL :: ss_initial(100) = zero_
-   AED_REAL :: decay(100) = 0
-   AED_REAL :: Ke_ss(100) = 0
-   AED_REAL :: w_ss(100), rho_ss(100), d_ss(100)
-   AED_REAL :: Fsed(100), tau_0(100)
-   AED_REAL :: epsilon, tau_r, kTau_0
-   AED_REAL :: fs(100) = zero_
-   AED_REAL :: sed_porosity = 0.3
-   AED_REAL :: sed_initial = zero_
-   CHARACTER(len=64) :: macrophyte_link_var = ''
    CHARACTER(4) :: ncs_name
+
+!  %% NAMELIST
+   ! Set default parameter values
+   INTEGER           :: num_ss          = 0
+   INTEGER           :: resuspension    = 0
+   INTEGER           :: settling        = 0
+   LOGICAL           :: simSedimentMass = .FALSE.
+   AED_REAL          :: ss_initial(100) = zero_
+   AED_REAL          :: decay(100)      = zero_
+   AED_REAL          :: Ke_ss(100)      = 0.02
+   AED_REAL          :: w_ss(100)       = 0.
+   AED_REAL          :: rho_ss(100)     = 1.6e3
+   AED_REAL          :: d_ss(100)       = 1e-6
+   AED_REAL          :: Fsed(100)       = zero_
+   AED_REAL          :: tau_0(100)      = 0.04
+   AED_REAL          :: epsilon         = 0.02
+   AED_REAL          :: tau_r           = 1.0
+   AED_REAL          :: kTau_0          = 1.0
+   AED_REAL          :: fs(100)         = 1.0
+   AED_REAL          :: sed_porosity    = 0.3
+   AED_REAL          :: sed_initial     = zero_
+   CHARACTER(len=64) :: macrophyte_link_var = ''
+!  %% END NAMELIST
 
    NAMELIST /aed2_noncohesive/ num_ss, decay, Ke_ss, &
                                settling, w_ss, rho_ss, d_ss, &
@@ -145,21 +154,6 @@ SUBROUTINE aed2_define_noncohesive(data, namlst)
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed2_noncohesive initialization"
-
-   ! Set default parameter values
-   decay        = zero_  ! this is now not for public use
-   Fsed         = zero_   ! this is now not for public use
-
-   w_ss         = zero_
-   rho_ss       = 1.6e3
-   Ke_ss        = 0.02
-   d_ss         = 1e-6
-   epsilon      = 0.02
-   kTau_0       = 1.0
-   tau_0        = 0.04
-   tau_r        = 1.0
-   fs           = 1.0
-   sed_porosity = 0.3
 
    ! Read the namelist
    read(namlst,nml=aed2_noncohesive,iostat=status)

@@ -23,7 +23,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -109,16 +109,28 @@ SUBROUTINE aed2_define_totals(data, namlst)
 
 !
 !LOCALS
-   INTEGER  :: status
+   INTEGER :: status
+   INTEGER :: i, num_tn,num_tkn,num_tp,num_toc,num_tss,num_turb,num_tfe,num_tal
 
-   INTEGER           :: i, num_tn,num_tkn,num_tp,num_toc,num_tss,num_turb,num_tfe,num_tal
-   CHARACTER(len=40) :: tn_vars(100), tkn_vars(100), tp_vars(100)
-   CHARACTER(len=40) :: toc_vars(100), tss_vars(100), turb_vars(100)
-   CHARACTER(len=40) :: tfe_vars(10), tal_vars(10)
-   AED_REAL          :: tn_varscale(100), tkn_varscale(100), tp_varscale(100)
-   AED_REAL          :: toc_varscale(100), tss_varscale(100), turb_varscale(100)
-   AED_REAL          :: tfe_varscale(10), tal_varscale(10)
-   LOGICAL           :: outputLight = .FALSE.
+!  %% NAMELIST
+   CHARACTER(len=40) :: tn_vars(100)       = ''
+   CHARACTER(len=40) :: tkn_vars(100)      = ''
+   CHARACTER(len=40) :: tp_vars(100)       = ''
+   CHARACTER(len=40) :: toc_vars(100)      = ''
+   CHARACTER(len=40) :: tss_vars(100)      = ''
+   CHARACTER(len=40) :: turb_vars(100)     = ''
+   CHARACTER(len=40) :: tfe_vars(10)       = ''
+   CHARACTER(len=40) :: tal_vars(10)       = ''
+   AED_REAL          :: tn_varscale(100)   = 1.0
+   AED_REAL          :: tkn_varscale(100)  = 1.0
+   AED_REAL          :: tp_varscale(100)   = 1.0
+   AED_REAL          :: toc_varscale(100)  = 1.0
+   AED_REAL          :: tss_varscale(100)  = 1.0
+   AED_REAL          :: turb_varscale(100) = 1.0
+   AED_REAL          :: tfe_varscale(10)   = 1.0
+   AED_REAL          :: tal_varscale(10)   = 1.0
+   LOGICAL           :: outputLight        = .FALSE.
+!  %% END NAMELIST
 
    NAMELIST /aed2_totals/ tn_vars,  tn_varscale,  tkn_vars,  tkn_varscale,  &
                           tp_vars,  tp_varscale,  toc_vars, toc_varscale,   &
@@ -130,21 +142,14 @@ SUBROUTINE aed2_define_totals(data, namlst)
 !BEGIN
    print *,"        aed2_totals initialization"
 
-   tn_vars = '' ;       tkn_vars = '' ;      tp_vars = ''
-   toc_vars = '' ;      tss_vars = '' ;      turb_vars = ''
-   tfe_vars = '' ;      tal_vars = '' ;
-   tn_varscale = 1.0 ;  tkn_varscale = 1.0;  tp_varscale = 1.0
-   toc_varscale = 1.0 ; tss_varscale = 1.0;  turb_varscale = 1.0
-   tfe_varscale = 1.0 ; tal_varscale = 1.0
-
-   num_tn  = 0 ; num_tkn  = 0 ; num_tp  = 0 ; num_toc = 0
-   num_tss = 0 ; num_turb = 0 ; num_tfe = 0 ; num_tal = 0
-
    ! Read the namelist
    read(namlst,nml=aed2_totals,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_totals'
 
    data%outputLight = outputLight
+
+   num_tn  = 0 ; num_tkn  = 0 ; num_tp  = 0 ; num_toc = 0
+   num_tss = 0 ; num_turb = 0 ; num_tfe = 0 ; num_tal = 0
 
    DO i=1,100 ; IF (tn_vars(i)  .EQ. '' ) THEN ; num_tn  = i-1 ; EXIT ; ENDIF ; ENDDO
    DO i=1,100 ; IF (tkn_vars(i) .EQ. '' ) THEN ; num_tkn = i-1 ; EXIT ; ENDIF ; ENDDO

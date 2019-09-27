@@ -145,6 +145,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
 !
 !LOCALS
    INTEGER                   :: status
+
+!  %% NAMELIST
    !-- Default initial values and limits
    AED_REAL                  :: om_min         = zero_
    AED_REAL                  :: om_max         =   1e8
@@ -210,7 +212,8 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
    AED_REAL                  :: KePOM  = 0.0001
    AED_REAL                  :: KeDOMR = 0.0001
    AED_REAL                  :: KeCPOM = 0.0001
-   AED_REAL                  :: photo_fmin = 0.9, photo_c = 7.52
+   AED_REAL                  :: photo_fmin = 0.9
+   AED_REAL                  :: photo_c    = 7.52
    LOGICAL                   :: simPhotolysis = .FALSE.
 
    !-- Particle settling parameters
@@ -247,6 +250,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
 
    !-- Misc options
    LOGICAL                   :: extra_diag = .FALSE.
+!  %% END NAMELIST
 
    !-- Parameters to read in
    NAMELIST /aed2_organic_matter/   om_min, om_max,                            &
@@ -263,7 +267,6 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
                       don_miner_product_variable,dop_miner_product_variable,   &
                       simRPools,Rdomr_minerl,                                  &
                       Rcpom_bdown,X_cpom_n,X_cpom_p,                           &
-                    ! docr_miner_product_variable, donr_miner_product_variable,dopr_miner_product_variable, &
                       Kin_denitrat,Kin_denitrit,Kin_denitrous,K_nit,           &
                       Klim_denitrous,Klim_denitrit,Kpart_denitrit,             &
                       KeDOM, KePOM, KeDOMR, KeCPOM,                            &
@@ -276,8 +279,9 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
                       Fsed_poc_variable, Fsed_doc_variable,                    &
                       Fsed_pop_variable, Fsed_dop_variable,                    &
                       Fsed_pon_variable, Fsed_don_variable,                    &
-                      extra_diag,  &
-                      simDenitrification, simFeReduction, simSO4Reduction, simMethanogenesis
+                      simDenitrification, simFeReduction,                      &
+                      simSO4Reduction, simMethanogenesis,                      &
+                      extra_diag
 
 !-------------------------------------------------------------------------------
 !BEGIN

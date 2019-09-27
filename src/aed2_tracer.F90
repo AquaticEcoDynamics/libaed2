@@ -23,7 +23,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -114,20 +114,27 @@ SUBROUTINE aed2_define_tracer(data, namlst)
 !
 !LOCALS
    INTEGER  :: status,i
-   LOGICAL  :: retention_time = .FALSE.
-   INTEGER  :: resuspension = 0
-   INTEGER  :: settling = 0
-   INTEGER  :: num_tracers
-   AED_REAL :: trace_initial = zero_
-   AED_REAL :: decay(100)
-   AED_REAL :: Fsed(100)
-   AED_REAL :: Ke_ss(100)
-   AED_REAL :: w_ss(100), rho_ss(100), d_ss(100)
-   AED_REAL :: epsilon, tau_r, kTau_0
-   AED_REAL :: tau_0(100)
-   AED_REAL :: fs(100)
-   CHARACTER(len=64) :: macrophyte_link_var = ''
    CHARACTER(4) :: trac_name
+
+!  %% NAMELIST
+   INTEGER           :: num_tracers
+   LOGICAL           :: retention_time = .FALSE.
+   INTEGER           :: resuspension   = 0
+   INTEGER           :: settling       = 0
+   AED_REAL          :: trace_initial  = zero_
+   AED_REAL          :: decay(100)     = zero_
+   AED_REAL          :: Fsed(100)      = zero_
+   AED_REAL          :: Ke_ss(100)     = 0.02
+   AED_REAL          :: w_ss(100)      = zero_
+   AED_REAL          :: rho_ss(100)    = 1.6e3
+   AED_REAL          :: d_ss(100)      = 1e-6
+   AED_REAL          :: epsilon        = 0.02
+   AED_REAL          :: tau_r          = 1.0
+   AED_REAL          :: kTau_0         = 1.0
+   AED_REAL          :: tau_0(100)     = 0.04
+   AED_REAL          :: fs(100)        = 1.0
+   CHARACTER(len=64) :: macrophyte_link_var = ''
+!  %% END NAMELIST
 
    NAMELIST /aed2_tracer/ num_tracers, decay, Fsed, Ke_ss, &
                           settling, w_ss, rho_ss, d_ss, &

@@ -94,14 +94,22 @@ SUBROUTINE aed2_define_dummy(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
+   INTEGER  :: i, num_v, num_dv, num_sv, num_dsv
 
    CHARACTER(len=4),POINTER :: prefix => null()
 
-   INTEGER           :: i, num_v,num_dv,num_sv, num_dsv
-   CHARACTER(len=40) :: dm_vars(100),  dm_dvars(100)
-   CHARACTER(len=40) :: dm_svars(100), dm_dsvars(100)
-   AED_REAL          :: dm_max(100),   dm_min(100),   dm_init(100)
-   AED_REAL          :: dm_smax(100),  dm_smin(100),  dm_sinit(100)
+!  %% NAMELIST
+   CHARACTER(len=40) :: dm_vars(100)
+   AED_REAL          :: dm_max(100)
+   AED_REAL          :: dm_min(100)
+   AED_REAL          :: dm_init(100)
+   CHARACTER(len=40) :: dm_dvars(100)
+   CHARACTER(len=40) :: dm_svars(100)
+   AED_REAL          :: dm_smax(100)
+   AED_REAL          :: dm_smin(100)
+   AED_REAL          :: dm_sinit(100)
+   CHARACTER(len=40) :: dm_dsvars(100)
+!  %% END NAMELIST
 
    NAMELIST /aed2_dummy/ dm_vars, dm_max, dm_min, dm_init,             &
                          dm_dvars,                                     &

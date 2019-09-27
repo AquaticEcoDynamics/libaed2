@@ -88,6 +88,7 @@ SUBROUTINE aed2_define_chla(data,  namlst)
 !LOCALS
    INTEGER  :: status
 
+!  %% NAMELIST
    AED_REAL           :: p_initial=0.
    AED_REAL           :: p0=0.0225
    AED_REAL           :: w_p=-1.157407e-05
@@ -100,9 +101,11 @@ SUBROUTINE aed2_define_chla(data,  namlst)
    CHARACTER(len=64)  :: excretion_target_variable=''
    CHARACTER(len=64)  :: mortality_target_variable=''
    CHARACTER(len=64)  :: uptake_target_variable=''
+!  %% END NAMELIST
 
    NAMELIST /aed2_chla/ p_initial,p0,w_p,i_min,rmax,alpha,rpn,rpdu,rpdl, &
-                    excretion_target_variable,mortality_target_variable,uptake_target_variable
+                    excretion_target_variable,mortality_target_variable, &
+                    uptake_target_variable
 
 !-------------------------------------------------------------------------------
 !BEGIN

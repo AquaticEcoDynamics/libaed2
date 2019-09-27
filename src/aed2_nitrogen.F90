@@ -21,7 +21,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -122,6 +122,8 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    LOGICAL           :: simNitrfLight = .false.
    LOGICAL           :: simDryDeposition = .false.
    LOGICAL           :: simWetDeposition = .false.
+
+!  %% NAMELIST
    AED_REAL          :: n_min         = zero_
    AED_REAL          :: n_max         =   1e6
    AED_REAL          :: nit_initial   =   4.5
@@ -168,6 +170,7 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
    CHARACTER(len=64) :: Fsed_nit_variable=''
    CHARACTER(len=64) :: Fsed_n2o_variable=''
    CHARACTER(len=64) :: Fsed_no2_variable=''
+!  %% END NAMELIST
 
    NAMELIST /aed2_nitrogen/     n_min, n_max,                                  &
                 nit_initial, amm_initial, n2o_initial, no2_initial,            &

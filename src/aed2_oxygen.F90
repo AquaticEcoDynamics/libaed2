@@ -23,7 +23,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -112,17 +112,67 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
-   INTEGER  :: oxy_piston_model =1
-   AED_REAL :: oxy_initial=300.
-   AED_REAL :: oxy_min=0.
-   AED_REAL :: oxy_max=nan_
-   AED_REAL :: Fsed_oxy = -20.0
-   AED_REAL :: Ksed_oxy = 30.0
-   AED_REAL :: theta_sed_oxy = 1.0
-   CHARACTER(len=64) :: Fsed_oxy_variable=''
 
-   NAMELIST /aed2_oxygen/ oxy_initial,oxy_min,oxy_max,Fsed_oxy,Ksed_oxy,theta_sed_oxy,  &
-                         Fsed_oxy_variable,oxy_piston_model
+!  %% NAMELIST
+   AED_REAL          :: oxy_initial       = 300.  !% initial dissolved oxygen (DO) concentration
+                                                  !% $$mmol\,m^{-3}$$
+                                                  !% float
+                                                  !%     
+                                                  !% 0-400
+                                                  !% Note: will be overwritten by GLM or TFV IC
+
+   AED_REAL          :: oxy_min           = 0.    !% minimum dissolved oxygen (DO) concentration
+                                                  !% $$mmol\,m^{-3}$$
+                                                  !% float
+                                                  !%     
+                                                  !%     
+                                                  !% Optional variable to enforce negative number clipping
+
+   AED_REAL          :: oxy_max           = nan_  !% maxmium dissolved oxygen (DO) concentration
+                                                  !% $$mmol\,m^{-3}$$
+                                                  !% float
+                                                  !% -
+                                                  !% 1000
+                                                  !% Optional variable to enforce high number clipping
+
+   AED_REAL          :: Fsed_oxy          = -20.0 !% sediment oxygen demand (SOD)
+                                                  !% $$mmol\,m^{-2}\,day^{-1}$$
+                                                  !% float
+                                                  !%     
+                                                  !% -100
+                                                  !% Note: unused if Fsed_oxy_variable is activated via aed2_sedflux
+
+   AED_REAL          :: Ksed_oxy          = 30.0  !% half-saturation concentration of oxygen sediment flux
+                                                  !% $$mmol\,m^{-3}$$
+                                                  !% float
+                                                  !%   50
+                                                  !% 10-100
+                                                  !% Changes the sensitivity of the oxygen flux to the 
+                                                  !-     overlying oxygen concentration
+
+   AED_REAL          :: theta_sed_oxy     = 1.0   !% Arrhenius temperature multiplier for sediment oxygen flux
+                                                  !% -
+                                                  !% float
+                                                  !% 1e+00
+                                                  !% 1.04 - 1.12
+                                                  !% Changes the sensitivity of the oxygen flux to 
+                                                  !-     the overlying temperature
+
+   CHARACTER(len=64) :: Fsed_oxy_variable =''     !% oxygen sediment flux variable link
+                                                  !% -
+                                                  !% string
+                                                  !% '
+                                                  !% e.g.: SDF_Fsed_oxy
+                                                  !% will use the value supplied by the aed2_sedflux 
+                                                  !-     model for Fsed_oxy; use this option to allow for
+                                                  !-     spatial or temperal variation
+
+   INTEGER           :: oxy_piston_model  = 1
+!  %% END NAMELIST
+
+   NAMELIST /aed2_oxygen/ oxy_initial, oxy_min, oxy_max,           &
+                          Fsed_oxy, Ksed_oxy, theta_sed_oxy,       &
+                          Fsed_oxy_variable, oxy_piston_model
 !
 !-------------------------------------------------------------------------------
 !BEGIN

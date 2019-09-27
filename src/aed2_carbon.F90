@@ -23,7 +23,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -118,36 +118,41 @@ SUBROUTINE aed2_define_carbon(data, namlst)
 !
 !LOCALS
    INTEGER           :: status
-   INTEGER           :: co2_model        = 1
-   INTEGER           :: alk_mode         = 1
-   INTEGER           :: co2_piston_model = 1
-   INTEGER           :: ch4_piston_model = 1
-   AED_REAL          :: pH_initial       = 7.5
-   AED_REAL          :: ionic            = 0.0
+
+!  %% NAMELIST VARS
    AED_REAL          :: dic_initial      = 1000.0
+   AED_REAL          :: pH_initial       = 7.5
+   AED_REAL          :: ch4_initial      = 4.5
+   AED_REAL          :: ionic            = 0.0
    AED_REAL          :: Fsed_dic         = 0.0
    AED_REAL          :: Ksed_dic         = 30.0
    AED_REAL          :: theta_sed_dic    = 1.0
    CHARACTER(len=64) :: Fsed_dic_variable=''
-   AED_REAL          :: ch4_initial      = 4.5
    AED_REAL          :: Fsed_ch4         = 0.0
    AED_REAL          :: Ksed_ch4         = 30.0
    AED_REAL          :: theta_sed_ch4    = 1.0
    CHARACTER(len=64) :: Fsed_ch4_variable=''
+   AED_REAL          :: atm_co2          = 367e-6
+   AED_REAL          :: atm_ch4          = 1.76e-6
    AED_REAL          :: Rch4ox           = 0.01
    AED_REAL          :: Kch4ox           = 0.01
    AED_REAL          :: vTch4ox          = 1.05
-   AED_REAL          :: atm_co2          = 367e-6
-   AED_REAL          :: atm_ch4          = 1.76e-6
    CHARACTER(len=64) :: methane_reactant_variable=''
-   CHARACTER(len=64) :: carbon_pco2_link = 'CAR_pCO2'  ! added by PHuang
+!  CHARACTER(len=64) :: carbon_pco2_link = 'CAR_pCO2'  ! added by PHuang
+!                                                      ! removed by CAB because it's not used
 
-   AED_REAL :: maxMPBProdn =  40.0   ! mmolC/m2/day
-   AED_REAL :: IkMPB       = 180.0   ! Light sensitivity of MPB
+   AED_REAL          :: maxMPBProdn      =  40.0   ! mmolC/m2/day
+   AED_REAL          :: IkMPB            = 180.0   ! Light sensitivity of MPB
+
+   INTEGER           :: co2_model        = 1
+   INTEGER           :: alk_mode         = 1
+   INTEGER           :: co2_piston_model = 1
+   INTEGER           :: ch4_piston_model = 1
 
    LOGICAL           :: simCH4ebb
    AED_REAL          :: Fsed_ch4_ebb  = zero_
    AED_REAL          :: ch4_bub_tau0  = one_
+!  %% END NAMELIST VARS
 
    NAMELIST /aed2_carbon/ dic_initial,pH_initial,ch4_initial,ionic,         &
                          Fsed_dic,Ksed_dic,theta_sed_dic,Fsed_dic_variable, &

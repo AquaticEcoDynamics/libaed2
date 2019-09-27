@@ -23,7 +23,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -108,18 +108,24 @@ SUBROUTINE load_sed_zone_data(data,namlst)
 !LOCALS
    INTEGER  :: status
 
-!  AED_REAL :: FsedA_initial=0.01
-!  AED_REAL :: FsedN_initial=0.01
-
+!  %% NAMELIST
    INTEGER  :: n_zones=0
-   AED_REAL :: Fsed_oxy(_MAX_ZONES_) = MISVAL, Fsed_rsi(_MAX_ZONES_) = MISVAL, &
-               Fsed_amm(_MAX_ZONES_) = MISVAL, Fsed_nit(_MAX_ZONES_) = MISVAL, &
-               Fsed_frp(_MAX_ZONES_) = MISVAL, Fsed_pon(_MAX_ZONES_) = MISVAL, &
-               Fsed_don(_MAX_ZONES_) = MISVAL, Fsed_pop(_MAX_ZONES_) = MISVAL, &
-               Fsed_dop(_MAX_ZONES_) = MISVAL, Fsed_poc(_MAX_ZONES_) = MISVAL, &
-               Fsed_doc(_MAX_ZONES_) = MISVAL, Fsed_dic(_MAX_ZONES_) = MISVAL, &
-               Fsed_ch4(_MAX_ZONES_) = MISVAL, Fsed_feii(_MAX_ZONES_) = MISVAL,&
-               Fsed_n2o(_MAX_ZONES_) = MISVAL
+   AED_REAL :: Fsed_oxy(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_rsi(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_amm(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_nit(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_frp(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_pon(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_don(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_pop(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_dop(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_poc(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_doc(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_dic(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_ch4(_MAX_ZONES_)  = MISVAL
+   AED_REAL :: Fsed_feii(_MAX_ZONES_) = MISVAL
+   AED_REAL :: Fsed_n2o(_MAX_ZONES_)  = MISVAL
+!  %% END NAMELIST
 
    NAMELIST /aed2_sed_const2d/ n_zones, &
                               Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,&
@@ -216,14 +222,32 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
+
+!  %% NAMELIST
    CHARACTER(len=64) :: sedflux_model=''
-   INTEGER  :: nzones = 1
-   AED_REAL :: Fsed_oxy = MISVAL, Fsed_rsi = MISVAL, Fsed_amm = MISVAL, Fsed_nit = MISVAL, &
-               Fsed_pon = MISVAL, Fsed_don = MISVAL, Fsed_pop = MISVAL, Fsed_dop = MISVAL, &
-               Fsed_poc = MISVAL, Fsed_doc = MISVAL, Fsed_dic = MISVAL, Fsed_frp = MISVAL, &
-               Fsed_ch4 = MISVAL, Fsed_feii = MISVAL, Fsed_n2o = MISVAL
+!  %% END NAMELIST
 
    NAMELIST /aed2_sedflux/ sedflux_model
+
+!  %% NAMELIST
+   INTEGER  :: nzones = 1
+   AED_REAL :: Fsed_oxy  = MISVAL
+   AED_REAL :: Fsed_rsi  = MISVAL
+   AED_REAL :: Fsed_amm  = MISVAL
+   AED_REAL :: Fsed_nit  = MISVAL
+   AED_REAL :: Fsed_pon  = MISVAL
+   AED_REAL :: Fsed_don  = MISVAL
+   AED_REAL :: Fsed_pop  = MISVAL
+   AED_REAL :: Fsed_dop  = MISVAL
+   AED_REAL :: Fsed_poc  = MISVAL
+   AED_REAL :: Fsed_doc  = MISVAL
+   AED_REAL :: Fsed_dic  = MISVAL
+   AED_REAL :: Fsed_frp  = MISVAL
+   AED_REAL :: Fsed_ch4  = MISVAL
+   AED_REAL :: Fsed_feii = MISVAL
+   AED_REAL :: Fsed_n2o  = MISVAL
+!  %% END NAMELIST
+
    NAMELIST /aed2_sed_constant/ nzones,                                           &
                                 Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp, &
                                 Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, Fsed_n2o, &

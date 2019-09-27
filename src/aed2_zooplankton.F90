@@ -194,9 +194,12 @@ SUBROUTINE aed2_define_zooplankton(data, namlst)
 !LOCALS
    INTEGER  :: status
 
+   INTEGER  :: zoop_i, prey_i, phy_i
+
+!  %% NAMELIST
    INTEGER  :: num_zoops
    INTEGER  :: the_zoops(MAX_ZOOP_TYPES)
-   LOGICAL  :: simZoopFeedback
+   LOGICAL  :: simZoopFeedback = .FALSE.
 
    CHARACTER(len=64)  :: dn_target_variable='' !dissolved nitrogen target variable
    CHARACTER(len=64)  :: pn_target_variable='' !particulate nitrogen target variable
@@ -205,8 +208,7 @@ SUBROUTINE aed2_define_zooplankton(data, namlst)
    CHARACTER(len=64)  :: dc_target_variable='' !dissolved carbon target variable
    CHARACTER(len=64)  :: pc_target_variable='' !particulate carbon target variable
    CHARACTER(len=128) :: dbase='aed2_zoop_pars.nml'
-
-   INTEGER  :: zoop_i, prey_i, phy_i
+!  %% END NAMELIST
 
    NAMELIST /aed2_zooplankton/ num_zoops, the_zoops, &
                     dn_target_variable, pn_target_variable, dp_target_variable, &

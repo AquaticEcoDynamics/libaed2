@@ -23,7 +23,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2018 -  The University of Western Australia               #
+!#  Copyright 2013 - 2019 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -112,6 +112,8 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
+
+!  %% NAMELIST
    ! Initial
    AED_REAL          :: frp_initial   = 4.5
    AED_REAL          :: frp_min       = zero_
@@ -138,6 +140,7 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
    LOGICAL           :: simWetDeposition = .false.
    AED_REAL          :: atm_pip_dd   = zero_
    AED_REAL          :: atm_frp_conc = zero_
+!  %% END NAMELIST
 
    NAMELIST /aed2_phosphorus/ frp_initial,frp_min,frp_max,                     &
                             Fsed_frp,Ksed_frp,theta_sed_frp,Fsed_frp_variable, &
