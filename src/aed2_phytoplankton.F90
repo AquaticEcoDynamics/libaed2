@@ -505,16 +505,16 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    ! Register diagnostic variables
    data%id_GPP = aed2_define_diag_variable('GPP','mmol/m**3/d',  'gross primary production')
    data%id_NCP = aed2_define_diag_variable('NCP','mmol/m**3/d',  'net community production')
-   data%id_PPR = aed2_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
-   data%id_NPR = aed2_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
+   IF (extra_diag) data%id_PPR = aed2_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
+   IF (extra_diag) data%id_NPR = aed2_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
 
    data%id_NUP = aed2_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
    data%id_NUP2= aed2_define_diag_variable('NUP_nh4','mmol/m**3/d','nitrogen (NH4) uptake')
    data%id_PUP = aed2_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
    data%id_CUP = aed2_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
-   data%id_dPAR = aed2_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
-   data%id_TCHLA = aed2_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
+   IF (extra_diag) data%id_dPAR = aed2_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
+   IF (extra_diag) data%id_TCHLA = aed2_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
    data%id_TPHY = aed2_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
    data%id_TIN = aed2_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed2_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
@@ -714,13 +714,17 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
                            (1.0-a_nfix(phy_i))*(1.0-data%phytos(phy_i)%k_nfix))
       ENDIF
 
-
+      !------------------------------------------------------------------------+
       ! Respiration and general metabolic loss
       respiration(phy_i) = bio_respiration(data%phytos(phy_i)%R_resp,data%phytos(phy_i)%theta_resp,temp)
 
-      ! Salinity stress effect on respiration
+      ! Salinity stress effect on respiration (or growth)
       fSal =  phyto_salinity(data%phytos,phy_i,salinity)
-      respiration(phy_i) = respiration(phy_i) * fSal
+      IF( data%phytos(phy_i)%salTol >= 4) THEN
+        primprod(phy_i) = primprod(phy_i) * fSal   ! growth limtation rather than mortality enhancement
+      ELSE
+        respiration(phy_i) = respiration(phy_i) * fSal
+      ENDIF
 
       ! photo-exudation
       exudation(phy_i) = primprod(phy_i)*data%phytos(phy_i)%f_pr
@@ -734,7 +738,7 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
 
       ! write(*,"(4X,'limitations (fT,fI,fN,fP,fSi,Io, par, mu): ',9F9.2)")fT,fI,fNit,fPho,fSil,Io,par,primprod*secs_per_day
 
-
+      !------------------------------------------------------------------------+
       ! Carbon uptake and excretion
       cuptake(phy_i)    = -primprod(phy_i) * phy
       cexcretion(phy_i) = (data%phytos(phy_i)%k_fdom*(1.0-data%phytos(phy_i)%k_fres)*respiration(phy_i)+exudation(phy_i)) * phy
@@ -761,6 +765,7 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
          simortality(phy_i) = zero_
       ENDIF
 
+      !------------------------------------------------------------------------+
       ! Diagnostic info
       _DIAG_VAR_(data%id_NtoP(phy_i)) =  INi/IPi
 
@@ -1054,7 +1059,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
         _FLUX_VAR_(data%id_Pupttarget(1)) = _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
      ENDIF
 
-     ! Resuspension (simple assumption here)
+     ! Resuspension (a simple assumption here)
      Fsed_phy = zero_
      IF ( data%n_zones > 0 ) THEN
         IF( in_zone_set(matz,data%active_zones) .AND. data%id_l_resus > 0 ) THEN
@@ -1066,9 +1071,9 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
 
      ! Update the diagnostic variables
      _DIAG_VAR_S_(data%id_d_mpb) = mpb
-     _DIAG_VAR_S_(data%id_d_bpp) = (mpb_prod)*mpb * secs_per_day
+     _DIAG_VAR_S_(data%id_d_bpp) =(mpb_prod) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_bcp) = mpb_flux * secs_per_day
-     _DIAG_VAR_S_(data%id_d_mpbv)= (Psed_phy - Fsed_phy)* secs_per_day
+     _DIAG_VAR_S_(data%id_d_mpbv)=(Psed_phy - Fsed_phy) * secs_per_day
    ENDIF
 END SUBROUTINE aed2_calculate_benthic_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -662,9 +662,9 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
       oxy = 300.0
    ENDIF
    IF (data%use_nit) THEN
-      oxy = _STATE_VAR_(data%id_nit)! nitrate
+      nit = _STATE_VAR_(data%id_nit)! nitrate
    ELSE
-      oxy = 300.0
+      nit = 300.0
    ENDIF
    IF (data%use_no2) THEN
       no2 = _STATE_VAR_(data%id_no2)! nitrite
@@ -854,7 +854,8 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
                                     _FLUX_VAR_(data%id_dic) + photolysis*(1.-photo_fmin)
    ENDIF
    IF (data%use_amm) THEN
-      !amm now done above _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don*don_mineralisation)
+      IF( data%simDenitrification==1 ) _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
+      !IF( data%simDenitrification==2 ) !MH needs balacing with Denit fraction !_FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
       IF ( data%simRPools )  &
          _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + &
                                        photolysis*(1.-photo_fmin)*MIN(donr/MAX(docr,1e-2),one_)
@@ -1016,14 +1017,14 @@ SUBROUTINE aed2_calculate_benthic_organic_matter(data,column,layer_idx)
     !_FLUX_VAR_B_(data%id_sed_dop) = _FLUX_VAR_B_(data%id_sed_dop) - dop_flux
   ENDIF
 
-   ! Also store net sediment fluxes as diagnostic variable.
+   ! Also store net sediment fluxes as diagnostic variable (mmol/m2/day)
    IF (data%extra_diag) THEN
-      _DIAG_VAR_S_(data%id_sed_poc) = Fsed_poc + Psed_poc ! resus & settling
-      _DIAG_VAR_S_(data%id_sed_doc) = Fsed_doc            ! dissolved flux
-      _DIAG_VAR_S_(data%id_sed_pon) = Fsed_poc + Psed_poc
-      _DIAG_VAR_S_(data%id_sed_don) = Fsed_don
-      _DIAG_VAR_S_(data%id_sed_pop) = Fsed_poc + Psed_poc
-      _DIAG_VAR_S_(data%id_sed_dop) = Fsed_dop
+     _DIAG_VAR_S_(data%id_sed_poc) = secs_per_day*(Fsed_poc + Psed_poc) ! resus & settling
+     _DIAG_VAR_S_(data%id_sed_doc) = secs_per_day*(Fsed_doc)            ! dissolved flux
+     _DIAG_VAR_S_(data%id_sed_pon) = secs_per_day*(Fsed_pon + Psed_pon) ! resus & settling
+     _DIAG_VAR_S_(data%id_sed_don) = secs_per_day*(Fsed_don)            ! dissolved flux
+     _DIAG_VAR_S_(data%id_sed_pop) = secs_per_day*(Fsed_pop + Psed_pop) ! resus & settling
+     _DIAG_VAR_S_(data%id_sed_dop) = secs_per_day*(Fsed_dop)            ! dissolved flux
    ENDIF
 END SUBROUTINE aed2_calculate_benthic_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
