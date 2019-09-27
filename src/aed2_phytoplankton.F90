@@ -504,16 +504,16 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    ! Register diagnostic variables
    data%id_GPP = aed2_define_diag_variable('GPP','mmol/m**3/d',  'gross primary production')
    data%id_NCP = aed2_define_diag_variable('NCP','mmol/m**3/d',  'net community production')
-   data%id_PPR = aed2_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
-   data%id_NPR = aed2_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
+   IF (extra_diag) data%id_PPR = aed2_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
+   IF (extra_diag) data%id_NPR = aed2_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
 
    data%id_NUP = aed2_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
    data%id_NUP2= aed2_define_diag_variable('NUP_nh4','mmol/m**3/d','nitrogen (NH4) uptake')
    data%id_PUP = aed2_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
    data%id_CUP = aed2_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
-   data%id_dPAR = aed2_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
-   data%id_TCHLA = aed2_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
+   IF (extra_diag) data%id_dPAR = aed2_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
+   IF (extra_diag) data%id_TCHLA = aed2_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
    data%id_TPHY = aed2_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
    data%id_TIN = aed2_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed2_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
@@ -1058,7 +1058,7 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
         _FLUX_VAR_(data%id_Pupttarget(1)) = _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
      ENDIF
 
-     ! Resuspension (simple assumption here)
+     ! Resuspension (a simple assumption here)
      Fsed_phy = zero_
      IF ( data%n_zones > 0 ) THEN
         IF( in_zone_set(matz,data%active_zones) .AND. data%id_l_resus > 0 ) THEN
@@ -1070,9 +1070,9 @@ SUBROUTINE aed2_calculate_benthic_phytoplankton(data,column,layer_idx)
 
      ! Update the diagnostic variables
      _DIAG_VAR_S_(data%id_d_mpb) = mpb
-     _DIAG_VAR_S_(data%id_d_bpp) = (mpb_prod)*mpb * secs_per_day
+     _DIAG_VAR_S_(data%id_d_bpp) =(mpb_prod) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_bcp) = mpb_flux * secs_per_day
-     _DIAG_VAR_S_(data%id_d_mpbv)= (Psed_phy - Fsed_phy)* secs_per_day
+     _DIAG_VAR_S_(data%id_d_mpbv)=(Psed_phy - Fsed_phy) * secs_per_day
    ENDIF
 END SUBROUTINE aed2_calculate_benthic_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
