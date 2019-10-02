@@ -252,7 +252,8 @@ SUBROUTINE aed2_define_nitrogen(data, namlst)
       ! TODO check here to see if oxy is simulated if simN2O is also on
      IF (nitrif_reactant_variable .NE. '') THEN
        print *,'          advanced nitrogen redox model linking to ',TRIM(nitrif_reactant_variable)
-       data%id_oxy = aed2_locate_variable(nitrif_reactant_variable)
+       ! this allocation is done below with other state var dependancies
+       !data%id_oxy = aed2_locate_variable(nitrif_reactant_variable)
        print *,'          ... found'
       ELSE
         PRINT *,'  ERROR advanced nitrogen redox set (simN2O) but no oxygen target variable is set'

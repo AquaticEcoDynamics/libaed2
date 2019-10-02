@@ -935,7 +935,7 @@ SUBROUTINE aed2_calculate_benthic_organic_matter(data,column,layer_idx)
    AED_REAL :: Fsed_poc,Fsed_doc
    AED_REAL :: Fsed_pon,Fsed_don
    AED_REAL :: Fsed_pop,Fsed_dop
-   AED_REAL :: Psed_poc, Psed_pon, Psed_pop
+   AED_REAL :: Psed_poc, Psed_pon = 0., Psed_pop = 0.
    AED_REAL :: fT, fDO, fDOM
 
 !-------------------------------------------------------------------------------
