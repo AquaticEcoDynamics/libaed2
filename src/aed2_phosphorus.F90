@@ -182,14 +182,12 @@ SUBROUTINE aed2_define_phosphorus(data, namlst)
 
    ! Register external state variable dependencies (for benthic flux)
    data%ben_use_oxy = phosphorus_reactant_variable .NE. '' !This means oxygen module switched on
-   IF (data%ben_use_oxy) THEN
+   IF (data%ben_use_oxy) &
      data%id_oxy = aed2_locate_variable(phosphorus_reactant_variable)
-   ENDIF
 
    data%ben_use_aedsed = Fsed_frp_variable .NE. '' !This means aed sediment module switched on
-   IF (data%ben_use_aedsed) THEN
+   IF (data%ben_use_aedsed) &
      data%id_Fsed_frp = aed2_locate_global_sheet(Fsed_frp_variable)
-   ENDIF
 
    data%id_frpads = -1
    data%id_frpads_vvel = -1
