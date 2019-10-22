@@ -35,6 +35,7 @@
 !
 MODULE aed2_util
 !-------------------------------------------------------------------------------
+!
 ! aed2_util --- shared utility functions for aed modules
 !
 !-------------------------------------------------------------------------------
@@ -44,11 +45,12 @@ MODULE aed2_util
 
    PRIVATE
 !
-   PUBLIC find_free_lun, qsort
-   PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, aed2_n2o_sat, exp_integral
+   PUBLIC find_free_lun, qsort, exp_integral
+   PUBLIC water_viscosity
+   PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, aed2_n2o_sat
    PUBLIC aed2_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
-   PUBLIC water_viscosity
+   PUBLIC InitialTemp, SoilTemp
 !
 
 
@@ -79,6 +81,220 @@ INTEGER FUNCTION find_free_lun()
    find_free_lun = -1
 END FUNCTION find_free_lun
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION exp_integral(inp) RESULT(E_ib)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: inp
+!
+!LOCALS
+   AED_REAL  :: E_ib !-- Outgoing
+   INTEGER   :: j
+   AED_REAL  :: ff
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ff = -1e-9
+   IF(ABS(inp-10.0) < 12.0) THEN
+     IF(inp==0.0) THEN
+       E_ib = inp
+     ELSE
+       j  = 10+2*IABS(INT(inp))
+       ff = 1.0/(REAL(j+1)**2.0)
+       DO WHILE(j/=0)
+         ff = (ff*REAL(j)*inp+1.0)/REAL(j*j)
+         j  = j-1
+       ENDDO
+       ff   = ff*inp+LOG(1.781072418*ABS(inp))
+       E_ib = ff
+     ENDIF
+   ELSE
+     j = 5 + 20 / IABS(INT(inp))
+     ff = inp
+     DO WHILE(j/=0)
+       ff = (1.0/(1.0/ff-1.0/REAL(j)))+inp
+       j = j-1
+     ENDDO
+     ff  = EXP(inp)/ff
+     E_ib = ff
+   ENDIF
+
+END FUNCTION exp_integral
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+!#                                                                             #
+!# A fortran implementation of the quicksort algorithm.                        #
+!#                                                                             #
+!###############################################################################
+RECURSIVE SUBROUTINE qsort(RA,IA,start,end)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: RA(:)
+   INTEGER,INTENT(inout) :: IA(:)
+   INTEGER,INTENT(in) :: start,end
+!
+!LOCALS
+  INTEGER :: p, l, r
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+  IF ( start .LT. end ) THEN
+     l=start+1
+     r=end
+     p = IA(start);
+
+     DO WHILE(l<r)
+        IF (cmp(IA(l), p) .LE. 0) THEN
+           l=l+1;
+        ELSEIF (cmp(IA(r), p) .GE. 0) THEN
+           r=r-1
+        ELSE
+           CALL swap(IA(l), IA(r))
+        ENDIF
+     ENDDO
+     IF (cmp(IA(l), p) .LT. 0 ) THEN
+        CALL swap(IA(l), IA(start))
+        l=l-1
+     ELSE
+        l=l-1
+        CALL swap(IA(l), IA(start))
+     ENDIF
+
+     CALL qsort(RA,IA,start,l)
+     CALL qsort(RA,IA,r,end)
+  ENDIF
+
+CONTAINS
+
+   !############################################################################
+   SUBROUTINE swap(a, b)
+   !----------------------------------------------------------------------------
+     INTEGER,intent(inout) :: a, b
+     INTEGER t
+   !----------------------------------------------------------------------------
+   !BEGIN
+     t = a
+     a = b
+     b = t
+   END SUBROUTINE swap
+
+   !############################################################################
+   INTEGER FUNCTION cmp(l,r)
+   !----------------------------------------------------------------------------
+      INTEGER,INTENT(in)::l,r
+   !----------------------------------------------------------------------------
+   !BEGIN
+      IF ( RA(l) .LT. RA(r) ) THEN
+         cmp = -1
+      ELSEIF ( RA(l) .EQ. RA(r) ) THEN
+         cmp = 0
+      ELSE
+         cmp = 1
+      ENDIF
+   END FUNCTION cmp
+   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+END SUBROUTINE qsort
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+LOGICAL FUNCTION in_zone_set(matz, active_zones)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: matz
+   AED_REAL,INTENT(in) :: active_zones(:)
+!
+!LOCALS
+   INTEGER :: i, l
+   LOGICAL :: res
+!BEGIN
+!-------------------------------------------------------------------------------
+   res = .FALSE.
+   l = size(active_zones)
+   DO i=1,l
+      IF ( active_zones(i) == matz ) THEN
+         res = .TRUE.
+         EXIT
+      ENDIF
+   ENDDO
+
+   in_zone_set = res
+END FUNCTION in_zone_set
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+FUNCTION water_viscosity(temperature) RESULT(mu)
+!-------------------------------------------------------------------------------
+! Calculates the molecular viscosity of water for a given temperature
+!
+! From Table A.1b, FLUID_MECHANICS With Engineering Applications
+! by Robert L. Daugherty and Joseph B. Franzini,
+! however, note these values are common in most fluid mechanics texts.
+! NOTE: N s / m^2  = kg / m / s
+!
+!  Temp (C)     Viscosity (N s / m^2) x 10^3
+!  --------     ---------
+!      0          1.781
+!      5          1.518
+!     10          1.307
+!     15          1.139
+!     20          1.002
+!     25          0.890
+!     30          0.798
+!     40          0.653
+!     50          0.547
+!     60          0.466
+!     70          0.404
+!     80          0.354
+!     90          0.315
+!    100          0.282
+!
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+  AED_REAL,INTENT(inout)  :: temperature
+  AED_REAL :: mu
+!
+!LOCALS
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   !-- Check for non-sensical temperatures
+   IF( temperature<zero_ ) temperature = 0.0
+   IF( temperature>100.0 ) temperature = 100.0
+
+   IF( temperature<=20.0 ) THEN
+     ! 0C to 20C
+     ! y = 0.0008 * x^2 - 0.0556 * x + 1.7789
+     ! r^2 = 0.9999
+     mu = 0.0008 * temperature**2. - 0.0556 * temperature + 1.7789
+
+   ELSEIF(temperature <= 60) THEN
+     ! 20C to 60C
+     ! y = 0.0002 * x^2 - 0.0323 * x + 1.5471
+     ! r^2 = 0.9997
+     mu = 0.0002 * temperature**2. - 0.0323 * temperature + 1.5471
+   ELSE
+     ! 60C to 100C
+     ! y = 0.00006 * x^2 - 0.0141 * x + 1.1026
+     ! r^2 = 0.9995
+     mu = 0.00006 * temperature**2. - 0.0141 * temperature + 1.1026
+   ENDIF
+
+   ! Now convert to units of: N s / m^2
+   mu = mu / 1e3
+
+END FUNCTION water_viscosity
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 !###############################################################################
@@ -236,6 +452,7 @@ END FUNCTION aed2_gas_piston_velocity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+
 !###############################################################################
 PURE AED_REAL FUNCTION aed2_oxygen_sat(salt,temp)
 !-------------------------------------------------------------------------------
@@ -354,47 +571,6 @@ PURE AED_REAL FUNCTION aed2_n2o_sat(salt,temp)
 END FUNCTION aed2_n2o_sat
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
-!###############################################################################
-FUNCTION exp_integral(inp) RESULT(E_ib)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   AED_REAL,INTENT(in) :: inp
-!
-!LOCALS
-   AED_REAL  :: E_ib !-- Outgoing
-   INTEGER   :: j
-   AED_REAL  :: ff
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   ff = -1e-9
-   IF(ABS(inp-10.0) < 12.0) THEN
-     IF(inp==0.0) THEN
-       E_ib = inp
-     ELSE
-       j  = 10+2*IABS(INT(inp))
-       ff = 1.0/(REAL(j+1)**2.0)
-       DO WHILE(j/=0)
-         ff = (ff*REAL(j)*inp+1.0)/REAL(j*j)
-         j  = j-1
-       ENDDO
-       ff   = ff*inp+LOG(1.781072418*ABS(inp))
-       E_ib = ff
-     ENDIF
-   ELSE
-     j = 5 + 20 / IABS(INT(inp))
-     ff = inp
-     DO WHILE(j/=0)
-       ff = (1.0/(1.0/ff-1.0/REAL(j)))+inp
-       j = j-1
-     ENDDO
-     ff  = EXP(inp)/ff
-     E_ib = ff
-   ENDIF
-
-END FUNCTION exp_integral
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
@@ -581,82 +757,6 @@ END FUNCTION fTemp_function
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-!###############################################################################
-!#                                                                             #
-!# A fortran implementation of the quicksort algorithm.                        #
-!#                                                                             #
-!###############################################################################
-RECURSIVE SUBROUTINE qsort(RA,IA,start,end)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   AED_REAL,INTENT(in) :: RA(:)
-   INTEGER,INTENT(inout) :: IA(:)
-   INTEGER,INTENT(in) :: start,end
-!
-!LOCALS
-  INTEGER :: p, l, r
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-  IF ( start .LT. end ) THEN
-     l=start+1
-     r=end
-     p = IA(start);
-
-     DO WHILE(l<r)
-        IF (cmp(IA(l), p) .LE. 0) THEN
-           l=l+1;
-        ELSEIF (cmp(IA(r), p) .GE. 0) THEN
-           r=r-1
-        ELSE
-           CALL swap(IA(l), IA(r))
-        ENDIF
-     ENDDO
-     IF (cmp(IA(l), p) .LT. 0 ) THEN
-        CALL swap(IA(l), IA(start))
-        l=l-1
-     ELSE
-        l=l-1
-        CALL swap(IA(l), IA(start))
-     ENDIF
-
-     CALL qsort(RA,IA,start,l)
-     CALL qsort(RA,IA,r,end)
-  ENDIF
-
-CONTAINS
-
-   !############################################################################
-   SUBROUTINE swap(a, b)
-   !----------------------------------------------------------------------------
-     INTEGER,intent(inout) :: a, b
-     INTEGER t
-   !----------------------------------------------------------------------------
-   !BEGIN
-     t = a
-     a = b
-     b = t
-   END SUBROUTINE swap
-
-   !############################################################################
-   INTEGER FUNCTION cmp(l,r)
-   !----------------------------------------------------------------------------
-      INTEGER,INTENT(in)::l,r
-   !----------------------------------------------------------------------------
-   !BEGIN
-      IF ( RA(l) .LT. RA(r) ) THEN
-         cmp = -1
-      ELSEIF ( RA(l) .EQ. RA(r) ) THEN
-         cmp = 0
-      ELSE
-         cmp = 1
-      ENDIF
-   END FUNCTION cmp
-   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-END SUBROUTINE qsort
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 !###############################################################################
 SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
@@ -747,97 +847,6 @@ END SUBROUTINE PO4AdsorptionFraction
 
 
 !###############################################################################
-LOGICAL FUNCTION in_zone_set(matz, active_zones)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   AED_REAL,INTENT(in) :: matz
-   AED_REAL,INTENT(in) :: active_zones(:)
-!
-!LOCALS
-   INTEGER :: i, l
-   LOGICAL :: res
-!BEGIN
-!-------------------------------------------------------------------------------
-   res = .FALSE.
-   l = size(active_zones)
-   DO i=1,l
-      IF ( active_zones(i) == matz ) THEN
-         res = .TRUE.
-         EXIT
-      ENDIF
-   ENDDO
-
-   in_zone_set = res
-END FUNCTION in_zone_set
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-FUNCTION water_viscosity(temperature) RESULT(mu)
-!-------------------------------------------------------------------------------
-! Calculates the molecular viscosity of water for a given temperature
-!
-! From Table A.1b, FLUID_MECHANICS With Engineering Applications
-! by Robert L. Daugherty and Joseph B. Franzini,
-! however, note these values are common in most fluid mechanics texts.
-! NOTE: N s / m^2  = kg / m / s
-!
-!  Temp (C)     Viscosity (N s / m^2) x 10^3
-!  --------     ---------
-!      0          1.781
-!      5          1.518
-!     10          1.307
-!     15          1.139
-!     20          1.002
-!     25          0.890
-!     30          0.798
-!     40          0.653
-!     50          0.547
-!     60          0.466
-!     70          0.404
-!     80          0.354
-!     90          0.315
-!    100          0.282
-!
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-  AED_REAL,INTENT(inout)  :: temperature
-  AED_REAL :: mu
-!
-!LOCALS
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   !-- Check for non-sensical temperatures
-   IF( temperature<zero_ ) temperature = 0.0
-   IF( temperature>100.0 ) temperature = 100.0
-
-   IF( temperature<=20.0 ) THEN
-     ! 0C to 20C
-     ! y = 0.0008 * x^2 - 0.0556 * x + 1.7789
-     ! r^2 = 0.9999
-     mu = 0.0008 * temperature**2. - 0.0556 * temperature + 1.7789
-
-   ELSEIF(temperature <= 60) THEN
-     ! 20C to 60C
-     ! y = 0.0002 * x^2 - 0.0323 * x + 1.5471
-     ! r^2 = 0.9997
-     mu = 0.0002 * temperature**2. - 0.0323 * temperature + 1.5471
-   ELSE
-     ! 60C to 100C
-     ! y = 0.00006 * x^2 - 0.0141 * x + 1.1026
-     ! r^2 = 0.9995
-     mu = 0.00006 * temperature**2. - 0.0141 * temperature + 1.1026
-   ENDIF
-
-   ! Now convert to units of: N s / m^2
-   mu = mu / 1e3
-
-END FUNCTION water_viscosity
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
 AED_REAL FUNCTION fSal_function(salinity, minS, Smin, Smax, maxS )
 !-------------------------------------------------------------------------------
 ! Salinity tolerance of biotic variables
@@ -900,6 +909,165 @@ AED_REAL FUNCTION fSal_function(salinity, minS, Smin, Smax, maxS )
 
  END FUNCTION fSal_function
 !-------------------------------------------------------------------------------
+
+
+
+!===============================================================================
+SUBROUTINE InitialTemp(m,depth,wv,topTemp,botTemp,nSPinUpDays,tNew)
+
+   INTEGER,intent(in)   :: m
+   AED_REAL,intent(in)  :: wv,depth(0:m+1)
+   AED_REAL,intent(in)  :: topTemp,botTemp,nSPinUpDays
+   AED_REAL,intent(out) :: tNew(0:m+1)
+
+   INTEGER  :: i
+   AED_REAL :: w(m+1),t(0:m+1),tn(0:m+1),k(0:m+1),cp(m),a(m+1),b(m),c(m),d(m),z(0:m+1)
+   AED_REAL :: ti, dt, da, f, g, mc, c1, c2, c3, c4
+
+
+   AED_REAL :: bd = 1.3
+
+   k(0) = 20    ! boundary layer conductance in w/(m^2 k)
+
+   ti = 0      ! ti is time of day
+   dt = 3600   ! dt is time step (sec)
+   da = 0      ! da is day number
+
+   f = .6      !
+   g = 1-f     !
+   mc = .12;   ! clay fraction
+
+   !z(0) = 0.00
+   !z(1) = 0.001
+   !z(i+1) = z(i) + 0.005 * 1.5**(i-1)
+
+   z = depth
+
+   t(:) = botTemp
+   t(0:1) = topTemp
+   tn(m+1) = t(m+1)
+
+    c1 = .65-.78*bd+.6*bd*bd
+    c2 = 1.06*bd
+    c3 = 1+2.6/sqrt(mc)
+    c4 = .3+.1*bd*bd
+
+    DO i=1, m
+      cp(i) = (2400000*bd/2.65+4180000*wv)*(z(i+1)-z(i-1))/(2*dt)
+      k(i) = (c1+c2*wv-(c1-c4) * exp(-(c3*wv)**4))/(z(i+1)-z(i))
+    ENDDO
+
+    DO WHILE(da < nSpinUpDays)
+        ti = ti+dt/3600
+        IF ( ti > 24 ) THEN
+           ti = ti-24
+           da = da+1
+        ENDIF
+        tn(0) = 5.0 ! topTemp !ta+am*sin(.261799*(ti-6))
+        DO i=1, m
+            c(i) = -k(i)*f
+            a(i+1) = c(i)
+            b(i) = f*(k(i)+k(i-1))+cp(i)
+            d(i) = g*k(i-1)*t(i-1)+(cp(i)-g*(k(i)+k(i-1)))*t(i)+g*k(i)*t(i+1)
+        ENDDO
+        d(1) = d(1)+k(0)*tn(0)*f
+        d(m) = d(m)+k(m)*f*tn(m+1)
+        DO i=1, m-1
+            c(i) = c(i)/b(i)
+            d(i) = d(i)/b(i)
+            b(i+1) = b(i+1)-a(i+1)*c(i)
+            d(i+1) = d(i+1)-a(i+1)*d(i)
+        ENDDO
+        tn(m) = d(m)/b(m)
+        DO i=m-1, 1,-1
+            tn(i) = d(i)-c(i)*tn(i+1)
+        ENDDO
+    !    print *,'depth ,temperature, k(i)'
+
+        DO i=0, m+1
+    !         print *,'s', z(i),tn(i),k(i)
+             tNew(i) = tn(i)
+        ENDDO
+    ENDDO
+    !print *,"Done InitialTemp"
+END SUBROUTINE InitialTemp
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp)
+   INTEGER,intent(in) :: m
+   AED_REAL,intent(in) :: wv(:), depth(:), topTemp
+   AED_REAL,intent(inout) :: temp(m+1)
+!
+    AED_REAL :: w(m+1),t(0:m+1),tn(0:m+1),k(0:m+1),cp(m),a(m+1),b(m),c(m),d(m),z(0:m+1)
+    INTEGER  :: i
+    AED_REAL :: ti, dt, da, f, g, mc, c1, c2, c3, c4
+
+    AED_REAL :: bd = 1.3
+
+
+    k(0) = 20    ! boundary layer conductance in w/(m^2 k)
+
+    ti = 0      ! ti is time of day
+    dt = 3600   ! dt is time step (sec)
+    da = 0      ! da is day number
+
+    f = .6      !
+    g = 1-f     !
+    mc = .12;   ! clay fraction
+
+    z = depth
+
+    DO i=1, m
+        t(i) = temp(i)
+    ENDDO
+    t(0:1) = topTemp
+    t(m+1) = temp(m+1)
+    tn(m+1) = temp(m+1)
+
+    c1 = .65-.78*bd+.6*bd*bd
+    c2 = 1.06*bd
+    c3 = 1+2.6/sqrt(mc)
+    c4 = .3+.1*bd*bd
+
+    DO i=1, m
+        cp(i) = (2400000*bd/2.65+4180000*wv(i))*(z(i+1)-z(i-1))/(2*dt)
+        k(i) = (c1+c2*wv(i)-(c1-c4) * exp(-(c3*wv(i))**4))/(z(i+1)-z(i))
+    ENDDO
+
+        tn(0) = topTemp
+        DO i=1, m
+            c(i) = -k(i)*f
+            a(i+1) = c(i)
+            b(i) = f*(k(i)+k(i-1))+cp(i)
+            d(i) = g*k(i-1)*t(i-1)+(cp(i)-g*(k(i)+k(i-1)))*t(i)+g*k(i)*t(i+1)
+        ENDDO
+        d(1) = d(1)+k(0)*tn(0)*f
+        d(m) = d(m)+k(m)*f*tn(m+1)
+        DO i=1, m-1
+            c(i) = c(i)/b(i)
+            d(i) = d(i)/b(i)
+            b(i+1) = b(i+1)-a(i+1)*c(i)
+            d(i+1) = d(i+1)-a(i+1)*d(i)
+        ENDDO
+        tn(m) = d(m)/b(m)
+        DO i=m-1, 1,-1
+            tn(i) = d(i)-c(i)*tn(i+1)
+        ENDDO
+
+      !print *, 'heat flux =',k(0)*(g*(t(0)-t(1))+f*(tn(0)-tn(1)))!"w/m2"
+      !print *,'depth ,temperature, k(i)'
+
+        DO i=1, m+1
+      !     print *,'s', z(i),tn(i),k(i)
+            temp(i) = tn(i)
+        ENDDO
+
+      !print *,"Done SoilTemp"
+END SUBROUTINE SoilTemp
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 END MODULE aed2_util
