@@ -321,25 +321,25 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
 
 !  %% NAMELIST
    ! Default settings
-   INTEGER  :: num_phytos
-   INTEGER  :: the_phytos(MAX_PHYTO_TYPES)
-   INTEGER  :: settling(MAX_PHYTO_TYPES)     = _MOB_CONST_
-   AED_REAL :: resuspension(MAX_PHYTO_TYPES) = 0.
-   CHARACTER(len=64)  :: resus_link=''
-   CHARACTER(len=64)  :: p_excretion_target_variable=''
-   CHARACTER(len=64)  :: p_mortality_target_variable=''
-   CHARACTER(len=64)  :: p1_uptake_target_variable=''
+   INTEGER            :: num_phytos = 0
+   INTEGER            :: the_phytos(MAX_PHYTO_TYPES) = 0
+   INTEGER            :: settling(MAX_PHYTO_TYPES)     = _MOB_CONST_
+   AED_REAL           :: resuspension(MAX_PHYTO_TYPES) = 0.
+   CHARACTER(len=64)  :: resus_link='NCS_resus'
+   CHARACTER(len=64)  :: p_excretion_target_variable='OGM_dop'
+   CHARACTER(len=64)  :: p_mortality_target_variable='OGM_pop'
+   CHARACTER(len=64)  :: p1_uptake_target_variable='PHS_frp'
    CHARACTER(len=64)  :: p2_uptake_target_variable=''
-   CHARACTER(len=64)  :: n_excretion_target_variable=''
-   CHARACTER(len=64)  :: n_mortality_target_variable=''
-   CHARACTER(len=64)  :: n1_uptake_target_variable=''
-   CHARACTER(len=64)  :: n2_uptake_target_variable=''
+   CHARACTER(len=64)  :: n_excretion_target_variable='OGM_don'
+   CHARACTER(len=64)  :: n_mortality_target_variable='OGM_pon'
+   CHARACTER(len=64)  :: n1_uptake_target_variable='NIT_nit'
+   CHARACTER(len=64)  :: n2_uptake_target_variable='NIT_amm'
    CHARACTER(len=64)  :: n3_uptake_target_variable=''
    CHARACTER(len=64)  :: n4_uptake_target_variable=''
-   CHARACTER(len=64)  :: c_excretion_target_variable=''
-   CHARACTER(len=64)  :: c_mortality_target_variable=''
+   CHARACTER(len=64)  :: c_excretion_target_variable='OGM_doc'
+   CHARACTER(len=64)  :: c_mortality_target_variable='OGM_poc'
    CHARACTER(len=64)  :: c_uptake_target_variable=''
-   CHARACTER(len=64)  :: do_uptake_target_variable=''
+   CHARACTER(len=64)  :: do_uptake_target_variable='OXY_oxy'
    CHARACTER(len=64)  :: si_excretion_target_variable=''
    CHARACTER(len=64)  :: si_mortality_target_variable=''
    CHARACTER(len=64)  :: si_uptake_target_variable=''
@@ -354,8 +354,9 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    AED_REAL           :: min_rho = 900.
    AED_REAL           :: max_rho = 1200.
    LOGICAL            :: extra_debug = .false.
-   INTEGER            :: do_mpb, n_zones = 0
-   AED_REAL           :: active_zones(1000)
+   INTEGER            :: do_mpb = 0
+   INTEGER            :: n_zones = 0
+   AED_REAL           :: active_zones(1000) = 0
 !  %% END NAMELIST
 
    NAMELIST /aed2_phytoplankton/ num_phytos, the_phytos, settling,resuspension,&
@@ -514,8 +515,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%id_CUP = aed2_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
    IF (extra_diag) data%id_dPAR = aed2_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
-   IF (extra_diag) data%id_TCHLA = aed2_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
-   data%id_TPHY = aed2_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
+   data%id_TCHLA = aed2_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
+   IF (extra_diag) data%id_TPHY = aed2_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
    data%id_TIN = aed2_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed2_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
    IF(do_mpb>0) THEN
@@ -983,8 +984,8 @@ SUBROUTINE aed2_calculate_phytoplankton(data,column,layer_idx)
    _DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
 
    IF (extra_diag) _DIAG_VAR_(data%id_dPAR) =  par
-   IF (extra_diag) _DIAG_VAR_(data%id_TCHLA)=  tchla
-   _DIAG_VAR_(data%id_TPHY) =  tphy
+   _DIAG_VAR_(data%id_TCHLA)=  tchla
+   IF (extra_diag) _DIAG_VAR_(data%id_TPHY) =  tphy
    _DIAG_VAR_(data%id_TIN)  =  tin
    _DIAG_VAR_(data%id_TIP)  =  tip
 
