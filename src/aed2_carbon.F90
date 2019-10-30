@@ -98,6 +98,8 @@ MODULE aed2_carbon
 !        PROCEDURE :: delete            => aed2_delete_carbon
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
 
 !===============================================================================
 CONTAINS

@@ -66,6 +66,8 @@ MODULE aed2_chlorophylla
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
 
 !===============================================================================
 CONTAINS

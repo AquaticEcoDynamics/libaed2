@@ -45,9 +45,12 @@ MODULE aed2_bio_utils
 
    IMPLICIT NONE
 
-!  PRIVATE   ! By default make everything private
+   PRIVATE   ! By default make everything private
 !
-!  PUBLIC aed2_type_phytoplankton
+   PUBLIC phyto_data, phyto_nml_data, ino3, inh4,idon, in2, ifrp, idop
+   PUBLIC photosynthesis_irradiance, phyto_fN, phyto_fP, phyto_fSi, findMin
+   PUBLIC bio_respiration, phyto_salinity
+   PUBLIC phyto_internal_nitrogen, phyto_internal_phosphorus
 !
    TYPE phyto_data
       ! General Attributes

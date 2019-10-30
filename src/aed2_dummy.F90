@@ -73,6 +73,8 @@ MODULE aed2_dummy
          PROCEDURE :: calculate         => aed2_calculate_dummy
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
 
 !===============================================================================
 CONTAINS

@@ -96,6 +96,9 @@ MODULE aed2_nitrogen
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
+
 !===============================================================================
 CONTAINS
 

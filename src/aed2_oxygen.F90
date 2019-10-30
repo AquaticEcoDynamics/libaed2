@@ -91,6 +91,8 @@ MODULE aed2_oxygen
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
 
 !===============================================================================
 CONTAINS

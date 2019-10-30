@@ -89,6 +89,8 @@ MODULE aed2_totals
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
 
 !===============================================================================
 CONTAINS

@@ -92,10 +92,12 @@ MODULE aed2_zooplankton
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
    LOGICAL :: debug = .TRUE.
 
-CONTAINS
 !===============================================================================
+CONTAINS
 
 
 !###############################################################################

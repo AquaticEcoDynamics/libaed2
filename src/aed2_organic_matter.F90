@@ -125,6 +125,8 @@ MODULE aed2_organic_matter
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
    AED_REAL :: c
 
 !===============================================================================
@@ -281,7 +283,7 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
                       Fsed_pon_variable, Fsed_don_variable,                    &
                       simDenitrification, simFeReduction,                      &
                       simSO4Reduction, simMethanogenesis,                      &
-                      extra_diag
+                      extra_diag, diag_level
 
 !-------------------------------------------------------------------------------
 !BEGIN

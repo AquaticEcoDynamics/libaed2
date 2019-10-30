@@ -93,8 +93,11 @@ MODULE aed2_sedflux
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_sedflux
 !        PROCEDURE :: delete            => aed2_delete_sedflux
    END TYPE
-!===============================================================================
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
+
+!===============================================================================
 CONTAINS
 
 

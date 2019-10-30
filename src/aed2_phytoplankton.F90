@@ -113,6 +113,8 @@ MODULE aed2_phytoplankton
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
    AED_REAL :: dtlim = 0.9 * 3600
    LOGICAL  :: extra_diag = .false.
 
@@ -371,7 +373,7 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
                       si_uptake_target_variable,                               &
                     dbase, zerolimitfudgefactor, extra_debug, extra_diag,      &
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
-                    resus_link, n_zones, active_zones,                         &
+                    resus_link, n_zones, active_zones, diag_level,             &
                     theta_mpb_growth,theta_mpb_resp
 !-----------------------------------------------------------------------
 !BEGIN

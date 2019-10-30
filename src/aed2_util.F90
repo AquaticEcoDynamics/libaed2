@@ -1036,35 +1036,35 @@ SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp)
         k(i) = (c1+c2*wv(i)-(c1-c4) * exp(-(c3*wv(i))**4))/(z(i+1)-z(i))
     ENDDO
 
-        tn(0) = topTemp
-        DO i=1, m
-            c(i) = -k(i)*f
-            a(i+1) = c(i)
-            b(i) = f*(k(i)+k(i-1))+cp(i)
-            d(i) = g*k(i-1)*t(i-1)+(cp(i)-g*(k(i)+k(i-1)))*t(i)+g*k(i)*t(i+1)
-        ENDDO
-        d(1) = d(1)+k(0)*tn(0)*f
-        d(m) = d(m)+k(m)*f*tn(m+1)
-        DO i=1, m-1
-            c(i) = c(i)/b(i)
-            d(i) = d(i)/b(i)
-            b(i+1) = b(i+1)-a(i+1)*c(i)
-            d(i+1) = d(i+1)-a(i+1)*d(i)
-        ENDDO
-        tn(m) = d(m)/b(m)
-        DO i=m-1, 1,-1
-            tn(i) = d(i)-c(i)*tn(i+1)
-        ENDDO
+    tn(0) = topTemp
+    DO i=1, m
+        c(i) = -k(i)*f
+        a(i+1) = c(i)
+        b(i) = f*(k(i)+k(i-1))+cp(i)
+        d(i) = g*k(i-1)*t(i-1)+(cp(i)-g*(k(i)+k(i-1)))*t(i)+g*k(i)*t(i+1)
+    ENDDO
+    d(1) = d(1)+k(0)*tn(0)*f
+    d(m) = d(m)+k(m)*f*tn(m+1)
+    DO i=1, m-1
+        c(i) = c(i)/b(i)
+        d(i) = d(i)/b(i)
+        b(i+1) = b(i+1)-a(i+1)*c(i)
+        d(i+1) = d(i+1)-a(i+1)*d(i)
+    ENDDO
+    tn(m) = d(m)/b(m)
+    DO i=m-1, 1,-1
+        tn(i) = d(i)-c(i)*tn(i+1)
+    ENDDO
 
-      !print *, 'heat flux =',k(0)*(g*(t(0)-t(1))+f*(tn(0)-tn(1)))!"w/m2"
-      !print *,'depth ,temperature, k(i)'
+    !print *, 'heat flux =',k(0)*(g*(t(0)-t(1))+f*(tn(0)-tn(1)))!"w/m2"
+    !print *,'depth ,temperature, k(i)'
 
-        DO i=1, m+1
-      !     print *,'s', z(i),tn(i),k(i)
-            temp(i) = tn(i)
-        ENDDO
+    DO i=1, m+1
+    !   print *,'s', z(i),tn(i),k(i)
+        temp(i) = tn(i)
+    ENDDO
 
-      !print *,"Done SoilTemp"
+    !print *,"Done SoilTemp"
 END SUBROUTINE SoilTemp
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

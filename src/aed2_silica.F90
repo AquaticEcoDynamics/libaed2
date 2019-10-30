@@ -77,6 +77,9 @@ MODULE aed2_silica
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
+
 !===============================================================================
 CONTAINS
 

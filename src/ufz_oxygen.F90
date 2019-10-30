@@ -34,7 +34,7 @@
 
 MODULE ufz_oxygen
 !-------------------------------------------------------------------------------
-! aed2_oxygen --- oxygen biogeochemical model
+! ufz2_oxygen --- oxygen biogeochemical model
 !
 ! The AED module oxygen contains equations that describe exchange of
 ! oxygen across the air/water interface and sediment flux.
@@ -74,6 +74,8 @@ MODULE ufz_oxygen
 
    END TYPE
 
+! MODULE GLOBALS
+   INTEGER :: diag_level = 10
 
 !===============================================================================
 CONTAINS
