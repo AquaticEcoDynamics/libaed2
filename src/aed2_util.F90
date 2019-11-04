@@ -995,10 +995,11 @@ END SUBROUTINE InitialTemp
 
 
 !===============================================================================
-SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp)
+SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp,heatflux)
    INTEGER,intent(in) :: m
    AED_REAL,intent(in) :: wv(:), depth(:), topTemp
    AED_REAL,intent(inout) :: temp(m+1)
+   AED_REAL,intent(out) :: heatflux
 !
     AED_REAL :: w(m+1),t(0:m+1),tn(0:m+1),k(0:m+1),cp(m),a(m+1),b(m),c(m),d(m),z(0:m+1)
     INTEGER  :: i
@@ -1056,7 +1057,8 @@ SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp)
         tn(i) = d(i)-c(i)*tn(i+1)
     ENDDO
 
-    !print *, 'heat flux =',k(0)*(g*(t(0)-t(1))+f*(tn(0)-tn(1)))!"w/m2"
+    heatflux = k(0)*( g*(t(0)-t(1)) + f*(tn(0)-tn(1))) !"W/m2"
+    !print *, 'heat flux =',heatflux
     !print *,'depth ,temperature, k(i)'
 
     DO i=1, m+1
