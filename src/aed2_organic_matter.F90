@@ -93,6 +93,7 @@ MODULE aed2_organic_matter
       INTEGER  :: id_sed_pop, id_sed_dop
       INTEGER  :: id_sed_poc, id_sed_doc
       INTEGER  :: id_bod, id_cdom
+      INTEGER  :: id_pom_vvel, id_cpom_vvel
       INTEGER  :: id_l_resus, id_denit, id_anaerobic
 
       !# Model options
@@ -529,11 +530,11 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
      data%id_sed_don = aed2_define_sheet_diag_variable('sed_don','mmol/m**2/d',  'DON sediment flux')
      data%id_sed_pop = aed2_define_sheet_diag_variable('sed_pop','mmol/m**2/d',  'Net POP sediment flux')
      data%id_sed_dop = aed2_define_sheet_diag_variable('sed_dop','mmol/m**2/d',  'DOP sediment flux')
-     data%id_poc_miner = aed2_define_diag_variable('poc_miner','mmol/m**3/d','POC mineralisation')
+     data%id_poc_miner = aed2_define_diag_variable('poc_hydrol','mmol/m**3/d','POC hydrolosis')
      data%id_doc_miner = aed2_define_diag_variable('doc_miner','mmol/m**3/d','DOC mineralisation')
-     data%id_pon_miner = aed2_define_diag_variable('pon_miner','mmol/m**3/d','PON mineralisation')
+     data%id_pon_miner = aed2_define_diag_variable('pon_hydrol','mmol/m**3/d','PON hydrolosis')
      data%id_don_miner = aed2_define_diag_variable('don_miner','mmol/m**3/d','DON mineralisation')
-     data%id_pop_miner = aed2_define_diag_variable('pop_miner','mmol/m**3/d','POP hydrolysis')
+     data%id_pop_miner = aed2_define_diag_variable('pop_hydrol','mmol/m**3/d','POP hydrolysis')
      data%id_dop_miner = aed2_define_diag_variable('dop_miner','mmol/m**3/d','DOP mineralisation')
      data%id_anaerobic = aed2_define_diag_variable('anaerobic','mmol/m**3/d','anaerobic metabolism')
      data%id_denit = aed2_define_diag_variable('denit','mmol/m**3/d','denitrification')
@@ -541,6 +542,9 @@ SUBROUTINE aed2_define_organic_matter(data, namlst)
      data%id_bod = aed2_define_diag_variable('BOD5','mg O2/L',  'Biochemical Oxygen Demand (BOD)')
      IF ( simphotolysis .and. simRpools  ) data%id_photolysis = &
        aed2_define_diag_variable('photolysis','mmol C/m3/d',  'photolysis rate of breakdown of DOC')
+
+     data%id_pom_vvel = aed2_define_diag_variable('pom_vvel','m/d','POM vertical velocity')
+     data%id_cpom_vvel = aed2_define_diag_variable('cpom_vvel','m/d','CPOM vertical velocity')
    ENDIF
 
    ! Register environmental dependencies
@@ -1113,6 +1117,7 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
 
         CASE ( _MOB_STOKES_ )
           ! settling velocity based on Stokes Law calculation and cell density
+
           pw = _STATE_VAR_(data%id_rho)              ! water density
           temp = _STATE_VAR_(data%id_temp)
           mu = water_viscosity(temp)                 ! water dynamic viscosity
@@ -1120,13 +1125,13 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
           vvel = -9.807*(data%d_pom**2.)*( rho_pom-pw ) / ( 18.*mu )
           IF(data%simRPools) &
           vvel_cpom = -9.807*(data%d_cpom**2.)*( data%rho_cpom-pw ) / ( 18.*mu )
-
         CASE DEFAULT
           ! unknown settling/migration option selection
           vvel = data%w_pom
           vvel_cpom = data%w_cpom
 
       END SELECT
+
       ! set global mobility array (m/s), later used to compute settling
       mobility(data%id_poc) = vvel
       mobility(data%id_pon) = vvel
@@ -1137,6 +1142,12 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
       _DIAG_VAR_(data%id_Psed_pon) = mobility(data%id_pon)*_STATE_VAR_(data%id_pon)
       _DIAG_VAR_(data%id_Psed_pop) = mobility(data%id_pop)*_STATE_VAR_(data%id_pop)
       IF(data%simRPools) _DIAG_VAR_(data%id_Psed_cpom) = mobility(data%id_cpom)*_STATE_VAR_(data%id_cpom)
+
+      IF(data%extra_diag) THEN
+        _DIAG_VAR_(data%id_pom_vvel) = vvel*secs_per_day
+        IF(data%simRPools) _DIAG_VAR_(data%id_cpom_vvel) = vvel_cpom*secs_per_day
+      ENDIF
+
 
 END SUBROUTINE aed2_mobility_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

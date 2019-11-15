@@ -298,7 +298,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, re
           ! Register vertical velocity diagnostic, where relevant
           IF (data%phytos(i)%settling == _MOB_STOKES_ .OR. &
                                    data%phytos(i)%settling == _MOB_MOTILE_) THEN
-            data%id_vvel(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_vvel', 'm/s', 'vertical velocity')
+            data%id_vvel(i) = aed2_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_vvel', 'm/day', 'vertical velocity')
           ENDIF
        ENDIF
     ENDDO
@@ -1173,10 +1173,10 @@ SUBROUTINE aed2_mobility_phytoplankton(data,column,layer_idx,mobility)
       ! set global mobility array
       mobility(data%id_p(phy_i)) = vvel
       IF(extra_diag .AND. data%id_vvel(phy_i)>0) &
-            _DIAG_VAR_(data%id_vvel(phy_i)) = vvel
+              _DIAG_VAR_(data%id_vvel(phy_i)) = vvel * secs_per_day
       ! set sedimentation flux (mmmol/m2) for later use/reporting
       _DIAG_VAR_(data%id_Psed_phy) =   &
-            _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i))
+              _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i))
     ENDDO
 END SUBROUTINE aed2_mobility_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

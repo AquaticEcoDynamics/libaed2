@@ -72,7 +72,7 @@ MODULE aed2_sedflux
       INTEGER  :: id_Fsed_frp, id_Fsed_pon, id_Fsed_don
       INTEGER  :: id_Fsed_pop, id_Fsed_dop, id_Fsed_poc, id_Fsed_doc
       INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_feii
-      INTEGER  :: id_Fsed_n2o
+      INTEGER  :: id_Fsed_n2o, id_Fsed_oxy_pel
       INTEGER  :: id_zones
 
       !# Model parameters
@@ -330,49 +330,52 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
    IF ( data%Fsed_oxy .GT. MISVAL ) &
       data%id_Fsed_oxy = aed2_define_sheet_diag_variable('Fsed_oxy','mmol/m**2',   &
-                                          'sedimentation rate of oxygen')
+                                          'flux rate of oxygen across the swi')
    IF ( Fsed_rsi .GT. MISVAL ) &
       data%id_Fsed_rsi = aed2_define_sheet_diag_variable('Fsed_rsi','mmol/m**2',   &
-                                          'sedimentation rate of silica')
+                                          'flux rate of rsi across the swi')
    IF ( Fsed_amm .GT. MISVAL ) &
       data%id_Fsed_amm = aed2_define_sheet_diag_variable('Fsed_amm','mmol/m**2',   &
-                                          'sedimentation rate of ammonia')
+                                          'flux rate of amm across the swi')
    IF ( Fsed_nit .GT. MISVAL ) &
       data%id_Fsed_nit = aed2_define_sheet_diag_variable('Fsed_nit','mmol/m**2',   &
-                                          'sedimentation rate of nitrate')
+                                          'flux rate of nit across the swi')
    IF ( Fsed_n2o .GT. MISVAL ) &
       data%id_Fsed_n2o = aed2_define_sheet_diag_variable('Fsed_n2o','mmol/m**2',   &
-                                          'sedimentation rate of n2o')
+                                          'flux rate of n2o across the swi')
    IF ( Fsed_frp .GT. MISVAL ) &
       data%id_Fsed_frp = aed2_define_sheet_diag_variable('Fsed_frp','mmol/m**2',   &
-                                          'sedimentation rate of phosphorus')
+                                          'flux rate of frp across the swi')
    IF ( Fsed_pon .GT. MISVAL ) &
       data%id_Fsed_pon = aed2_define_sheet_diag_variable('Fsed_pon','mmol/m**2',   &
                                           'sedimentation rate of pon')
    IF ( Fsed_don .GT. MISVAL ) &
       data%id_Fsed_don = aed2_define_sheet_diag_variable('Fsed_don','mmol/m**2',   &
-                                          'sedimentation rate of don')
+                                          'flux rate of don across the swi')
    IF ( Fsed_pop .GT. MISVAL ) &
       data%id_Fsed_pop = aed2_define_sheet_diag_variable('Fsed_pop','mmol/m**2',   &
                                           'sedimentation rate of pop')
    IF ( Fsed_dop .GT. MISVAL ) &
       data%id_Fsed_dop = aed2_define_sheet_diag_variable('Fsed_dop','mmol/m**2',   &
-                                          'sedimentation rate of dop')
+                                          'flux rate of dop across the swi')
    IF ( Fsed_poc .GT. MISVAL ) &
       data%id_Fsed_poc = aed2_define_sheet_diag_variable('Fsed_poc','mmol/m**2',   &
                                           'sedimentation rate of poc')
    IF ( Fsed_doc .GT. MISVAL ) &
       data%id_Fsed_doc = aed2_define_sheet_diag_variable('Fsed_doc','mmol/m**2',   &
-                                          'sedimentation rate of doc')
+                                          'flux rate of doc across the swi')
    IF ( Fsed_dic .GT. MISVAL ) &
       data%id_Fsed_dic = aed2_define_sheet_diag_variable('Fsed_dic','mmol/m**2',   &
-                                          'sedimentation rate of carbon')
+                                          'flux rate of dic across the swi')
    IF ( Fsed_ch4 .GT. MISVAL ) &
       data%id_Fsed_ch4 = aed2_define_sheet_diag_variable('Fsed_ch4','mmol/m**2',   &
-                                          'sedimentation rate of ch4')
+                                          'flux rate of ch4 across the swi')
    IF ( Fsed_feii .GT. MISVAL ) &
       data%id_Fsed_feii = aed2_define_sheet_diag_variable('Fsed_feii','mmol/m**2', &
-                                          'sedimentation rate of iron')
+                                          'flux rate of feii across the swi')
+
+   !data%id_Fsed_oxy_pel = aed2_define_diag_variable('Fsed_oxy_pel','mmol/m**2',&
+   !                                          'sedimentation rate of oxygen')
 
 END SUBROUTINE aed2_define_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -474,8 +477,7 @@ END SUBROUTINE aed2_initialize_sedflux
 !###############################################################################
 SUBROUTINE aed2_calculate_benthic_sedflux(data,column,layer_idx)
 !-------------------------------------------------------------------------------
-! Calculate pelagic bottom fluxes and benthic sink and source terms of AED sedflux
-! Everything in units per surface area (not volume!) per time.
+! Set the bottom fluxes into the pelagic/water layers
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_sedflux_data_t),INTENT(in) :: data
@@ -486,6 +488,8 @@ SUBROUTINE aed2_calculate_benthic_sedflux(data,column,layer_idx)
 !
    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &
       CALL aed2_initialize_sedflux(data, column, layer_idx)
+
+   !_DIAG_VAR_(data%id_Fsed_oxy_pel) =   _DIAG_VAR_S_(data%id_Fsed_oxy)* secs_per_day
 END SUBROUTINE aed2_calculate_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

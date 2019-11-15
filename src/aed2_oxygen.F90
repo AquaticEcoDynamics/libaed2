@@ -71,7 +71,7 @@ MODULE aed2_oxygen
       INTEGER  :: id_Fsed_oxy
       INTEGER  :: id_oxy_sat !, id_atm_oxy_exch3d
       INTEGER  :: id_atm_oxy_exch
-      INTEGER  :: id_sed_oxy
+      INTEGER  :: id_sed_oxy, id_sed_oxy_pel
       INTEGER  :: id_larea, id_lht, id_cell_vel
       INTEGER  :: oxy_piston_model
 
@@ -119,15 +119,15 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    AED_REAL          :: oxy_initial       = 300.  !% initial dissolved oxygen (DO) concentration
                                                   !% $$mmol\,m^{-3}$$
                                                   !% float
-                                                  !%     
+                                                  !%
                                                   !% 0-400
                                                   !% Note: will be overwritten by GLM or TFV IC
 
    AED_REAL          :: oxy_min           = 0.    !% minimum dissolved oxygen (DO) concentration
                                                   !% $$mmol\,m^{-3}$$
                                                   !% float
-                                                  !%     
-                                                  !%     
+                                                  !%
+                                                  !%
                                                   !% Optional variable to enforce negative number clipping
 
    AED_REAL          :: oxy_max           = nan_  !% maxmium dissolved oxygen (DO) concentration
@@ -140,7 +140,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    AED_REAL          :: Fsed_oxy          = -20.0 !% sediment oxygen demand (SOD)
                                                   !% $$mmol\,m^{-2}\,day^{-1}$$
                                                   !% float
-                                                  !%     
+                                                  !%
                                                   !% -100
                                                   !% Note: unused if Fsed_oxy_variable is activated via aed2_sedflux
 
@@ -149,7 +149,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
                                                   !% float
                                                   !%   50
                                                   !% 10-100
-                                                  !% Changes the sensitivity of the oxygen flux to the 
+                                                  !% Changes the sensitivity of the oxygen flux to the
                                                   !-     overlying oxygen concentration
 
    AED_REAL          :: theta_sed_oxy     = 1.0   !% Arrhenius temperature multiplier for sediment oxygen flux
@@ -157,7 +157,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
                                                   !% float
                                                   !% 1e+00
                                                   !% 1.04 - 1.12
-                                                  !% Changes the sensitivity of the oxygen flux to 
+                                                  !% Changes the sensitivity of the oxygen flux to
                                                   !-     the overlying temperature
 
    CHARACTER(len=64) :: Fsed_oxy_variable =''     !% oxygen sediment flux variable link
@@ -165,7 +165,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
                                                   !% string
                                                   !% '
                                                   !% e.g.: SDF_Fsed_oxy
-                                                  !% will use the value supplied by the aed2_sedflux 
+                                                  !% will use the value supplied by the aed2_sedflux
                                                   !-     model for Fsed_oxy; use this option to allow for
                                                   !-     spatial or temperal variation
 
@@ -184,7 +184,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    read(namlst,nml=aed2_oxygen,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed2_oxygen'
 
-   ! Store parameter values in our own derived type
+   ! Store parameter values in the modules own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
 
@@ -205,6 +205,9 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    ! Register diagnostic variables
    data%id_sed_oxy = aed2_define_sheet_diag_variable(        &
                      'sed_oxy', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
+
+  !data%id_sed_oxy_pel = aed2_define_diag_variable(        &
+  !                  'sed_oxy_pel', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
 
    data%id_atm_oxy_exch = aed2_define_sheet_diag_variable(   &
                      'atm_oxy_flux', 'mmol/m**2/d', 'O2 exchange across atm/water interface')
@@ -390,6 +393,7 @@ SUBROUTINE aed2_calculate_benthic_oxygen(data,column,layer_idx)
 
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
+  !_DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day
 
 END SUBROUTINE aed2_calculate_benthic_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
