@@ -18,7 +18,6 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
@@ -40,7 +39,8 @@
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
-!# Created May 2011                                                            #
+!#   Created May 2011                                                          #
+!#   Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed2   #
 !#                                                                             #
 !###############################################################################
 
@@ -51,7 +51,10 @@ MODULE aed2_oxygen
 ! aed2_oxygen --- oxygen biogeochemical model
 !
 ! The AED module oxygen contains equations that describe exchange of
-! oxygen across the air/water interface and sediment flux.
+! oxygen across the air/water interface and sediment flux. Other modules can
+! also add or consume oxygen. A summary fo the module is provided online at:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_oxygen.html
+!
 !-------------------------------------------------------------------------------
    USE aed2_core
 
@@ -66,17 +69,16 @@ MODULE aed2_oxygen
    TYPE,extends(aed2_model_data_t) :: aed2_oxygen_data_t
       !# Variable identifiers
       INTEGER  :: id_oxy
-      INTEGER  :: id_temp, id_salt
-      INTEGER  :: id_wind
       INTEGER  :: id_Fsed_oxy
-      INTEGER  :: id_oxy_sat !, id_atm_oxy_exch3d
-      INTEGER  :: id_atm_oxy_exch
-      INTEGER  :: id_sed_oxy, id_sed_oxy_pel
+      INTEGER  :: id_oxy_sat
+      INTEGER  :: id_atm_oxy_exch, id_sed_oxy
+      INTEGER  :: id_sed_oxy_pel, id_atm_oxy_exch3d
+      INTEGER  :: id_temp, id_salt, id_wind
       INTEGER  :: id_larea, id_lht, id_cell_vel
-      INTEGER  :: oxy_piston_model
 
       !# Model parameters
       AED_REAL :: Fsed_oxy,Ksed_oxy,theta_sed_oxy
+      INTEGER  :: oxy_piston_model
       LOGICAL  :: use_sed_model
 
      CONTAINS
@@ -86,13 +88,16 @@ MODULE aed2_oxygen
          PROCEDURE :: calculate_benthic => aed2_calculate_benthic_oxygen
 !        PROCEDURE :: mobility          => aed2_mobility_oxygen
 !        PROCEDURE :: light_extinction  => aed2_light_extinction_oxygen
-         PROCEDURE :: particle_bgc      => aed2_particle_bgc_oxygen
+!        PROCEDURE :: particle_bgc      => aed2_particle_bgc_oxygen
 !        PROCEDURE :: delete            => aed2_delete_oxygen
 
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
+                                          ! 1 = basic diagnostic outputs
+                                          ! 2-10 = most diagnostic outputs
+                                          ! >10 = debug/checking outputs
 
 !===============================================================================
 CONTAINS
@@ -102,7 +107,7 @@ CONTAINS
 !###############################################################################
 SUBROUTINE aed2_define_oxygen(data, namlst)
 !-------------------------------------------------------------------------------
-! Initialise the aed2_oxygen model
+! Setup and initialise the aed2_oxygen model
 !
 !  Here, the oxygen namelist is read and te variables exported
 !  by the model are registered with AED2.
@@ -120,7 +125,7 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
                                                   !% $$mmol\,m^{-3}$$
                                                   !% float
                                                   !%
-                                                  !% 0-400
+                                                  !% 0 - 400
                                                   !% Note: will be overwritten by GLM or TFV IC
 
    AED_REAL          :: oxy_min           = 0.    !% minimum dissolved oxygen (DO) concentration
@@ -169,12 +174,18 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
                                                   !-     model for Fsed_oxy; use this option to allow for
                                                   !-     spatial or temperal variation
 
-   INTEGER           :: oxy_piston_model  = 1
+   INTEGER           :: oxy_piston_model  = 1     !% specifies the atm exchange piston model
+                                                  !% -
+                                                  !% integer
+                                                  !% 1
+                                                  !% 1 - X
+                                                  !% Choice depends on waterbody type
 !  %% END NAMELIST
 
    NAMELIST /aed2_oxygen/ oxy_initial, oxy_min, oxy_max,           &
                           Fsed_oxy, Ksed_oxy, theta_sed_oxy,       &
-                          Fsed_oxy_variable, oxy_piston_model
+                          Fsed_oxy_variable, oxy_piston_model,     &
+                          diag_level
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -187,7 +198,6 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    ! Store parameter values in the modules own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
-
    data%Ksed_oxy = Ksed_oxy
    data%Fsed_oxy = Fsed_oxy/secs_per_day
    data%theta_sed_oxy = theta_sed_oxy
@@ -198,25 +208,27 @@ SUBROUTINE aed2_define_oxygen(data, namlst)
    data%id_oxy = aed2_define_variable('oxy','mmol/m**3','oxygen',   &
                                     oxy_initial,minimum=oxy_min,maximum=oxy_max)
 
-   ! Register link to external pools
-
+   ! Register the link to external variables
    IF (data%use_sed_model) data%id_Fsed_oxy = aed2_locate_global_sheet(Fsed_oxy_variable)
 
    ! Register diagnostic variables
-   data%id_sed_oxy = aed2_define_sheet_diag_variable(        &
+   IF (diag_level>0) THEN
+     data%id_oxy_sat = aed2_define_diag_variable(                   &
+                     'sat', '%', 'oxygen saturation')
+
+     data%id_sed_oxy = aed2_define_sheet_diag_variable(             &
                      'sed_oxy', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
 
-  !data%id_sed_oxy_pel = aed2_define_diag_variable(        &
-  !                  'sed_oxy_pel', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
-
-   data%id_atm_oxy_exch = aed2_define_sheet_diag_variable(   &
+     data%id_atm_oxy_exch = aed2_define_sheet_diag_variable(        &
                      'atm_oxy_flux', 'mmol/m**2/d', 'O2 exchange across atm/water interface')
+    IF (diag_level>10) THEN
+     data%id_sed_oxy_pel = aed2_define_diag_variable(               &
+                     'sed_oxy_pel', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
 
-!  data%id_atm_oxy_exch3d = aed2_define_sheet_diag_variable( &
-!                    'atm_oxy_exch3d', 'mmol/m**2/d', 'Oxygen exchange across atm/water interface')
-
-   data%id_oxy_sat = aed2_define_diag_variable(              &
-                     'sat', '%', 'oxygen saturation')
+     data%id_atm_oxy_exch3d = aed2_define_diag_variable(      &
+                     'atm_oxy_exch3d', 'mmol/m**3/d', 'Oxygen exchange across atm/water interface')
+    ENDIF
+   ENDIF
 
    ! Register environmental dependencies
    data%id_temp = aed2_locate_global('temperature') ! Temperature (degrees Celsius)
@@ -267,10 +279,9 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
    temp  = _STATE_VAR_(data%id_temp)    ! Temperature (degrees Celsius)
    salt  = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
    wind  = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10 m above surface (m/s)
-   windHt= 10.
+   windHt= 10.                          ! Assumed wind height of 10m
    depth = MAX( _STATE_VAR_(data%id_lht), one_ )
    IF (data%id_cell_vel > 0 )  vel = _STATE_VAR_(data%id_cell_vel)
-
 
    ! Retrieve current (local) state variable values.
    oxy = _STATE_VAR_(data%id_oxy) ! Concentration of oxygen in surface layer
@@ -282,10 +293,9 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
                                          schmidt_model=2,                     &
                                          piston_model=data%oxy_piston_model)
 
-
    ! First get the oxygen concentration in the air phase at the interface
    ! (taken from Riley and Skirrow, 1974)
-   f_pres = 1.0
+   f_pres = 1.0    ! set pressure function here using data%id_pres
    Coxy_air = f_pres * aed2_oxygen_sat(salt,temp)
 
    ! Get the oxygen flux
@@ -294,9 +304,15 @@ SUBROUTINE aed2_calculate_surface_oxygen(data,column,layer_idx)
    ! Transfer surface exchange value to AED2 (mmmol/m2/s) converted by driver
    _FLUX_VAR_T_(data%id_oxy) = oxy_atm_flux
 
-   ! Also store oxygen flux across the atm/water interface as diagnostic variable (mmmol/m2/day)
-   _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
-   _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
+   ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
+   IF (diag_level>0) THEN
+     _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
+     _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
+   ENDIF
+
+   ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
+   IF (diag_level>10) &
+     _DIAG_VAR_(data%id_atm_oxy_exch3d) = oxy_atm_flux * secs_per_day / _STATE_VAR_(data%id_lht)
 
 END SUBROUTINE aed2_calculate_surface_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -314,7 +330,7 @@ SUBROUTINE aed2_calculate_oxygen(data,column,layer_idx)
 !
 !LOCALS
    AED_REAL :: oxy, temp, salt
-   AED_REAL :: diff_oxy, f_pres, coxy_sat
+   AED_REAL :: f_pres, coxy_sat
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -325,20 +341,13 @@ SUBROUTINE aed2_calculate_oxygen(data,column,layer_idx)
    ! Retrieve current (local) state variable values.
    oxy = _STATE_VAR_(data%id_oxy)! oxygen
 
-   ! Set temporal derivatives
-   diff_oxy = 0.
-
-   _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + (diff_oxy)
-
-
    ! Compute the oxygen saturation for diagnostic output
-   f_pres = 1.0
+   f_pres = 1.0 ! set pressure function here using data%id_pres
    coxy_sat = f_pres * aed2_oxygen_sat(salt,temp)
 
    ! Export diagnostic variables
    _DIAG_VAR_(data%id_oxy_sat) =  (oxy/coxy_sat)*100.
 
-   ! If an externally maintained pool is present, change the pool according
 END SUBROUTINE aed2_calculate_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -370,21 +379,20 @@ SUBROUTINE aed2_calculate_benthic_oxygen(data,column,layer_idx)
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
-    ! Retrieve current (local) state variable values.
+   ! Retrieve current (local) state variable values.
    oxy = _STATE_VAR_(data%id_oxy)! oxygen
 
    IF (data%use_sed_model) THEN
-       !Fsed_oxy = _STATE_VAR_S_(data%id_Fsed_oxy)
        Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy)
    ELSE
        Fsed_oxy = data%Fsed_oxy
    ENDIF
 
-    ! Sediment flux dependent on oxygen and temperature
+   ! Compute the sediment flux dependent on overlying oxygen & temperature
    oxy_flux = Fsed_oxy * MIN(3.,oxy/(data%Ksed_oxy+oxy) * (data%theta_sed_oxy**(temp-20.0)))
 
    ! Set bottom fluxes for the pelagic (change per surface area per second)
-   ! Transfer sediment flux value to AED2.
+   ! Transfer sediment flux value to AED2
    _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + (oxy_flux)
 
    ! Set sink and source terms for the benthos (change per surface area per second)
@@ -393,44 +401,9 @@ SUBROUTINE aed2_calculate_benthic_oxygen(data,column,layer_idx)
 
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
-  !_DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day
+   IF (diag_level>10) _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day
 
 END SUBROUTINE aed2_calculate_benthic_oxygen
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-SUBROUTINE aed2_particle_bgc_oxygen(data,column,layer_idx,ppid,partcl)
-!ARGUMENTS
-   CLASS (aed2_oxygen_data_t),INTENT(in) :: data
-   TYPE (aed2_column_t),INTENT(inout) :: column(:)
-   INTEGER,INTENT(in) :: layer_idx
-   INTEGER,INTENT(inout) :: ppid
-   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
-!
-!LOCALS
-   AED_REAL k, mass, pod
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-!print*,"aed2_particle_bgc_oxygen ", trim(data%aed2_model_name)
-   k = 1   !* for now
-
-   mass = partcl(15) ! I think this is mass [CAB]
-   pod = mass * k
-
-!  _STATE_VAR_(data%id_oxy) = pod / ( _STATE_VAR_(data%id_lht) * _STATE_VAR_S_(data%id_larea) )
-
-!  _DIAG_VAR_(data%id_ptm_n) = -pod * (???)
-
-!  ! work out oxygen consumption by an individual particle, if its active
-!  IF(ptm%group(g)%particle(p)%istat ==1)
-!     oxy_decay = ptm%group(g)%particle(p)%mass * data%coef_something
-
-!  ! add to generic flux doo-daddy, for returning
-!  flux_part (id_oxy) = flux_part (id_oxy) + oxy_decay
-
-END SUBROUTINE aed2_particle_bgc_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
