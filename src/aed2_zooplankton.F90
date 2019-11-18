@@ -72,7 +72,7 @@ MODULE aed2_zooplankton
       INTEGER  :: id_Pexctarget,id_Pmorttarget
       INTEGER  :: id_Cexctarget,id_Cmorttarget
       INTEGER  :: id_DOupttarget
-      INTEGER  :: id_tem, id_sal, id_extc
+      INTEGER  :: id_tem, id_sal, id_oxy
       INTEGER  :: id_grz,id_resp,id_mort
 
 
@@ -291,14 +291,14 @@ SUBROUTINE aed2_define_zooplankton(data, namlst)
 
 
    ! Register diagnostic variables
-   data%id_grz = aed2_define_diag_variable('grz','mmolC/m**3/d',  'net zooplankton grazing')
+   data%id_grz  = aed2_define_diag_variable('grz','mmolC/m**3/d',  'net zooplankton grazing')
    data%id_resp = aed2_define_diag_variable('resp','mmolC/m**3/d',  'net zooplankton respiration')
    data%id_mort = aed2_define_diag_variable('mort','mmolC/m**3/d','net zooplankton mortality')
 
    ! Register environmental dependencies
    data%id_tem = aed2_locate_global('temperature')
    data%id_sal = aed2_locate_global('salinity')
-   data%id_extc = aed2_locate_global('extc_coef')
+   data%id_oxy = aed2_locate_variable('OXY_oxy')
 END SUBROUTINE aed2_define_zooplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -314,26 +314,27 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   AED_REAL           :: zoo,temp,salinity !State variables
+   INTEGER            :: zoop_i,prey_i,prey_j,phy_i
+   AED_REAL           :: zoo,temp,salinity,oxy !State variables
    AED_REAL           :: prey(MAX_ZOOP_PREY), grazing_prey(MAX_ZOOP_PREY) !Prey state variables
    AED_REAL           :: phy_INcon(MAX_ZOOP_PREY), phy_IPcon(MAX_ZOOP_PREY) !Internal nutrients for phytoplankton
    AED_REAL           :: dn_excr, dp_excr, dc_excr !Excretion state variables
    AED_REAL           :: pon, pop, poc !Mortaility and fecal pellet state variables
-   AED_REAL           :: FGrazing_Limitation, f_T, f_Salinity
+   AED_REAL           :: FGrazing_Limitation, f_T, f_Salinity, f_DO
    AED_REAL           :: pref_factor, Ctotal_prey !total concentration of available prey
    AED_REAL           :: food, grazing, respiration, mortality !Growth & decay functions
    AED_REAL           :: grazing_n, grazing_p !Grazing on nutrients
    AED_REAL           :: pon_excr, pop_excr, poc_excr !POM excretion rates
    AED_REAL           :: don_excr, dop_excr, doc_excr, delta_C !DOM excretion rates
-   INTEGER  :: zoop_i,prey_i,prey_j,phy_i
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    pon = 0.0 ; poc = 0.0 ; pop = 0.0  !## CAB [-Wmaybe-uninitialized]
 
    ! Retrieve current environmental conditions.
-   temp = _STATE_VAR_(data%id_tem)    ! local temperature
-   salinity = _STATE_VAR_(data%id_sal)! local salinity
+   temp = _STATE_VAR_(data%id_tem)      ! local temperature
+   salinity = _STATE_VAR_(data%id_sal)  ! local salinity
+   oxy = _STATE_VAR_(data%id_oxy)  ! local oxygen
 
    ! Retrieve current (local) state variable values.
    IF (data%simDNexcr)  dn_excr = _STATE_VAR_(data%id_Nexctarget)
@@ -365,13 +366,10 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
       ! Get the temperature function
        f_T = fTemp_function(1, data%zoops(zoop_i)%Tmax_zoo,       &
                                data%zoops(zoop_i)%Tstd_zoo,       &
-                               data%zoops(zoop_i)%theta_resp_zoo, &
+                               data%zoops(zoop_i)%theta_grz_zoo,  &
                                data%zoops(zoop_i)%aTn,            &
                                data%zoops(zoop_i)%bTn,            &
                                data%zoops(zoop_i)%kTn, temp)
-
-      ! Get the salinity limitation.
-       f_Salinity = fSalinity_Limitation(data%zoops,zoop_i,salinity)
 
       ! Get the growth rate (/ s)
       ! grazing is in units of mass consumed/mass zoops/unit time
@@ -450,11 +448,22 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
       ENDDO
 
 
+      ! Get the salinity limitation.
+      f_Salinity = fSalinity_Limitation(data%zoops,zoop_i,salinity)
+      f_DO = 1.
+      IF (oxy<data%zoops(zoop_i)%DOmin_zoo) THEN
+        f_DO = 1.+((data%zoops(zoop_i)%DOmin_zoo-oxy)/ data%zoops(zoop_i)%DOmin_zoo )
+      ENDIF
+      f_T = data%zoops(zoop_i)%theta_grz_zoo**(temp-20.)
+
+
+
       ! Get the respiration rate (/ s)
-      respiration = data%zoops(zoop_i)%Rresp_zoo * f_Salinity
+      respiration = data%zoops(zoop_i)%Rresp_zoo * f_T * f_Salinity
 
       ! Get the mortality rate (/ s)
-      mortality = data%zoops(zoop_i)%Rmort_zoo * f_T
+
+      mortality = data%zoops(zoop_i)%Rmort_zoo * f_T * f_DO
 
       ! Don't excrete or die if we are at the min biomass otherwise we have a
       ! mass conservation leak in the C mass balance
