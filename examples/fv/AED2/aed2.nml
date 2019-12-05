@@ -1,0 +1,658 @@
+! .***(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((*.!
+!.(((((((((((((((((((((((/////****/////((((((((((((((((((((((((((((((((((((((((!
+!((((((((((((((((((/*,,,...,,,,************//((((((((((((((((((((((((((((((((((!
+!((((((((((((((/*.....**//((((((((((((((((////*//((((((((((((((((((((((((((((((!
+!(((((((((((((/,.  .,///((((((((((((((((((((//////(((((((((((((((((((((((((((((!
+!((((((((((//,  ,**/(((((((((((((((((((((((((((((//((((((((((((((((((((((((((((!
+!(((((((((/,,  ,*//((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((!
+!(((((((/*.  .*/(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((!
+!((((((/*. ,,/(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((!
+!((((((/. .**/(((((((((((((///////(((((///////////////////////////////(((((((((!
+!((((//,  *//(((((((((((((/,     .**/(/..             ,.            ...*/((((((!
+!((((**. ,/((((((((((((((/*.      ..*(/..   .,,,,,,,,**,    .,,,,,..    .,//(((!
+!(((/,,  ,/((((((((((((((/,    .    *//..   ,**////////,    .*/////*..   .**/((!
+!(((/,, .*((((((((((((((/*    ,*.   .**..   ,//(((((((/,    ./((((((//,   ..*((!
+!(((/.. .*((((((((((((((*.  ..*/*.   .*,,    ......**//,    ./((((((((*.    ,/(!
+!(((/.. .*((((((((((((//,   ,,/(/.   .,,,          ,,//,    ./((((((((*.    ,/(!
+!(((/,, .*/((((((((((/**.   ,,***,    .,,.  .******//(/,    ./((((((//*.  ..*/(!
+!(((/**. ,/((((((((((*..               ..,. ,//(((((((/,    ./(((((/**.   ,,/((!
+!((((**. .*(((((((((/,     .........   ..,,.,//////////,    .*/////*..   .**/((!
+!((((//*  ,//((((((/*.   .*/((((((//,    .,.         .,.               .,/(((((!
+!((((((/,  ,,/(((((/,....*/(((((((((/,....,*,........,*,...........,**//(((((((!
+!(((((((*. ..*/((((//***//(((((((((((//**////********////********/////(((((((((!
+!((((((((/,   ,/(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((!
+!(((((((((/**. .,//((((((((((((((((((((((((((((((//((((((((((((((((((((((((((((!
+!((((((((((//*. .,,//(((((((((((((((((((((((((((///((((((((((((((((((((((((((((!
+!(((((((((((((//,.. .,**/((((((((((((((((((//////((((((((((((((((((((((((((((((!
+!(((((((((((((((/**,....,*////((((((((/////**///(((((((((((((((((((((((((((((((!
+!(((((((((((((((((((//**,,....,,,,,,,,***///(((((((((((((((((((((((((((((((((((!
+!.((((((((((((((((((((((((((////////((((((((((((((((((((((((((((((((((((((((**.!
+!###############################################################################
+!
+! solution_method     (1: Euler's Method)
+! link_bottom_drag    (T/F: AED variables included/excluded in TFV bottom drag)
+! link_surface_drag   (T/F: AED variables included/excluded in TFV surface drag)
+! link_water_density  (T/F: AED variables included/excluded in TFV density calculation)
+! link_water_clarity  (T/F: AED variables included/excluded in TFV light extinction)
+! base_par_extinction (Kw; /m)
+! ext_tss_extinction  (T/F: TFV SS concs included/excluded in Kd calculation)
+!
+&aed2_bio
+   !-- AED2 configuration flags
+   solution_method =  1
+   do_limiter      = .true.
+   display_minmax  = .false.
+ ! do_2d_atm_flux  = .true.
+ ! do_particle_bgc = .false.
+   glob_min = -1e38
+   glob_max =  1e38
+   min_water_depth =  0.0401
+   n_equil_substep = 12
+   !-- Linkages with host model: PHYSICS
+   link_bottom_drag = .false.
+   link_surface_drag = .false.
+   link_water_density = .false.
+   !-- Linkages with host model: LIGHT
+   link_ext_par = .false.
+   link_water_clarity = .false.
+   base_par_extinction = 0.2
+   ext_tss_extinction = .false.
+   tss_par_extinction = 0.02
+   !-- Linkages with host model: RIPARIAN
+   link_solar_shade = .false.
+   link_rain_loss = .false.
+   !-- Benthic variable initialisation
+   init_values_file = ''
+  !route_table_file = '../External/AED2/Routing_Tbl.csv'
+/
+
+!-------------------------------------------------------------------------------
+! aed2_models  :  List of AED2 modules to be simulated
+!-------------------------------------------------------------------------------
+!
+! List here the available aed2 modules to be included in the simulation.
+!       It is important they are listed in the correct order so dependencies
+!       can be set during the model set-up phase.
+!
+! For further detail about available AED modules visit:
+!       http://aquatic.science.uwa.edu.au/research/models/AED/
+!
+! NOTE: This example only includes CORE modules without all values and options
+!       configured. Refer to the web-links for summary tables of modules
+!       parameters, and  refer to AED2+ documentation for details of
+!       configuration of the PLUS modules.
+!
+!-------------------------------------------------------------------------------
+&aed2_models
+    models =
+       !-->  NUTRIENT/CHEMISTRY modules  <--!
+             'aed2_sedflux',
+        !off 'aed2_macrophyte',
+			       'aed2_noncohesive',
+             'aed2_tracer',
+             'aed2_oxygen',
+        !off 'aed2_carbon',
+             'aed2_silica',
+             'aed2_nitrogen',
+             'aed2_phosphorus',
+             'aed2_organic_matter',
+        !off 'aed2_seddiagenesis',
+       !-->  BIOLOGY modules  <--!
+             'aed2_phytoplankton',
+        !off 'aed2_macroalgae',
+        !off 'aed2_geochemistry',
+        !off 'aed2_zooplankton',
+        !off 'aed2_bivalve',
+        !off 'aed2_macrophyte',
+        !off 'aed2_pathogens',
+       !-->  RIPARIAN modules  <--!
+        !off 'aed2_land',
+        !off 'aed2_ass',
+        !off 'aed2_vegetation',
+       !-->  SUMMARY modules  <--!
+             'aed2_totals',
+        !off 'aed2_habitat'
+/
+
+!###############################################################################
+! SDF: aed2_sedflux - AED sedflux interface module
+!
+! If TFV is host, this allows spatially variable fluxes, based on Materials
+!
+!-------------------------------------------------------------------------------
+&aed2_sedflux
+   sedflux_model = 'Constant2D'
+/
+&aed2_sed_const2d
+ n_zones = 42    ! check match to TFV material zones IDs
+ ! Fsed_oxy =    -15.,-20.,-50.,-30.,-50.
+ ! Fsed_rsi =    -1e10,-1e10,-1e10,-1e10,-1e10
+ ! Fsed_amm =     0.2,0.5,1.2,0.5,1.9
+ ! Fsed_nit =     1.,1.,3.,1.,2.
+ ! Fsed_frp =     0.05,0.15,0.16,0.12,0.22
+ ! !> disable these
+ ! Fsed_pon =    -1e10,-1e10,-1e10,-1e10,-1e10
+ ! Fsed_don =    -1e10,-1e10,-1e10,-1e10,-1e10
+ ! Fsed_pop =    -1e10,-1e10,-1e10,-1e10,-1e10
+ ! Fsed_dop =    -1e10,-1e10,-1e10,-1e10,-1e10
+ ! Fsed_poc =    -1e10,-1e10,-1e10,-1e10,-1e10
+ ! Fsed_doc =    -1e10,-1e10,-1e10,-1e10,-1e10
+ ! Fsed_dic =    -1e10,-1e10,-1e10,-1e10,-1e10
+ !                 1,     2,     3,     4,     5,     6,     7,     8,     9,    10,    11,    12,    13,    14,    15,    16,    17,    18,    19,    20,    21,    22,    23,    24,    25,    26,    27,    28,    29,    30,    31,    32,    33,    34,    35,    36,    37,    38,    39,    40,   101,   102
+	Fsed_oxy  =  -5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000,-5.000
+	Fsed_rsi  =   0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+	Fsed_amm  =   0.700, 0.700, 0.700, 0.700, 0.700, 1.900, 0.700, 0.700, 1.900,-0.230,-0.230, 0.000, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 1.900, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 0.700, 1.200, 0.700, 0.700
+	Fsed_nit  =  -0.200,-0.200,-0.200,-0.200,-0.200,-0.305,-0.200,-0.200,-0.305,-3.280,-3.280,-0.400,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.305,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.200,-0.285,-0.200,-0.200
+	Fsed_frp  =  -0.004,-0.004,-0.004, 0.015, 0.015, 0.140, 0.015, 0.015, 1.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.500, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.100, 0.000, 0.000
+	Fsed_pon  =   0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+	Fsed_don  =   2.000, 2.000, 2.000, 3.000, 3.000, 2.000, 3.000, 3.000, 2.000,-3.051,-3.051, 1.500, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 2.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.300, 3.000, 3.000
+	Fsed_pop  =   0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,-0.100, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+	Fsed_dop  =   0.000, 0.000, 0.000, 0.024, 0.024,-0.005, 0.024, 0.024,-0.005,-0.063,-0.063,-0.100, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,-0.005, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.042, 0.000, 0.000
+	Fsed_poc  =  -0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080,-0.080
+	Fsed_doc  =   0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+	Fsed_dic  =   3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000, 3.000
+	Fsed_ch4  =   0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500
+	Fsed_feii =   0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
+/
+
+!-------------------------------------------------------------------------------
+!###############################################################################
+! aed2_macrophyte - AED macrophyte model
+!-------------------------------------------------------------------------------
+&aed2_macrophyte
+   num_mphy = 0
+   the_mphy = 3
+   n_zones  = 4
+   active_zones = 2,3,4,5
+   simStaticBiomass = .true.
+   simMacFeedback = .false.
+   dbase = '../External/AED2/aed2_macrophyte_pars.nml'
+/
+
+!###############################################################################
+! TRC: aed2_noncohesive
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_tracer.html
+!
+!-------------------------------------------------------------------------------
+&aed2_noncohesive
+   !-- Select SS groups and their properties
+    num_ss     = 1
+    ss_initial = 1
+    Ke_ss      = 0.06
+   !-- Configure sediment resuspension
+    settling   = 1
+    w_ss       = -0.5
+    d_ss       = 2e-6
+    rho_ss     = 1.5e3
+   !-- Configure sediment resuspension
+    resuspension        = 2
+    epsilon             = 0.0080
+    tau_0               = 0.045
+    tau_r               = 1.0
+    Ktau_0              = 0.0015
+    macrophyte_link_var = ''
+   !-- Configure sediment mass
+    simSedimentMass     = .true.
+    fs                  = 0.4,0.4
+    sed_porosity        = 0.6
+/
+
+!###############################################################################
+! TRC: aed2_tracer
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_tracer.html
+!
+!-------------------------------------------------------------------------------
+&aed2_tracer
+   !-- Optional retention time tracer
+    retention_time = .true.
+   !-- Select number of tracers and their decay/sedflux/light properties
+    num_tracers = 0
+    decay = 0,0
+    Fsed = 0,0
+/
+
+!###############################################################################
+! OXY: aed2_oxygen - AED oxygen model
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_oxygen.html
+!
+!-------------------------------------------------------------------------------
+&aed2_oxygen
+   oxy_initial       = 225.0
+   Fsed_oxy          = -40.0    ! overwritten by SDF_Fsed_oxy
+   Ksed_oxy          = 100.0
+   theta_sed_oxy     =   1.08
+   Fsed_oxy_variable = 'SDF_Fsed_oxy'
+   oxy_min           = 0
+   oxy_max           = 500
+  !diag_level        = 1
+/
+
+!###############################################################################
+! CAR: aed2_carbon - AED carbon model
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_nutrient.html
+!
+!-------------------------------------------------------------------------------
+&aed2_carbon
+   !-- DIC & pH
+    dic_initial = 1600.5
+    Fsed_dic = 3.0
+    Ksed_dic = 20.0
+    theta_sed_dic = 1.08
+    Fsed_dic_variable='SDF_Fsed_dic'
+    pH_initial = 7.5
+    atmco2 = 390e-6
+    co2_model = 1
+    alk_mode = 1
+    ionic = 0.1
+    co2_piston_model = 1
+   !-- CH4
+   !ch4_initial = 27.6
+   !Rch4ox = 0.01
+   !Kch4ox = 0.5
+   !vTch4ox = 1.08
+   !Fsed_ch4 = 0.5
+   !Ksed_ch4 = 100.0
+   !theta_sed_ch4 = 1.08
+   !methane_reactant_variable = 'OXY_oxy'
+   !Fsed_ch4_variable = 'Fsed_ch4'
+   !atm_ch4 = 1.76e-6    !atm
+   !ch4_piston_model = 1
+/
+
+!###############################################################################
+! SIL: aed2_silica
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_nutrient.html
+!
+!-------------------------------------------------------------------------------
+&aed2_silica
+   rsi_initial = 12.5
+   Fsed_rsi = 0.
+   Ksed_rsi = 25.0
+   theta_sed_rsi = 1.08
+   silica_reactant_variable='OXY_oxy'
+   Fsed_rsi_variable = 'SDF_Fsed_rsi'
+/
+
+!###############################################################################
+! NIT: aed2_nitrogen - AED nitrogen model
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_nutrient.html
+!
+!-------------------------------------------------------------------------------
+&aed2_nitrogen
+  !-- Initial values
+   amm_initial      = 12.5
+   nit_initial      = 27.6
+   n2o_initial      =  0.0
+  !-- Nitrification
+   Rnitrif          =  0.3
+   Knitrif          = 78.1
+   theta_nitrif     =  1.08
+   nitrif_reactant_variable = 'OXY_oxy'
+   simNitrfpH       = .false.
+   nitrif_ph_variable = ''
+   Rnh4o2           = 0.000001
+   Rno2o2           = 0.000001
+  !-- N2O reactions
+   simN2O           = 0
+   Rn2o             = 0.05
+   Kpart_ammox      = 1.0
+   Kin_deamm        = 1.0
+   atm_n2o          = 0.32e-6     ! atm
+   n2o_piston_model = 4
+  !-- Annamox
+   Rnh4no2          = 0.000001
+   Ranammox         = 0.001
+   Kanmx_nit        = 2.0
+   Kanmx_amm        = 2.0
+  !-- De-nitrification
+   Rdenit           = 0.26
+   Kdenit           = 2.0
+   theta_denit      = 1.08
+   Rdnra            = 0.01
+   Kdnra_oxy        = 2.0
+  !-- Sediment fluxes
+   Fsed_amm         =   3.5
+   Ksed_amm         =  25.0
+   Fsed_nit         =  -4.5
+   Ksed_nit         = 100.0
+   Fsed_n2o         =   0.0
+   Ksed_n2o         = 100.0
+   theta_sed_amm    = 1.08
+   theta_sed_nit    = 1.08
+   Fsed_amm_variable='SDF_Fsed_amm'
+   Fsed_nit_variable='SDF_Fsed_nit'
+  !Fsed_n2o_variable='SDF_Fsed_n2o'
+  !-- Atmospheric deposition
+   simDryDeposition = .false.
+   atm_din_dd       = 0.05
+   simWetDeposition = .false.
+   atm_din_conc     = 4.0
+/
+
+!###############################################################################
+! PHS: aed2_phosphorus - AED phosphorus model
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_nutrient.html
+!
+!-------------------------------------------------------------------------------
+&aed2_phosphorus
+  !-- Initial value
+   frp_initial = 0.25
+  !-- Sediment flux
+   Fsed_frp = 0.08
+   Ksed_frp = 30.0
+   theta_sed_frp = 1.08
+   phosphorus_reactant_variable ='OXY_oxy'
+   Fsed_frp_variable ='SDF_Fsed_frp'
+  !-- PO4 adsorption
+   simPO4Adsorption = .true.
+   ads_use_external_tss = .false.
+   po4sorption_target_variable ='NCS_ss1'
+   PO4AdsorptionModel = 1
+   Kpo4p = 0.1
+   ads_use_pH = .false.
+   Kadsratio= 1.0
+   Qmax = 1.0
+   w_po4ads = -9999     ! Note: -9999 links PO4-ad settling to target_variable
+  !-- Atmospheric deposition
+   simDryDeposition = .false.
+   atm_pip_dd = 0.00
+   simWetDeposition = .false.
+   atm_frp_conc = 0.00
+/
+
+
+!###############################################################################
+! OGM: aed2_organic_matter - AED organic matter model
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_organic_matter.html
+!
+!-------------------------------------------------------------------------------
+&aed2_organic_matter
+   !-- Initial concentrations for OM variables (mmol/m3)
+     poc_initial  =  78.5
+     doc_initial  =  39.9
+     pon_initial  =   8.3
+     don_initial  =   1.3
+     pop_initial  =   8.3
+     dop_initial  =   1.5
+     docr_initial = 350.0
+     donr_initial =  13.0
+     dopr_initial =   3.0
+     cpom_initial = 100.0
+   !-- Breakdown and mineralisation (basic pool)
+     Rpoc_hydrol  =   0.05
+     Rdoc_minerl  =   0.001
+     Rpon_hydrol  =   0.05
+     Rdon_minerl  =   0.005
+     Rpop_hydrol  =   0.05
+     Rdop_minerl  =   0.001
+     theta_hydrol =   1.08
+     theta_minerl =   1.08
+     Kpom_hydrol  =  31.25
+     Kdom_minerl  =  31.25
+     simDenitrification = 0
+     dom_miner_oxy_reactant_var = 'OXY_oxy'
+    !dom_miner_no2_reactant_var = 'NIT_no2'
+    !dom_miner_n2o_reactant_var = 'NIT_n2o'
+    !dom_miner_fe3_reactant_var = 'GEO_feiii'
+    !dom_miner_so4_reactant_var = 'GEO_so4'
+    !dom_miner_ch4_reactant_var = 'CAR_ch4'
+     doc_miner_product_variable = ''
+     don_miner_product_variable = 'NIT_amm'
+     dop_miner_product_variable = 'PHS_frp'
+     dom_miner_nit_reactant_var = 'NIT_nit'
+     f_an         = 1.
+     K_nit        = 10.0
+   !-- Refractory organic matter (optional)
+     simRPools    = .false.
+     Rdomr_minerl = 0.0001
+     Rcpom_bdown  = 0.0001
+     X_cpom_n     = 0.0005
+     X_cpom_p     = 0.0001
+   !-- Light related parameters
+     KeDOM        = 0.000005
+     KePOM        = 0.00096
+     KeDOMR       = 0.10000    ! = 1 (assuming KeDOMR is applied to CDOM in /m)
+     KeCPOM       = 0.00096    ! = 0.08 (/m)/(mg/L)  /83.3  (mmol/m3)/(mg/L)
+     simphotolysis= .false.    ! .true.
+    !photo_fmin
+     photo_c      = 0.75
+   !-- Particle settling parameters
+     settling     =  3
+     w_pom        = -0.06
+     d_pom        =  1e-5
+     rho_pom      = 1.2e3
+     w_cpom       = -0.01
+     d_cpom       =  1e-5
+     rho_cpom     = 1.4e3
+   !-- Sediment interaction parameters (basic model)
+     resuspension = 0
+     resus_link   = 'NCS_resus'
+     sedimentOMfrac = 0.0002
+     Xsc = 0.5
+     Xsn = 0.05
+     Xsp = 0.005
+     Fsed_doc = 0.0
+     Fsed_don = 0.0
+     Fsed_dop = 0.0
+     Ksed_dom = 4.5
+     theta_sed_dom = 1.08
+     Fsed_doc_variable = 'SDF_Fsed_doc'
+     Fsed_don_variable = 'SDF_Fsed_don'
+     Fsed_dop_variable = 'SDF_Fsed_dop'
+   !-- Other options
+    extra_diag = .false. !.true.
+   !diag_level = 1
+/
+
+!###############################################################################
+! PHY: aed2_phytoplankton - AED phytoplankton model
+!
+! Refer to the below link for module settings & parameter details:
+! http://aquatic.science.uwa.edu.au/research/models/AED/aed_phytoplankton.html
+!
+!-------------------------------------------------------------------------------
+&aed2_phytoplankton
+!-- Configure phytoplankton groups to simulate
+  num_phytos = 4
+  the_phytos = 1,2,3,4
+  settling   = 1,1,1,1
+!-- Benthic phytoplankton group (microphytobenthos)
+  do_mpb = 0          ! turn this on for benthic photosynthesis in chosen zones
+  R_mpbg = 0.5
+  R_mpbr = 0.05
+  I_Kmpb = 100.
+  mpb_max = 2000.
+  resuspension = 0.0,0.0,0.0,0.0
+  resus_link   = 'NCS_resus'
+  n_zones = 0
+  active_zones = 2,3,4,5
+!-- Set link variables to other modules
+  p_excretion_target_variable='OGM_dop'
+  n_excretion_target_variable='OGM_don'
+  c_excretion_target_variable='OGM_doc'
+  si_excretion_target_variable=''
+  p_mortality_target_variable='OGM_pop'
+  n_mortality_target_variable='OGM_pon'
+  c_mortality_target_variable='OGM_poc'
+  si_mortality_target_variable=''
+  p1_uptake_target_variable='PHS_frp'
+  n1_uptake_target_variable='NIT_nit'
+  n2_uptake_target_variable='NIT_amm'
+  si_uptake_target_variable='SIL_rsi'
+  do_uptake_target_variable='OXY_oxy'
+  c_uptake_target_variable=''
+!-- General options
+  dbase = '../External/AED2/aed2_phyto_pars.nml'
+  extra_diag = .false.
+  zerolimitfudgefactor = 900
+  min_rho = 900.
+  max_rho = 1200.
+/
+
+
+!-------------------------------------------------------------------------------
+!###############################################################################
+! PHY: aed2_macroalgae - AED macroalgae model
+!-------------------------------------------------------------------------------
+&aed2_macroalgae
+   num_malgae = 1
+   the_malgae = 1
+   settling =   5
+   slough_stress = 0.5
+   n_zones = 16
+   active_zones = 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+   p_excretion_target_variable='OGM_dop'
+   n_excretion_target_variable='OGM_don'
+   c_excretion_target_variable='OGM_doc'
+   si_excretion_target_variable='SIL_rsi'
+   p_mortality_target_variable='OGM_pop'
+   n_mortality_target_variable='OGM_pon'
+   c_mortality_target_variable='OGM_poc'
+   si_mortality_target_variable=''
+   p1_uptake_target_variable='PHS_frp'
+   n1_uptake_target_variable='NIT_nit'
+   n2_uptake_target_variable='NIT_amm'
+   si_uptake_target_variable='SIL_rsi'
+   do_uptake_target_variable='OXY_oxy'
+   c_uptake_target_variable=''
+   simMalgHSI = 1
+   extra_debug = .false.
+   dbase = '../External/AED2/aed2_malgae_pars.nml'
+/
+
+!-------------------------------------------------------------------------------
+!###############################################################################
+! ZOO: aed2_zooplankton - AED zooplankton model
+!-------------------------------------------------------------------------------
+&aed2_zooplankton
+   num_zoops = 1
+   the_zoops = 1
+   dn_target_variable=''  ! dissolved nitrogen target variable
+   pn_target_variable=''  ! particulate nitrogen target variable
+   dp_target_variable=''  ! dissolved phosphorus target variable
+   pp_target_variable=''  ! particulate phosphorus target variable
+   dc_target_variable=''  ! dissolved carbon target variable
+   pc_target_variable=''  ! particulate carbon target variable
+   dbase = '../External/AED2/aed2_zoop_pars.nml'
+   simZoopFeedback = .false.
+/
+
+
+!###############################################################################
+! aed2_bivalve - AED bivalve model
+!-------------------------------------------------------------------------------
+&aed2_bivalve
+   num_biv = 1
+   the_biv = 2
+   n_zones = 16
+   active_zones = 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+   simBivTracer = .true.
+   simBivFeedback = .true.
+   dn_target_variable=''  ! dissolved nitrogen target variable
+   pn_target_variable=''  ! particulate nitrogen target variable
+   dp_target_variable=''  ! dissolved phosphorus target variable
+   pp_target_variable=''  ! particulate phosphorus target variable
+   dc_target_variable=''  ! dissolved carbon target variable
+   pc_target_variable=''  ! particulate carbon target variable
+   do_uptake_variable='OXY_oxy'  ! oxygen uptake variable
+   ss_uptake_variable=''  ! ss uptake variable
+   dbase = '../External/AED2/aed2_bivalve_pars.nml'
+   extra_diag = .false.
+   simFixedEnv = .false.
+   simStaticBiomass = .true.
+/
+
+!-------------------------------------------------------------------------------
+!###############################################################################
+! TOT: aed2_totals - summary module
+!
+!example TN_vars =  'NIT_nit','NIT_amm','OGM_don','OGM_donr','OGM_pon','OGM_cpom','PHY_grn','PHY_bga','PHY_crypt','PHY_diatom','PHY_dino_IN'
+!example TN_varscale =    1.0,      1.0,      1.0,      1.0,       1.0,    0.0005,     0.15,     0.15,       0.15,        0.15,        1.0
+!example TP_vars =  'PHS_frp','PHS_frp_ads','OGM_dop','OGM_dopr','OGM_pop','OGM_cpom','PHY_grn','PHY_bga','PHY_crypt','PHY_diatom','PHY_dino'
+!example TP_varscale =    1.0,      1.0,      1.0,      1.0,       1.0,       0.0001,     0.01,     0.01,       0.01,        0.01,     0.01
+!example TOC_vars = 'OGM_doc','OGM_docr','OGM_poc', 'OGM_cpom','PHY_grn','PHY_bga','PHY_crypt','PHY_diatom','PHY_dino'
+!example TOC_varscale =   1.0,      1.0,      1.0,       1.0,      1.0,      1.0,       1.0,        1.0,         1.0
+!example TSS_vars = 'NCS_ss1','NCS_ss2','OGM_poc','OGM_cpom','PHY_grn','PHY_bga','PHY_crypt','PHY_diatom','PHY_dino'
+!example TSS_varscale =  1.0,      1.0,     0.03,      0.03,     0.03,     0.03,      0.03,         0.03,      0.03
+!example Turb_vars = 'NCS_ss1','NCS_ss2','OGM_poc','OGM_cpom','PHY_grn','PHY_bga','PHY_crypt','PHY_diatom','PHY_dino'
+!example Turb_varscale =  0.33,     0.33,     0.01,      0.01,     0.01,     0.01,      0.01,         0.01,      0.01
+!-------------------------------------------------------------------------------
+&aed2_totals
+   outputLight = .false. !.true.
+   TN_vars =  'NIT_nit',
+              'NIT_amm',
+              'OGM_don',
+              'OGM_pon',
+              'PHY_grn',
+              'PHY_bga',
+              'PHY_fdiat',
+              'PHY_mdiat'
+   TN_varscale = 1.0, 1.0, 1.0, 1.0, 0.15, 0.15, 0.15, 0.15
+   TP_vars =  'PHS_frp',
+              'PHS_frp_ads',
+              'OGM_dop',
+              'OGM_pop',
+              'PHY_grn',
+              'PHY_bga',
+              'PHY_fdiat',
+              'PHY_mdiat'
+   TP_varscale = 1.0, 1.0, 1.0, 0.01, 0.01, 0.01, 0.01
+   TOC_vars = 'OGM_doc',
+              'OGM_poc',
+              'PHY_grn',
+              'PHY_bga',
+              'PHY_fdiat',
+              'PHY_mdiat'
+   TOC_varscale = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+   TSS_vars = 'NCS_ss1',
+              'OGM_poc',
+              'PHY_grn',
+              'PHY_bga',
+              'PHY_fdiat',
+              'PHY_mdiat'
+   TSS_varscale = 1,0.1,0.1,0.1,0.1,0.1            !,  <vector same length as TSS names>
+   Turb_vars = 'NCS_ss1',
+               'OGM_poc',
+               'PHY_grn',
+               'PHY_bga',
+               'PHY_fdiat',
+               'PHY_mdiat'
+   Turb_varscale = 1,0.1,0.1,0.1,0.1,0.1
+
+/
+
+
+!-------------------------------------------------------------------------------
+!###############################################################################
+! HAB: aed2_habitat - AED habitat templates
+!-------------------------------------------------------------------------------
+&aed2_habitat
+  !-- Biotic Habitat
+    simCrabHabitat   = .true.
+    simRuppiaHabitat = .false.
+    simBirdForaging  = .false.
+    simBenthicProd   = .false.
+    simFishTolerance = .false.
+  !-- Metal Toxicity
+    simMetalTox = .false.
+      mtox_vars =  'GEO_Al'
+      mtox_lims = 2.0
+  !-- Algal blooms
+    simCyanoRisk = .false.
+/

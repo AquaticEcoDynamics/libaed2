@@ -1,0 +1,340 @@
+! ------------------------------------------------------------------------------
+ GEOCHEMISTRY DATABASE
+! ------------------------------------------------------------------------------
+
+# --
+# Geochemical Database
+# Prepared from PHREEQC wateq4f.dat
+#
+# 
+# --
+
+#---------
+COMPONENTS
+#Element  Component  Charge    g/mol (as simulated in CAEDYM - element or ion)
+
+Al         Al+3        +3      26.9815
+Ag         Ag+         +1     107.8680
+Ba         Ba+2        +2     137.3400
+DIC        CO3-2       -2      12.0111
+CH4        CH4          0      12.0111
+Ca         Ca+2        +2      40.0800
+Cd         Cd+2        +2     112.4000
+Cl         Cl-         -1      35.4530
+Cs         Cs+         +1     132.9050
+CuI        Cu+         +1      63.5460
+CuII       Cu+2        +2      63.5460
+e          e-          -1       0.0000
+F          F-          -1      10.0000
+FeII       Fe+2        +2      55.8470
+FeIII      Fe+3        +3      55.8470
+I          I-          -1     126.9044
+H          H+          +1      01.0080
+O          H2O          0      18.0160
+K          K+          +1      39.1020
+Li         Li+         +1       6.9390
+Mg         Mg+2        +2      24.3120
+MnII       Mn+2        +2      54.9380
+MnIII      Mn+3        +3      54.9380
+MnIV       Mn+4        +4      54.9380
+MnVII      MnO4-       +3      54.9380
+Na         Na+         +1      22.9898
+N          N2           0      14.0067
+NO2        NO2-        -1      14.0067
+NO3        NO3-        -1      14.0067
+NH4        NH4+        +1      14.0067
+Ni         Ni+2        +2      58.7100
+Pb         Pb+2        +2     207.1900
+PO4        PO4-3       -3      30.9738
+SO4        SO4-2       -2      96.0616
+H2S        H2S          0      32.0640
+SiO2       H4SiO4       0      28.0843
+Sr         Sr+2        +2      87.6200
+Zn         Zn+2        +2      65.3700
+
+#---------------------------------------------------------------------------------------------
+SPECIES
+#Name       Reaction                                                    log K    deltaH
+#                                                                       (@ 25C)  (kJ/mol}
+H+          [ H+     = H+        ]                                       0.000    0.000
+e-          [ e-     = e-        ]                                       0.000    0.000
+H2O         [ H2O    = H2O       ]                                       0.000    0.000
+Al+3        [ Al+3   = Al+3      ]                                       0.000    0.000
+Ag+         [ Ag+    = Ag+       ]                                       0.000    0.000
+CO3-2       [ CO3-2  = CO3-2     ]                                       0.000    0.000
+Ca+2        [ Ca+2   = Ca+2      ]                                       0.000    0.000
+Cd+2        [ Cd+2   = Cd+2      ]                                       0.000    0.000
+CH4         [ CH4    = CH4       ]                                       0.000    0.000
+H2S         [ H2S    = H2S       ]                                       0.000    0.000
+Cl-         [ Cl-    = Cl-       ]                                       0.000    0.000
+Cs+         [ Cs+    = Cs+       ]                                       0.000    0.000
+Cu+2        [ Cu+2   = Cu+2      ]                                       0.000    0.000
+F-          [ F-     = F-        ]                                       0.000    0.000
+Fe+2        [ Fe+2   = Fe+2      ]                                       0.000    0.000
+Fe+3        [ Fe+3   = Fe+3      ]                                       0.000    0.000
+I-          [ I-     = I-        ]                                       0.000    0.000
+K+          [ K+     = K+        ]                                       0.000    0.000
+Li+         [ Li+    = Li+       ]                                       0.000    0.000
+Mg+2        [ Mg+2   = Mg+2      ]                                       0.000    0.000
+Mn+2        [ Mn+2   = Mn+2      ]                                       0.000    0.000
+Mn+4        [ Mn+4   = Mn+4      ]                                       0.000    0.000
+NO3-        [ NO3-   = NO3-      ]                                       0.000    0.000
+NH4+        [ NH4+   = NH4+      ]                                       0.000    0.000
+Na+         [ Na+    = Na+       ]                                       0.000    0.000
+Ni+2        [ Ni+2   = Ni+2      ]                                       0.000    0.000
+PO4-3       [ PO4-3  = PO4-3     ]                                       0.000    0.000
+Pb+2        [ Pb+2   = Pb+2      ]                                       0.000    0.000
+SO4-2       [ SO4-2  = SO4-2     ]                                       0.000    0.000
+H4SiO4      [ H4SiO4 = H4SiO4    ]                                       0.000    0.000
+Sr+2        [ Sr+2   = Sr+2      ]                                       0.000    0.000
+Zn+2        [ Zn+2   = Zn+2      ]                                       0.000    0.000
+#Fe+2       [ Fe+2   = Fe+3 + e- ]                                       0.000    0.000
+FeOH+2      [ FeOH+2        =  Fe+3       + H2O     - H+            ]   -2.190   43.514
+FeOH+       [ FeOH+         =  Fe+2       + H2O     - H+            ]   -9.500   55.229
+Fe(OH)3-    [ Fe(OH)3-      =  Fe+2       + 3H2O    - 3H+           ]  -31.000  126.775
+FeSO4+      [ FeSO4+        =  Fe+3       + SO4-2                   ]    4.040   16.359
+FeCl+2      [ FeCl+2        =  Fe+3       + Cl-                     ]    1.480   23.430
+FeCl2+      [ FeCl2+        =  Fe+3       + 2Cl-                    ]    2.130    0.000
+FeCl3       [ FeCl3         =  Fe+3       + 3Cl-                    ]    1.130    0.000
+FeSO4       [ FeSO4         =  Fe+2       + SO4-2                   ]    2.250   13.514
+H3SiO4-     [ H3SiO4-       =  H4SiO4     - H+                      ]   -9.830   25.606
+H2SiO4-2    [ H2SiO4-2      =  H4SiO4     - 2H+                     ]  -23.000   73.638
+HPO4-2      [ HPO4-2        =  H+         + PO4-3                   ]   12.346  -14.770
+H2PO4-      [ H2PO4-        =  2H+        + PO4-3                   ]   19.553  -18.912
+CaSO4       [ CaSO4         =  Ca+2       + SO4-2                   ]    2.300    6.904
+MgOH+       [ MgOH+         =  Mg+2       + H2O     - H+            ]  -11.440   66.743
+NH3         [ NH3           =  NH4+       - H+                      ]   -9.252   52.216
+NaHPO4-     [ NaHPO4-       =  Na+        + PO4-3   +   H+          ]   12.636    0.000
+KHPO4-      [ KHPO4-        =  K+         + PO4-3   +   H+          ]   12.636    0.000
+MgHPO4      [ MgHPO4        =  Mg+2       + PO4-3   +   H+          ]   15.216   13.807
+CaHPO4      [ CaHPO4        =  Ca+2       + PO4-3   +   H+          ]   15.085   13.807
+#CH4        [ CH4           =  CO3-2      + 8e-     +   10H+        ]   41.071 -255.387
+CO2         [ CO2           =  CO3-2      + 2H+     -   H2O         ]   16.681  -24.008
+HCO3-       [ HCO3-         =  H+         + CO3-2                   ]   10.329  -14.912
+NaCO3-      [ NaCO3-        =  Na+        + CO3-2                   ]    1.270   37.279
+NaHCO3      [ NaHCO3        =  Na+        + CO3-2   +   H+          ]   10.079    0.000
+NaSO4-      [ NaSO4-        =  Na+        + SO4-2                   ]    0.700    4.686
+KSO4-       [ KSO4-         =  K+         + SO4-2                   ]    0.850    9.414
+MgCO3       [ MgCO3         =  Mg+2       + CO3-2                   ]    2.980   11.351
+MgHCO3+     [ MgHCO3+       =  Mg+2       + CO3-2   +   H+          ]   11.399    3.305
+MgSO4       [ MgSO4         =  Mg+2       + SO4-2                   ]    2.370   19.037
+CaOH+       [ CaOH+         =  Ca+2       + H2O     - H+            ]  -12.780    0.000
+CaHCO3+     [ CaHCO3+       =  Ca+2       + CO3-2   +   H+          ]   11.435   11.255
+CaCO3       [ CaCO3         =  Ca+2       + CO3-2                   ]    3.224   14.832
+AlOH+2      [ AlOH+2        =  Al+3       + H2O     - H+            ]   -5.000   48.074
+Al(OH)2+    [ Al(OH)2+      =  Al+3       + 2H2O    - 2H+           ]  -10.100  112.550
+Al(OH)3     [ Al(OH)3       =  Al+3       + 3H2O    - 3H+           ]  -16.900  166.900
+Al(OH)4-    [ Al(OH)4-      =  Al+3       + 4H2O    - 4H+           ]  -22.700  176.983
+AlSO4+      [ AlSO4+        =  Al+3       + SO4-2                   ]    3.500    9.581
+Al(SO4)2-   [ Al(SO4)2-     =  Al+3       + 2SO4-2                  ]    5.000   13.012
+AlF+2       [ AlF+2         =  Al+3       + F-                      ]    7.000    4.435
+AlF2+       [ AlF2+         =  Al+3       + 2F-                     ]   12.700    8.284
+AlF3        [ AlF3          =  Al+3       + 3F-                     ]   16.800    9.037
+AlF4-       [ AlF4-         =  Al+3       + 4F-                     ]   19.400    9.205
+HSO4-       [ HSO4-         =  H+         + SO4-2                   ]    1.988   16.108
+#H2S        [ H2S           =  SO4-2      + 10H+    + 8e-   - 4H2O  ]   40.644 -273.801
+HS-         [ HS-           =  H2S        - H+                      ]   -6.994   22.175
+S-2         [ S-2           =  H2S        - 2H+                     ]  -19.912   50.626
+O2          [ O2            =  2H2O       - 4e-     - 4H+           ]  -86.080  563.961
+H2          [ H2            =  2H+        + 2e-                     ]   -3.150   -7.360
+Fe(OH)2+    [ Fe(OH)2+      =  Fe+3       + 2H2O    - 2H+           ]   -5.670   71.546
+Fe(OH)3     [ Fe(OH)3       =  Fe+3       + 3H2O    - 3H+           ]  -12.560  103.763
+Fe(OH)4-    [ Fe(OH)4-      =  Fe+3       + 4H2O    - 4H+           ]  -21.600  133.470
+Fe(OH)2     [ Fe(OH)2       =  Fe+2       + 2H2O    - 2H+           ]  -20.570  119.516
+FeH2PO4+    [ FeH2PO4+      =  Fe+2       + PO4-3   +   2H+         ]   22.253    0.000
+CaPO4-      [ CaPO4-        =  Ca+2       + PO4-3                   ]    6.459   12.970
+CaH2PO4+    [ CaH2PO4+      =  Ca+2       + PO4-3   +   2H+         ]   20.961   14.226
+MgPO4-      [ MgPO4-        =  Mg+2       + PO4-3                   ]    6.589   12.970
+MgH2PO4+    [ MgH2PO4+      =  Mg+2       + PO4-3   +   2H+         ]   21.066   12.970
+#NH4        [ NH4+          =  NO3-       + 10H+    + 8e- - 3H2O    ]  119.077 -782.638
+NH4SO4-     [ NH4SO4-       =  NH4+       + SO4-2                   ]    1.110    0.000
+FeHPO4      [ FeHPO4        =  Fe+2       + PO4-3   +   2H+         ]   23.153    0.000
+FeHPO4+     [ FeHPO4+       =  Fe+3       + PO4-3   +   2H+         ]   24.983   24.100
+FeHSO4+     [ FeHSO4+       =  Fe+2       + H+      +   SO4-2       ]    3.068    0.000
+OH-         [ OH-           =  H2O        - H+                      ]  -14.000   55.907
+FeH2PO4+2   [ FeH2PO4+2     =  Fe+3       + PO4-3   +   2H+         ]   24.983    0.000
+FeHSO4+2    [ FeHSO4+2      =  Fe+3       + H+      +   SO4-2       ]    4.468    0.000
+CaF+        [ CaF+          =  Ca+2       + F-                      ]    0.940   17.238
+FeF+2       [ FeF+2         =  Fe+3       + F-                      ]    6.200   11.297
+FeF2+       [ FeF2+         =  Fe+3       + 2F-                     ]   10.800   20.083
+FeF3        [ FeF3          =  Fe+3       + 3F-                     ]   14.000   22.594
+CaHSO4+     [ CaHSO4+       =  Ca+2       + H+      + SO4-2         ]    3.068    0.000
+MgF+        [ MgF+          =  Mg+2       + F-                      ]    1.820   13.389
+#Mn+3       [ Mn+3          =  Mn+2       + e-                      ]  -25.510  107.947
+MnCl+       [ MnCl+         =  Mn+2       + Cl-                     ]    0.610    0.000
+MnCl2       [ MnCl2         =  Mn+2       + 2Cl-                    ]    0.250    0.000
+MnCl3-      [ MnCl3-        =  Mn+2       + 3Cl-                    ]   -0.310    0.000
+MnOH+       [ MnOH+         =  Mn+2       + H2O     + H+            ]  -10.590   60.250
+Mn(OH)3-    [ Mn(OH)3-      =  Mn+2       + 3H2O    + 3H+           ]  -34.800    0.000
+MnF+        [ MnF+          =  Mn+2       + F-                      ]    0.840    0.000
+MnSO4       [ MnSO4         =  Mn+2       + SO4-2                   ]    2.250   14.100
+Mn(NO3)2    [ Mn(NO3)2      =  Mn+2       + 2NO3-                   ]    0.600   -1.657
+MnHCO3+     [ MnHCO3+       =  Mn+2       + CO3-2   + 2H+           ]   12.279    0.000
+#MnO4-      [ MnO4-         =  Mn+2       + 4H2O    - 8H+   - 5e-   ] -127.824  738.978
+#MnO4-2     [ MnO4-2        =  Mn+2       + 4H2O    - 8H+   - 4e-   ] -118.440  627.684
+SiF6-2      [ SiF6-2        =  H4SiO4     + 4H+     + 6F-   - 4H2O  ]   30.180  -68.032
+HF          [ HF            =  H+         + F-                      ]    3.180   13.305
+HF2-        [ HF2-          =  H+         + 2F-                     ]    3.760   19.037
+CuCl2-      [ CuCl2-        =  Cu+        + 2Cl-                    ]    5.500   -1.757
+CuCl3-2     [ CuCl3-2       =  Cu+        + 3Cl-                    ]    5.700    1.088
+#Cu+        [ Cu+           =  Cu+2       + e-                      ]    2.720    6.904
+CuCO3       [ CuCO3         =  Cu+2       + CO3-2                   ]    6.730    0.000
+Cu(CO3)2-2  [ Cu(CO3)2-2    =  Cu+2       + 2CO3-2                  ]    9.830    0.000
+CuCl+       [ CuCl+         =  Cu+2       + Cl-                     ]    0.430   36.192
+CuCl2       [ CuCl2         =  Cu+2       + 2Cl-                    ]    0.160   44.183
+CuCl3-      [ CuCl3-        =  Cu+2       + 3Cl-                    ]   -2.290   57.279
+CuCl4-2     [ CuCl4-2       =  Cu+2       + 4Cl-                    ]   -4.590   74.392
+CuF+        [ CuF+          =  Cu+2       + F-                      ]    1.260    6.778
+CuOH+       [ CuOH+         =  Cu+2       + H2O     + H+            ]   -8.000    0.000
+Cu(OH)2     [ Cu(OH)2       =  Cu+2       + 2H2O    + 2H+           ]  -13.680    0.000
+Cu(OH)3-    [ Cu(OH)3-      =  Cu+2       + 3H2O    + 3H+           ]  -26.900    0.000
+Cu(OH)4-2   [ Cu(OH)4-2     =  Cu+2       + 4H2O    + 4H+           ]  -39.600    0.000
+Cu2(OH)2+2  [ Cu2(OH)2+2    =  2Cu+2      + 2H2O    + 2H+           ]  -10.359   73.383
+CuSO4       [ CuSO4         =  Cu+2       + SO4-2                   ]    2.310    5.104
+#Cu(HS)3-   [ Cu(HS)3-      =  Cu+2       + 3HS-                    ]    25.90    0.000
+ZnCl+       [ ZnCl+         =  Zn+2       + Cl-                     ]    0.430   32.593
+ZnCl2       [ ZnCl2         =  Zn+2       + 2Cl-                    ]    0.450   35.564
+ZnCl3-      [ ZnCl3-        =  Zn+2       + 3Cl-                    ]    0.500   39.999
+ZnCl4-2     [ ZnCl4-2       =  Zn+2       + 4Cl-                    ]    0.200   45.857
+ZnF+        [ ZnF+          =  Zn+2       + F-                      ]    1.150    9.288
+ZnOH+       [ ZnOH+         =  Zn+2       + H2O     - H+            ]   -8.960   56.066
+Zn(OH)2     [ Zn(OH)2       =  Zn+2       + 2H2O    - 2H+           ]  -16.900    0.000
+Zn(OH)3-    [ Zn(OH)3-      =  Zn+2       + 3H2O    - 3H+           ]  -28.400    0.000
+Zn(OH)4-2   [ Zn(OH)4-2     =  Zn+2       + 4H2O    - 4H+           ]  -41.200    0.000
+ZnOHCl      [ ZnOHCl        =  Zn+2       + H2O     + Cl-   - H+    ]   -7.480    0.000
+#Zn(HS)2    [ Zn(HS)2       =  Zn+2       + 2HS-                    ]   14.940    0.000
+#Zn(HS)3-   [ Zn(HS)3-      =  Zn+2       + 3HS-                    ]   16.100    0.000
+ZnSO4       [ ZnSO4         =  Zn+2       + SO4-2                   ]    2.370    5.690
+Zn(SO4)2-2  [ Zn(SO4)2-2    =  Zn+2       + 2SO4-2                  ]    3.280    0.000
+CdCl+       [ CdCl+         =  Cd+2       + Cl-                     ]    1.980    2.469
+CdCl2       [ CdCl2         =  Cd+2       + 2Cl-                    ]    2.600    5.188
+CdCl3-      [ CdCl3-        =  Cd+2       + 3Cl-                    ]    2.400   16.318
+CdF+        [ CdF+          =  Cd+2       + F-                      ]    1.100    0.000
+CdF2        [ CdF2          =  Cd+2       + 2F-                     ]    1.500    0.000
+Cd(CO3)2-2  [ Cd(CO3)2-2    =  Cd+2       + 2CO3-2                  ]    6.400    0.000
+CdOH+       [ CdOH+         =  Cd+2       + H2O     - H+            ]  -10.080   54.810
+Cd(OH)2     [ Cd(OH)2       =  Cd+2       + 2H2O    - 2H+           ]  -20.350    0.000
+Cd(OH)3-    [ Cd(OH)3-      =  Cd+2       + 3H2O    - 3H+           ]  -33.300    0.000
+Cd(OH)4-2   [ Cd(OH)4-2     =  Cd+2       + 4H2O    - 4H+           ]  -47.350    0.000
+Cd2OH+3     [ Cd2OH+3       =  2Cd+2      + H2O     - H+            ]   -9.390   45.606
+CdOHCl      [ CdOHCl        =  Cd+2       + H2O     + Cl-   - H+    ]   -7.404   18.221
+CdNO3+      [ CdNO3+        =  Cd+2       + NO3-                    ]    0.400  -21.757
+CdSO4       [ CdSO4         =  Cd+2       + SO4-2                   ]    2.460    4.519
+#CdHS+      [ CdHS+         =  Cd+2       + HS-                     ]   10.170    0.000
+#Cd(HS)2    [ Cd(HS)2       =  Cd+2       + 2HS-                    ]   16.530    0.000
+#Cd(HS)3-   [ Cd(HS)3-      =  Cd+2       + 3HS-                    ]   18.710    0.000
+#Cd(HS)4-2  [ Cd(HS)4-2     =  Cd+2       + 4HS-                    ]   20.900    0.000
+Fe(SO4)2-   [ Fe(SO4)2-     =  Fe+3       + 2SO4-2                  ]    5.380   19.246
+Fe2(OH)2+4  [ Fe2(OH)2+4    =  2Fe+3      + 2H2O    - 2H+           ]   -2.950   56.484
+Fe3(OH)4+5  [ Fe3(OH)4+5    =  3Fe+3      + 4H2O    - 4H+           ]   -6.300   59.831
+PbCl+       [ PbCl+         =  Pb+2       + Cl-                     ]    1.600   18.326
+PbCl2       [ PbCl2         =  Pb+2       + 2Cl-                    ]    1.800    4.519
+PbCl3-      [ PbCl3-        =  Pb+2       + 3Cl-                    ]    1.700    9.079
+PbCl4-2     [ PbCl4-2       =  Pb+2       + 4Cl-                    ]    1.380   14.770
+Pb(CO3)2-2  [ Pb(CO3)2-2    =  Pb+2       + 2CO3-2                  ]   10.640    0.000
+PbF+        [ PbF+          =  Pb+2       + F-                      ]    1.250    0.000
+PbF2        [ PbF2          =  Pb+2       + 2F-                     ]    2.560    0.000
+PbF3-       [ PbF3-         =  Pb+2       + 3F-                     ]    3.420    0.000
+PbF4-2      [ PbF4-2        =  Pb+2       + 4F-                     ]    3.100    0.000
+PbOH+       [ PbOH+         =  Pb+2       + H2O     - H+            ]   -7.710    0.000
+Pb(OH)2     [ Pb(OH)2       =  Pb+2       + 2H2O    - 2H+           ]  -17.120    0.000
+Pb(OH)3-    [ Pb(OH)3-      =  Pb+2       + 3H2O    - 3H+           ]  -28.060    0.000
+Pb2OH+3     [ Pb2OH+3       =  2Pb+2      + H2O     - H+            ]   -6.360    0.000
+PbNO3+      [ PbNO3+        =  Pb+2       + NO3-                    ]    1.170    0.000
+PbSO4       [ PbSO4         =  Pb+2       + SO4-2                   ]    2.750    0.000
+#Pb(HS)2    [ Pb(HS)2       =  Pb+2       + 2HS-                    ]   15.270    0.000
+#Pb(HS)3-   [ Pb(HS)3-      =  Pb+2       + 3HS-                    ]   16.570    0.000
+Pb3(OH)4+2  [ Pb3(OH)4+2    =  3Pb+2      + 4H2O    + 4H+           ]  -23.880  110.876
+FeF+        [ FeF+          =  Fe+2       + F-                      ]    1.000    0.000
+AlHSO4+2    [ AlHSO4+2      =  Al+3       + H+      + SO4-2         ]    2.488    0.000
+#NO2        [ NO2-          =  NO3-       + 2H+     + 2e-   - H2O   ]   28.570 -183.092
+NiCl+       [ NiCl+         =  Ni+2       + Cl-                     ]    0.400    0.000
+NiF+        [ NiF+          =  Ni+2       + F-                      ]    1.300    0.000
+NiOH+       [ NiOH+         =  Ni+2       + H2O     - H+            ]   -9.860   51.965
+Ni(OH)2     [ Ni(OH)2       =  Ni+2       + 2H2O    - 2H+           ]  -19.000    0.000
+Ni(OH)3-    [ Ni(OH)3-      =  Ni+2       + 3H2O    - 3H+           ]  -30.000    0.000
+NiSO4       [ NiSO4         =  Ni+2       + SO4-2                   ]    2.290    6.360
+AgCl        [ AgCl          =  Ag+        + Cl-                     ]    3.270  -11.213
+AgCl2-      [ AgCl2-        =  Ag+        + 2Cl-                    ]    5.270  -16.443
+AgCl3-2     [ AgCl3-2       =  Ag+        + 3Cl-                    ]    5.290    0.000
+AgCl4-3     [ AgCl4-3       =  Ag+        + 4Cl-                    ]    5.510    0.000
+AgF         [ AgF           =  Ag+        + F-                      ]    0.360  -11.841
+#AgHS       [ AgHS          =  Ag+        + HS-                     ]   14.050    0.000
+#Ag(HS)2-   [ Ag(HS)2-      =  Ag+        + 2HS-                    ]   18.450    0.000
+AgI         [ AgI           =  Ag+        + I-                      ]    6.600    0.000
+AgI2-       [ AgI2-         =  Ag+        + 2I-                     ]   10.680    0.000
+AgOH        [ AgOH          =  Ag+        + H2O     + H+            ]  -12.000    0.000
+Ag(OH)2-    [ Ag(OH)2-      =  Ag+        + 2H2O    + 2H+           ]  -24.000    0.000
+AgSO4-      [ AgSO4-        =  Ag+        + SO4-2                   ]    1.290    6.234
+AgNO3       [ AgNO3         =  Ag+        + NO3-                    ]   -0.290    0.000
+Ag(NO2)2-   [ Ag(NO2)2-     =  Ag+        + 2NO2-                   ]    2.220    0.000
+ZnI+        [ ZnI+          =  Zn+2       + I-                      ]   -2.910    0.000
+ZnI2        [ ZnI2          =  Zn+2       + 2I-                     ]   -1.690    0.000
+CdI+        [ CdI+          =  Cd+2       + I-                      ]    2.150   -9.916
+CdI2        [ CdI2          =  Cd+2       + 2I-                     ]    3.590    0.000
+PbI+        [ PbI+          =  Pb+2       + I-                      ]    1.940    0.000
+PbI2        [ PbI2          =  Pb+2       + 2I-                     ]    3.200    0.000
+PbCO3       [ PbCO3         =  Pb+2       + CO3-2                   ]    7.240    0.000
+Pb(OH)4-2   [ Pb(OH)4-2     =  Pb+2       + 4H2O    + 4H+           ]  -39.700    0.000
+Pb(SO4)2-2  [ Pb(SO4)2-2    =  Pb+2       + 2SO4-2                  ]    3.470    0.000
+AgI3-2      [ AgI3-2        =  Ag+        + 3I-                     ]   13.370 -113.094
+AgI4-3      [ AgI4-3        =  Ag+        + 4I-                     ]   14.080    0.000
+#Fe(HS)2    [ Fe(HS)2       =  Fe+2       + 2HS-                    ]    8.950    0.000
+#Fe(HS)3-   [ Fe(HS)3-      =  Fe+2       + 3HS-                    ]   10.987    0.000
+#H4AsO3+    [ H4AsO3+       =  H3AsO3     + H+                      ]   -0.305    0.000
+CuHCO3+     [ CuHCO3+       =  Cu+2       + H+         + CO3-2      ]   13.029    0.000
+ZnHCO3+     [ ZnHCO3+       =  Zn+2       + H+         + CO3-2      ]   12.429    0.000
+ZnCO3       [ ZnCO3         =  Zn+2       + CO3-2                   ]    5.300    0.000
+Zn(CO3)2-2  [ Zn(CO3)2-2    =  Zn+2       + 2CO3-2                  ]    9.630    0.000
+CdHCO3      [ CdHCO3+       =  Cd+2       + H+         + CO3-2      ]   11.829    0.000
+CdCO3       [ CdCO3         =  Cd+2       + CO3-2                   ]    2.900    0.000
+Cd(SO4)2-2  [ Cd(SO4)2-2    =  Cd+2       + 2SO4-2                  ]    3.500    0.000
+PbHCO3+     [ PbHCO3+       =  Pb+2       + H+         + CO3-2      ]   13.229    0.000
+NiCl2       [ NiCl2         =  Ni+2       + 2Cl-                    ]    0.960    0.000
+NiHCO3+     [ NiHCO3+       =  Ni+2       + H+         + CO3-2      ]   12.469    0.000
+NiCO3       [ NiCO3         =  Ni+2       + CO3-2                   ]    6.870    0.000
+Ni(CO3)2-2  [ Ni(CO3)2-2    =  Ni+2       + 2CO3-2                  ]   10.110    0.000
+Ni(SO4)2-2  [ Ni(SO4)2-2    =  Ni+2       + 2SO4-2                  ]    1.020    0.000
+H2F2        [ H2F2          =  2H+        + 2F-                     ]    6.768    0.000
+NaF         [ NaF           =  Na+        + F-                      ]   -0.240    0.000
+FeCl+       [ FeCl+         =  Fe+2       + Cl-                     ]    0.140    0.000
+BaSO4       [ BaSO4         =  Ba+2       + SO4-2                   ]    2.700    0.000
+FeHCO3+     [ FeHCO3+       =  Fe+2       + H+         + CO3-2      ]   12.329    0.000
+FeCO3       [ FeCO3         =  Fe+2       + CO3-2                   ]    4.380    0.000
+MnCO3       [ MnCO3         =  Mn+2       + CO3-2                   ]    4.900    0.000
+BaHCO3+     [ BaHCO3+       =  Ba+2       + H+         + CO3-2      ]   11.311    0.000
+BaCO3       [ BaCO3         =  Ba+2       + CO3-2                   ]    2.710   14.853
+SrSO4       [ SrSO4         =  Sr+2       + SO4-2                   ]    2.290    8.703
+SrHCO3+     [ SrHCO3+       =  Sr+2       + H+         + CO3-2      ]   11.509   25.313
+
+#----------------------------------------------------------------------------------------------
+PHASES
+#Name       Reaction                                                  logK   deltaH SettlingVel
+#                                                                  (@ 25C) (kJ/mol}      (m/s)
+Gibbsite    [ Al(OH)3         = Al+3 + 3H2O  - 3H+               ]   9.100   -95.42   -0.000001
+Jurbanite   [ AlOHSO4         = Al+3 + SO4-2 + H2O - H+          ]  -3.230     0.00   -0.000001
+Jarosite-K  [ KFe3(SO4)2(OH)6 = K+ + 3Fe+3 + 2SO4-2 + 6H2O - 6H+ ]  -9.210  -130.91   -0.000001
+CO2(g)      [ CO2(g)          = CO3-2   +   2H+     -   H2O      ]  15.213     0.00   -0.000001
+Hematite    [ Fe2O3           = 2Fe+3   +   3H2O    -   6H+      ]  -4.008     0.00   -0.000001
+Maghemite   [ Fe2O3           = 2Fe+3   +   3H2O    -   6H+      ]   6.386     0.00   -0.000001
+Goethite    [ FeOOH           =  Fe+3   +   2H2O    -   3H+      ]  -1.000     0.00   -0.000001
+Magnetite   [ Fe3O4           = 2Fe+3   +   Fe+2 + 4H2O  -  8H+  ]   3.737     0.00   -0.000001
+Fe(OH)3_a   [ Fe(OH)3a        =  Fe+3   +   3H2O    -   3H+      ]   4.891     0.00   -0.000001
+Birnessite  [ MnO2            =  Mn+4    +   2H2O    -  4H+      ]  3.601     0.0    -0.000001
+# # # CANDI USES THESE: # # #
+FeOH3A      [ FeOH3A          =  Fe+3   +   3H2O    -   3H+      ]   4.891     0.00   -0.000001
+FeOH3B      [ FeOH3B          =  Fe+3   +   3H2O    -   3H+      ]  -1.000     0.00   -0.000001
+MnO2A       [ MnO2A           =  Mn+4   +   2H2O    -  4H+       ]  3.601     0.0    -0.000001
+MnO2B       [ MnO2B           =  Mn+4   +   2H2O    -  4H+       ]  3.601     0.0    -0.000001
+Calcite     [ CaCO3           =  Ca+2   +   CO3-2                ]  -8.0   -9.61   -0.0000005  was -8.48
+Aragonite   [ CaCO3           =  Ca+2   +   CO3-2                ]  -8.336   -10.84   -0.000001
+Rhodchros   [ MnCO3           =  Mn+2   +   CO3-2                ] -11.130    -6.86   -0.000001
+Siderite    [ FeCO3           =  Fe+2   +   CO3-2                ] -10.890   -11.90   -0.000001
+FeS(ppt)    [ FeS             =  Fe+2   +   H2S     -  2H+       ] -10.909     0.0    -0.000001
+Pyrite      [ FeS2            =  Fe+2   +   2H2S    -  4H+       ]  -3.915     0.0    -0.000001
+ZnS         [ ZnS             =  Zn+2   +   H2S     -  2H+       ]  -4.3624     0.0    -0.000001
+CdS         [ CdS             =  Cd+2   +   H2S     -  2H+       ]  -4.3624     0.0    -0.000001
+PbS         [ PbS             =  Pb+2   +   H2S     -  2H+       ]  -4.3624     0.0    -0.000001
+NiS         [ NiS             =  Ni+2   +   H2S     -  2H+       ]  -4.3624     0.0    -0.000001
+
+ENDFILE

@@ -1,0 +1,65 @@
+!-------------------------------------------------------------------------------
+! aed_phyto_pars
+!-------------------------------------------------------------------------------
+! p_name        [string]: Name of phytoplankton group
+! p_initial     [real]: Initial concentration of phytoplankton (mmol C/m3)
+! p0            [real]:	Minimum concentration of phytoplankton (mmol C/m3)
+! w_p           [real]: sedimentation rate (m/d)
+! Ycc           [real]: carbon to chlorophyll ratio (mg C/mg chla)
+!-- GROWTH parameters
+! R_growth      [real]: Phyto max growth rate @20C (/day)
+! fT_Method     [int]:  Specifies temperature limitation function of growth (-); 0 = no temperature limitation 1= CAEDYM style
+! theta_growth  [real]: Arrenhius temperature scaling for growth function (-)
+! T_std         [real]: Standard temperature (deg C)
+! T_opt         [real]: Optimum temperature (deg C)
+! T_max         [real]: Maximum temperature (deg C)
+!-- LIGHT parameters
+! lightModel    [int]: Type of light response function [0 = no photoinhibition; 1 = photoinhibition]
+! I_K           [real]: Half saturation constant for light limitation of growth (microE/m^2/s) used if lightModel=0
+! I_S           [real]: saturating light intensity  (microE/m^2/s) used if lightModel=1
+! KePHY         [real]: Specific attenuation coefficient  ((mmol C m^3^-1)^1 m^-1)
+!-- RESPIRATION parameters
+! f_pr          [real]: Fraction of primary production lost to exudation (-)
+! R_resp        [real]: Phytoplankton respiration/metabolic loss rate @ 20 (degC)
+! theta_resp    [real]: Arrhenius temperature scaling factor for respiration (-)
+! k_fres        [real]: Fraction of metabolic loss that is true respiration (-)
+! k_fdom        [real]: Fraction of metabolic loss that is DOM (-)
+!-- SALINITY parameters
+! salTol        [int]:  Type of salinity limitation function (-)
+! S_bep         [real]: Salinity limitation value at maximum salinity S_maxsp (-)
+! S_maxsp       [real]: Maximum salinity (g/kg)
+! S_opt         [real]: Optimal salinity (g/kg)
+!-- NITROGEN parameters
+! simDINUptake  [int]:  Simulate DIN uptake (0 = false, 1 = true)
+! simDONUptake  [int]:  Simulate DON uptake (0 = false, 1 = true) - currently not functioning
+! simNFixation  [int]:  Simulate N fixation (0 = false, 1 = true)
+! simINDynamics [int]:  Simulate internal N  (0 = assumed fixed C:N, 2 = dynamic C:N)
+! N_o           [real]: Nitrogen concentraion below which uptake is 0 (mmol N/m^3)
+! K_N           [real]: Half-saturation concentration of nitrogen (mmol N/m^3)
+! X_ncon        [real]: Constant internal nitrogen concentration (mmol N/ mmol C) used if simINDynamics = 0 or 1
+! X_nmin        [real]: minimum internal nitrogen concentration (mmol N/ mmol C) used if simINDynamics = 2
+! X_nmax        [real]: maximum internal nitrogen concentration (mmol N/ mmol C) used if simINDynamics = 2
+! R_nuptake     [real]: maximum nitrogen uptake rate(mmol N/m^3/d) used if simINDynamics = 2
+! k_nfix        [real]: growth rate reduction under maximum nitrogen fixation (/day) used if simNFixation >0
+! R_nfix        [real]: nitrogen fixation rate (mmol N/mmol C/day)
+!-- PHOSPHORUS parameters
+! simDIPUptake  [real]: Simulate DIP uptake (0 = false, 1 = true)
+! simIPDynamics [real]: Simulate internal phosphorus dynamics (0 = assumed fixed C:P, 2 = dynamic C:P)
+! P_0           [real]: Phosphorus concentraion below which uptake is 0 (mmol P/m^3)
+! K_P           [real]: Half-saturation concentration of phosphorus (mmol P/m^3)
+! X_pcon        [real]: Constant internal phosphorus concentration (mmol P/ mmol C) used if simIPDynamics = 0 or 1
+! X_pmin        [real]: Minimum internal phosphorus concentration (mmol P/mmol C) used if simIPDynamics = 2
+! X_pmax        [real]: Maximum internal phosphorus concentration (mmol P/mmol C) used if simIPDynamics = 2
+! R_puptake     [real]: Maximum phosphorus uptake rate(mmol P/m^3/d) used if simIPDynamics = 2
+!-- SILICA parameters
+! simSiUptake   [int]:  Simulate Si uptake (0 = false, 1 = true)
+! Si_0          [real]: Silica concentraion below which uptake is 0 (mmol Si/m^3)
+! K_Si          [real]: Half-saturation concentration of silica (mmol Si /m3)
+! X_sicon       [real]: Constant intenral silica concentration (mmol Si/mmol C)
+!-------------------------------------------------------------------------------
+
+!	p_name,	 p_initial,	   p0,	    w_p,	  Ycc, R_growth, fT_Method, theta_growth,   T_std,	T_opt,	T_max, lightModel,    I_K,    I_S,	  KePHY,	 f_pr,	R_resp,	theta_resp,	k_fres,	k_fdom,	salTol,	S_bep, S_maxsp,	S_opt,	simDINUptake, simDONUptake,	simNFixation,simINDynamics,   N_o,	  K_N, X_ncon, X_nmin, X_nmax, R_nuptake, k_nfix,   R_nfix,	simDIPUptake,	simIPDynamics,	  P_0,	  K_P, X_pcon, X_pmin, X_pmax, R_puptake, simSiUptake,    Si_0,	  K_Si,	X_sicon
+&malgae_data
+pd(1)=       'chaetomorpha',         20.0,	 1.5,	    -0.10, 	50.0,	     1.10,	      1,	       1.057,	   20.0,	25.0,	  35.0,	         1,	 150.0,	 600.0, 	0.0008,	 0.023,	 0.05,         1.047,	  0.7, 	  0.9,	    5, 	 0.0,	   48.0,	25.0,	            1,	          0,           	0,	          1, 1.000,	 10.0, 	 0.034,	 0.018,	 0.0676,	  0.208,	  0.7,	 0.00000,	           1,	            1, 1.0000,5.0000,	0.001,	0.00048,0.00216,	 0.00024,	         0,	 0.0000,	8.0000,	0.0171,
+pd(2)=       'cladophora',         20.0,	 1.2,	    -0.00, 	50.0,	     0.70,	      1,	       1.057,	   20.0,	25.0,	  35.0,	         1,	 150.0,	 600.0, 	0.0004,	 0.025,	 0.05,         1.047,	  0.7, 	  0.9,	    5, 	 0.0,	   48.0,	25.0,	            1,	          0,           	0,	          1, 1.000,	 10.0, 	 0.034,	 0.018,	 0.0676,	  0.208,	  0.7,	 0.00000,	           1,	            1, 1.0000,5.0000,	0.001,	0.00048,0.00216,	 0.00024,	         0,	 0.0000,	8.0000,	0.0171,
+/
