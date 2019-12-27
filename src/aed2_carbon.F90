@@ -1119,13 +1119,19 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
 
   REAL                 :: H, Denom, CAlk, BAlk, OH, PhosTop, PhosBot, PAlk, SiAlk, &
                         & FREEtoTOT, Hfree, HSO4, HF, Residual, Slope, deltapH, pHTol, ln10
+                        
+  INTEGER :: count
+  INTEGER :: max_count
 
   pHx      = 8.        !This is the first guess
   pHTol    = 0.0001    !tolerance for iterations end
   ln10     = log(10.)
   deltapH  = pHTol + 1
+  
+  count = 0
+  max_count = 100
 
-  DO WHILE (abs(deltapH) > pHTol)
+    DO WHILE (abs(deltapH) > pHTol .AND. count < max_count)
     H         = 10.**(-pHx)
     Denom     = (H*H + K1F*H + K1F*K2F)
     CAlk      = TCx*K1F*(H + 2.*K2F)/Denom
@@ -1150,6 +1156,7 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
 
     pHx       = pHx + deltapH  !% Is on the same scale as K1 and K2 were calculated...
 
+    count = count + 1
   END DO
 
   END SUBROUTINE Cal_pHfromTATC
