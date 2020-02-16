@@ -201,7 +201,7 @@ SUBROUTINE aed2_define_zooplankton(data, namlst)
 !  %% NAMELIST
    INTEGER  :: num_zoops
    INTEGER  :: the_zoops(MAX_ZOOP_TYPES)
-   LOGICAL  :: simZoopFeedback = .FALSE.
+   LOGICAL  :: simZoopFeedback = .TRUE.
 
    CHARACTER(len=64)  :: dn_target_variable='' !dissolved nitrogen target variable
    CHARACTER(len=64)  :: pn_target_variable='' !particulate nitrogen target variable
