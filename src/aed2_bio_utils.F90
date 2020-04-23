@@ -4,12 +4,11 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2019 -  The University of Western Australia               #
+!#  Copyright 2013 - 2020 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -34,7 +33,7 @@
 
 MODULE aed2_bio_utils
 !-------------------------------------------------------------------------------
-!  aed2_bio_utils --- utility functions for phytoplankton biogeochemical model
+!  aed2_bio_utils --- utility functions for phytoplankton & macroalgae models
 !-------------------------------------------------------------------------------
    USE aed2_core
 
@@ -47,15 +46,17 @@ MODULE aed2_bio_utils
 
    PRIVATE   ! By default make everything private
 !
-   PUBLIC phyto_data, phyto_nml_data, ino3, inh4,idon, in2, ifrp, idop
-   PUBLIC photosynthesis_irradiance, phyto_fN, phyto_fP, phyto_fSi, findMin
-   PUBLIC bio_respiration, phyto_salinity
+   PUBLIC phyto_data, phyto_nml_data
+   PUBLIC phyto_salinity, phyto_fN, phyto_fP, phyto_fSi
    PUBLIC phyto_internal_nitrogen, phyto_internal_phosphorus
+   PUBLIC photosynthesis_irradiance, bio_respiration
+   PUBLIC ino3, inh4,idon, in2, ifrp, idop
+   PUBLIC findMin
 !
    TYPE phyto_data
       ! General Attributes
       CHARACTER(64) :: p_name
-      AED_REAL :: p0,Xcc !,kc,i_min,rmax,gmax,iv,alpha,rpn,rzn,rdn,rpdu,rpdl,rzd
+      AED_REAL :: p0,Xcc
       ! Growth rate parameters
       INTEGER  :: fT_Method
       AED_REAL :: R_growth, theta_growth, T_std, T_opt, T_max, kTn, aTn, bTn
@@ -82,14 +83,14 @@ MODULE aed2_bio_utils
       INTEGER  :: settling
       AED_REAL :: w_p, d_phy, rho_phy, f1, f2, c1, c3
       ! Resuspension parameters
-      AED_REAL  :: resuspension
+      AED_REAL  :: resuspension, tau_0
    END TYPE
 
 
    TYPE phyto_nml_data
       CHARACTER(64) :: p_name
       AED_REAL :: p_initial
-      AED_REAL :: p0, w_p, Xcc, R_growth !i_min,rmax,alpha,rpn,rpdu,rpdl
+      AED_REAL :: p0, w_p, Xcc, R_growth
       INTEGER  :: fT_Method
       AED_REAL :: theta_growth, T_std, T_opt, T_max
       INTEGER  :: lightModel
@@ -108,8 +109,6 @@ MODULE aed2_bio_utils
       ! Silica parameters
       INTEGER  :: simSiUptake
       AED_REAL :: Si_0, K_Si, X_sicon
-    !  ! Carbon parameters
-    !  INTEGER  :: simCUptake, dic_mode
    END TYPE
 
 !Module Locals
@@ -125,7 +124,7 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
                                                  fT,pup,respiration,exudation, &
                                                      uptake,excretion,mortality)
 !-------------------------------------------------------------------------------
-! Calculates the internal phosphorus stores and fluxes
+! Calculates the biotic group internal phosphorus stores and fluxes
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
@@ -139,7 +138,7 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
 !CONSTANTS
    AED_REAL,PARAMETER :: one_e_neg5 = 1e-5
 !LOCALS
-   AED_REAL :: dumdum1,dumdum2,theX_pcon
+   AED_REAL :: tmpary1,tmpary2,theX_pcon
    INTEGER  :: c
 !
 !-------------------------------------------------------------------------------
@@ -163,14 +162,14 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
    ELSEIF (phytos(group)%simIPDynamics == 2) THEN
 
       ! Dynamic phosphorus uptake function
-      ! uptake = R_puptake*fT*phy* (X_pmax-IP/phy)/(X_pmax-X_pmin) * (PO4/(K_P + PO4))
+      ! R_puptake * fT * phy * (X_pmax-[IP/phy])/(X_pmax-X_pmin) * (PO4/K_P+PO4])
 
       theX_pcon = IP
-      dumdum1  = phytos(group)%R_puptake * fT * phy
-      dumdum2  = MAX(one_e_neg5, phytos(group)%X_pmax - (IP / phy))
-      dumdum1  = dumdum1 * dumdum2 / (phytos(group)%X_pmax-phytos(group)%X_pmin)
-      uptake(1)= -dumdum1 * phyto_fP(phytos,group,frp=pup)
-      uptake(2)= 0.0
+      tmpary1   = phytos(group)%R_puptake * fT * phy
+      tmpary2   = MAX(one_e_neg5, phytos(group)%X_pmax - (IP / phy))
+      tmpary1   = tmpary1 * tmpary2 / (phytos(group)%X_pmax-phytos(group)%X_pmin)
+      uptake(1) =-tmpary1 * phyto_fP(phytos,group,frp=pup)      ! FRP
+      uptake(2) = zero_                                         ! DOP
 
    ELSE
 
@@ -196,7 +195,7 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
                                    fT,no3up,nh4up,a_nfix,respiration,exudation,&
                                    PNf,uptake,excretion,mortality)
 !-------------------------------------------------------------------------------
-! Calculates the internal nitrogen stores and fluxes
+! Calculates the biotic group internal nitrogen stores and fluxes
 !-------------------------------------------------------------------------------
 
 !ARGUMENTS
@@ -216,7 +215,7 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    AED_REAL,PARAMETER :: one_e_neg5 = 1e-5
 !
 !LOCALS
-   AED_REAL  :: dumdum1,dumdum2,theX_ncon
+   AED_REAL  :: tmpary1,tmpary2,theX_ncon
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -237,13 +236,13 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    ELSEIF (phytos(group)%simINDynamics == 2) THEN
 
       ! Dynamic nitrogen uptake function
-      ! uptake = R_nuptake*fT*phy* (X_nmax-IN/phy)/(X_nmax-X_nmin) * (DIN/(K_N + DIN))
+      ! R_nuptake * fT * phy * (X_nmax-IN/phy)/(X_nmax-X_nmin) * (DIN/[K_N+DIN])
 
       theX_ncon = IN
-      dumdum1  = phytos(group)%R_nuptake * fT * phy
-      dumdum2  = MAX(phytos(group)%X_nmax - (IN / phy),one_e_neg5)
-      dumdum1  = dumdum1 * dumdum2 / (phytos(group)%X_nmax-phytos(group)%X_nmin)
-      uptake(1) = dumdum1 * phyto_fN(phytos,group,din=no3up+nh4up)
+      tmpary1   = phytos(group)%R_nuptake * fT * phy
+      tmpary2   = MAX(phytos(group)%X_nmax - (IN / phy),one_e_neg5)
+      tmpary1   = tmpary1 * tmpary2 / (phytos(group)%X_nmax-phytos(group)%X_nmin)
+      uptake(1) = tmpary1 * phyto_fN(phytos,group,din=no3up+nh4up)
       uptake(1) = -uptake(1)
    ELSE
       ! Unknown nitrogen uptake function
@@ -251,16 +250,16 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
       STOP
    ENDIF
 
-   ! Now find out how much of this was due to N Fixation:
+   ! Allocate a portion of N uptake to N fixation, where relevant:
    IF (phytos(group)%simNFixation /= 0) THEN
       a_nfix = phytos(group)%R_nfix * a_nfix * phy
-      IF (a_nfix > uptake(1)) THEN
+      IF (a_nfix > ABS(uptake(1))) THEN
          ! Extreme case:
-         a_nfix = uptake(1)
+         a_nfix = -uptake(1)
          uptake(1) = zero_
       ELSE
-         ! Reduce nuptake by the amount fixed:
-         uptake(1) = uptake(1) * (uptake(1)-a_nfix) / uptake(1)
+         ! Reduce n-uptake by the amount fixed:
+         uptake(1) = uptake(1) * (ABS(uptake(1))-a_nfix) / ABS(uptake(1))
       ENDIF
    ENDIF
 
@@ -268,16 +267,16 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    PNf = phyto_pN(phytos,group,nh4up,no3up)
 
    IF (phytos(group)%simDINUptake /= 0) THEN
-!     uptake(inh4) = uptake(1) * (1.0-PNf) !inh4 == 2
-!     uptake(ino3) = uptake(1) * PNf       !ino3 == 1
+     !uptake(inh4) = uptake(1) * (1.0-PNf) !inh4 == 2
+     !uptake(ino3) = uptake(1) * PNf       !ino3 == 1
       uptake(inh4) = uptake(1) * (PNf)     !inh4 == 2
       uptake(ino3) = uptake(1) * (1.-PNf)  !ino3 == 1
    ENDIF
    IF (phytos(group)%simDONUptake /= 0) THEN
-      uptake(idon) = 0.0  !MH to fix  (idon == 3)
+      uptake(idon) = 0.0                   !MH to fix  (idon == 3)
    ENDIF
    IF (phytos(group)%simNFixation /= 0 .AND. do_N2uptake) THEN
-      uptake(iN2) = a_nfix       ! iN2 == 4
+      uptake(iN2) = a_nfix                 ! iN2 == 4
    ENDIF
 
 
@@ -444,25 +443,6 @@ END FUNCTION findMin
 
 
 !###############################################################################
-FUNCTION bio_respiration(R_resp,theta_resp,temp) RESULT(respiration)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   AED_REAL,INTENT(in) :: R_resp
-   AED_REAL,INTENT(in) :: theta_resp
-   AED_REAL,INTENT(in) :: temp
-!
-!LOCALS
-   AED_REAL :: respiration ! Returns the phytoplankton respiration.
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   respiration = R_resp * theta_resp**(temp-20.0)
-
-END FUNCTION bio_respiration
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
 FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !-------------------------------------------------------------------------------
 ! Salinity tolerance of phytoplankton
@@ -497,7 +477,7 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
          fSal = 1.0
       ENDIF
    ELSEIF (phytos(group)%salTol == 2) THEN
-      !# f(S) = 1 at S=S_opt, f(S) = S_bep at S=0.
+      !# f(S) = 1 at S>=S_opt, f(S) = S_bep at S=0.
       IF (salinity<phytos(group)%S_opt) THEN
          fSal = (phytos(group)%S_bep-1.0) * (salinity**2.0)/(phytos(group)%S_opt**2.0) -  &
                       2.0*(phytos(group)%S_bep-1.0)*salinity/phytos(group)%S_opt+phytos(group)%S_bep
@@ -655,6 +635,25 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
 
    IF ( fI < zero_ ) fI = zero_
 END FUNCTION photosynthesis_irradiance
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION bio_respiration(R_resp,theta_resp,temp) RESULT(respiration)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: R_resp
+   AED_REAL,INTENT(in) :: theta_resp
+   AED_REAL,INTENT(in) :: temp
+!
+!LOCALS
+   AED_REAL :: respiration ! Returns the phytoplankton respiration.
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   respiration = R_resp * theta_resp**(temp-20.0)
+
+END FUNCTION bio_respiration
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

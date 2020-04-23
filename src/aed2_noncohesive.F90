@@ -99,7 +99,7 @@ MODULE aed2_noncohesive
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level =10
+   INTEGER :: diag_level = 10
    AED_REAL :: sed_depth = 1.0
 
 
