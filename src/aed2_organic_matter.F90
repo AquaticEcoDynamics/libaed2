@@ -860,8 +860,10 @@ SUBROUTINE aed2_calculate_organic_matter(data,column,layer_idx)
                                     _FLUX_VAR_(data%id_dic) + photolysis*(1.-photo_fmin)
    ENDIF
    IF (data%use_amm) THEN
-      IF( data%simDenitrification==1 ) _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
-      !IF( data%simDenitrification==2 ) !MH needs balacing with Denit fraction !_FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
+      IF( data%simDenitrification==1 ) &
+        _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
+      !IF( data%simDenitrification==2 ) & !MH needs balacing with Denit fraction
+      !  _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
       IF ( data%simRPools )  &
          _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + &
                                        photolysis*(1.-photo_fmin)*MIN(donr/MAX(docr,1e-2),one_)

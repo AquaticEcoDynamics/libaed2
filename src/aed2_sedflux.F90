@@ -405,6 +405,23 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
    ELSE
       PRINT*,"**ERROR : Unknown sedflux model type :", TRIM(sedflux_model)
    ENDIF
+   
+   data%id_Fsed_oxy = 0
+   data%id_Fsed_rsi = 0
+   data%id_Fsed_amm = 0
+   data%id_Fsed_nit = 0
+   data%id_Fsed_frp = 0
+   data%id_Fsed_pon = 0
+   data%id_Fsed_don = 0
+   data%id_Fsed_pop = 0
+   data%id_Fsed_dop = 0
+   data%id_Fsed_poc = 0
+   data%id_Fsed_doc = 0
+   data%id_Fsed_dic = 0
+   data%id_Fsed_ch4 = 0
+   data%id_Fsed_feii = 0
+   data%id_Fsed_n2o = 0
+
 
    ! Register state variables
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
