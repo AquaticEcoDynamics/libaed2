@@ -88,6 +88,7 @@ MODULE aed2_csv_reader
 !-------------------------------------------------------------------------------
    PUBLIC aed_csv_read_header, aed_csv_read_row, aed_csv_close, AED_SYMBOL
    PUBLIC extract_double, extract_logical, extract_integer, extract_string
+   PUBLIC copy_name
 
 CONTAINS
 
