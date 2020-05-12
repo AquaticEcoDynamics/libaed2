@@ -55,7 +55,7 @@ MODULE aed2_zooplankton
 !  aed2_zooplankton --- multi zooplankton biogeochemical model
 !-------------------------------------------------------------------------------
    USE aed2_core
-   USE aed2_util,ONLY : find_free_lun,aed2_bio_temp_function, fTemp_function,qsort
+   USE aed2_util
    USE aed2_zoop_utils
 
    IMPLICIT NONE
@@ -101,6 +101,88 @@ CONTAINS
 
 
 !###############################################################################
+INTEGER FUNCTION load_csv(dbase, zoop_param)
+!-------------------------------------------------------------------------------
+   USE aed2_csv_reader
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(len=*),INTENT(in) :: dbase
+   TYPE(type_zoop_params),INTENT(out) :: zoop_param(MAX_ZOOP_TYPES)
+!
+!LOCALS
+   INTEGER :: unit, nccols, ccol
+   CHARACTER(len=32),POINTER,DIMENSION(:) :: csvnames
+   CHARACTER(len=32) :: name
+   TYPE(AED_SYMBOL),DIMENSION(:),ALLOCATABLE :: values
+   INTEGER :: idx_col = 0
+   LOGICAL :: meh
+   INTEGER :: ret = 0
+!
+!BEGIN
+!-------------------------------------------------------------------------------
+   unit = aed_csv_read_header(dbase, csvnames, nccols)
+   IF (unit <= 0) THEN
+      load_csv = -1
+      RETURN !# No file found
+   ENDIF
+
+   ALLOCATE(values(nccols))
+
+   DO WHILE ( aed_csv_read_row(unit, values) )
+      DO ccol=2,nccols
+         zoop_param(ccol)%zoop_name = csvnames(ccol)
+
+         CALL copy_name(values(1), name)
+         SELECT CASE (name)
+            CASE ('zoop_initial')      ; zoop_param(ccol)%zoop_initial   = extract_double(values(ccol))
+            CASE ('min_zoo')           ; zoop_param(ccol)%min_zoo        = extract_double(values(ccol))
+            CASE ('Rgrz_zoo')          ; zoop_param(ccol)%Rgrz_zoo       = extract_double(values(ccol))
+            CASE ('fassim_zoo')        ; zoop_param(ccol)%fassim_zoo     = extract_double(values(ccol))
+            CASE ('Kgrz_zoo')          ; zoop_param(ccol)%Kgrz_zoo       = extract_double(values(ccol))
+            CASE ('theta_grz_zoo')     ; zoop_param(ccol)%theta_grz_zoo  = extract_double(values(ccol))
+            CASE ('Rresp_zoo')         ; zoop_param(ccol)%Rresp_zoo      = extract_double(values(ccol))
+            CASE ('Rmort_zoo')         ; zoop_param(ccol)%Rmort_zoo      = extract_double(values(ccol))
+            CASE ('ffecal_zoo')        ; zoop_param(ccol)%ffecal_zoo     = extract_double(values(ccol))
+            CASE ('fexcr_zoo')         ; zoop_param(ccol)%fexcr_zoo      = extract_double(values(ccol))
+            CASE ('ffecal_sed')        ; zoop_param(ccol)%ffecal_sed     = extract_double(values(ccol))
+            CASE ('theta_resp_zoo')    ; zoop_param(ccol)%theta_resp_zoo = extract_integer(values(ccol))
+            CASE ('Tstd_zoo')          ; zoop_param(ccol)%Tstd_zoo       = extract_integer(values(ccol))
+            CASE ('Topt_zoo')          ; zoop_param(ccol)%Topt_zoo       = extract_integer(values(ccol))
+            CASE ('Tmax_zoo')          ; zoop_param(ccol)%Tmax_zoo       = extract_integer(values(ccol))
+            CASE ('saltfunc_zoo')      ; zoop_param(ccol)%saltfunc_zoo   = extract_integer(values(ccol))
+            CASE ('Smin_zoo')          ; zoop_param(ccol)%Smin_zoo       = extract_integer(values(ccol))
+            CASE ('Smax_zoo')          ; zoop_param(ccol)%Smax_zoo       = extract_integer(values(ccol))
+            CASE ('Sint_zoo')          ; zoop_param(ccol)%Sint_zoo       = extract_integer(values(ccol))
+            CASE ('INC_zoo')           ; zoop_param(ccol)%INC_zoo        = extract_double(values(ccol))
+            CASE ('IPC_zoo')           ; zoop_param(ccol)%IPC_zoo        = extract_double(values(ccol))
+            CASE ('DOmin_zoo')         ; zoop_param(ccol)%DOmin_zoo      = extract_double(values(ccol))
+            CASE ('Cmin_grz_zoo')      ; zoop_param(ccol)%Cmin_grz_zoo   = extract_double(values(ccol))
+            CASE ('num_prey')          ; zoop_param(ccol)%num_prey       = extract_integer(values(ccol))
+
+            CASE ('prey(1)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(ccol)%prey(1)%zoop_prey)
+            CASE ('prey(1)%Pzoo_prey') ; zoop_param(ccol)%prey(1)%Pzoo_prey = extract_double(values(ccol))
+            CASE ('prey(2)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(ccol)%prey(3)%zoop_prey)
+            CASE ('prey(2)%Pzoo_prey') ; zoop_param(ccol)%prey(2)%Pzoo_prey = extract_double(values(ccol))
+            CASE ('prey(3)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(ccol)%prey(3)%zoop_prey)
+            CASE ('prey(3)%Pzoo_prey') ; zoop_param(ccol)%prey(3)%Pzoo_prey = extract_double(values(ccol))
+
+            CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
+         END SELECT
+      ENDDO
+   ENDDO
+
+   meh = aed_csv_close(unit)
+   !# don't care if close fails
+
+   IF (ASSOCIATED(csvnames)) DEALLOCATE(csvnames)
+   IF (ALLOCATED(values))    DEALLOCATE(values)
+
+   load_csv = ret
+END FUNCTION load_csv
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed2_zooplankton_load_params(data, dbase, count, list)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
@@ -119,11 +201,18 @@ SUBROUTINE aed2_zooplankton_load_params(data, dbase, count, list)
    NAMELIST /zoop_params/ zoop_param
 !-------------------------------------------------------------------------------
 !BEGIN
-    tfil = find_free_lun()
-    open(tfil,file=dbase, status='OLD',iostat=status)
-    IF (status /= 0) STOP 'Error opening zoop_params namelist file'
-    read(tfil,nml=zoop_params,iostat=status)
-    close(tfil)
+    SELECT CASE (param_file_type(dbase))
+       CASE (CSV_TYPE)
+           status = load_csv(dbase, zoop_param)
+       CASE (NML_TYPE)
+           tfil = find_free_lun()
+           open(tfil,file=dbase, status='OLD',iostat=status)
+           IF (status /= 0) STOP 'Error opening zoop_params namelist file'
+           read(tfil,nml=zoop_params,iostat=status)
+           close(tfil)
+       CASE DEFAULT
+           print *,'Unknown file type "',TRIM(dbase),'"'; status=1
+    END SELECT
     IF (status /= 0) STOP 'Error reading namelist zoop_params'
 
     data%num_zoops = count
