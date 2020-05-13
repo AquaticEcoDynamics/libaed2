@@ -487,12 +487,15 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
                               mortality) * data%zoops(zoop_i)%IPC_zoo * zoo
 
 
-      ! Calculate rate of change of zooplankton carbon (mmolC/s)          !
+      ! Calculate rate of change of zooplankton carbon (mmolC/s)
       delta_C = (data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality) * zoo
+
       ! Calculate nutrient excretion require to balance internal nutrient store
-      ! Note pon_excr includes loss due to messy feeding so no need to include assimilation fraction on grazing_n & grazing_p
+      ! Note - pon_excr includes loss due to messy feeding so no need to include
+      !        assimilation fraction on grazing_n & grazing_p
       don_excr = grazing_n - pon_excr - delta_C * data%zoops(zoop_i)%INC_zoo
       dop_excr = grazing_p - pop_excr - delta_C * data%zoops(zoop_i)%IPC_zoo
+
       !If nutrients are limiting then must excrete doc to maintain balance
       IF ((don_excr < zero_) .AND. (dop_excr < zero_)) THEN
          !Determine which nutrient is more limiting
@@ -522,7 +525,6 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
           doc_excr = zero_
       ENDIF
 
-
       !write(*,"(4X,'limitations (f_T,f_Salinity): ',2F8.2)")f_T,f_Salinity
       !write(*,"(4X,'sources/sinks (grazing,respiration,mortaility): ',3F8.2)")grazing,excretion,mortality
 
@@ -531,8 +533,8 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
 
       ! Zooplankton production / losses in mmolC/s
 
-      _FLUX_VAR_(data%id_zoo(zoop_i)) = _FLUX_VAR_(data%id_zoo(zoop_i)) +           &
-                        ((data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality)*zoo)
+      _FLUX_VAR_(data%id_zoo(zoop_i)) = _FLUX_VAR_(data%id_zoo(zoop_i))        &
+                +  ((data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality)*zoo)
 
       IF( data%simZoopFeedback ) THEN
       ! Now take food grazed by zooplankton from food pools in mmolC/s
@@ -585,7 +587,7 @@ SUBROUTINE aed2_calculate_zooplankton(data,column,layer_idx)
       ENDIF
 
       ! Export diagnostic variables
-      _DIAG_VAR_(data%id_grz ) = zoo*grazing*secs_per_day
+      _DIAG_VAR_(data%id_grz )  = zoo*grazing*secs_per_day
       _DIAG_VAR_(data%id_resp ) = zoo*respiration*secs_per_day
       _DIAG_VAR_(data%id_mort ) = zoo*mortality*secs_per_day
 
