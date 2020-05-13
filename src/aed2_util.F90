@@ -51,8 +51,11 @@ MODULE aed2_util
    PUBLIC aed2_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC InitialTemp, SoilTemp
+   PUBLIC make_dir_path, param_file_type, CSV_TYPE, NML_TYPE
 !
 
+INTEGER, PARAMETER :: CSV_TYPE = 1
+INTEGER, PARAMETER :: NML_TYPE = 2
 
 !===============================================================================
 CONTAINS
@@ -1071,5 +1074,84 @@ END SUBROUTINE SoilTemp
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+!###############################################################################
+LOGICAL FUNCTION make_dir_path(dir)
+!-------------------------------------------------------------------------------
+! Create the directory path as specified
+!-------------------------------------------------------------------------------
+#ifdef __INTEL_COMPILER
+   USE ifport
+#endif
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: dir
+!LOCALS
+   INTEGER :: len, i, sys
+   CHARACTER(len=128) :: d
+   LOGICAL :: res = .TRUE.
+#  define DIRSEP "/"
+!BEGIN
+!-------------------------------------------------------------------------------
+   len = LEN_TRIM(dir)
+!print*,'making dir path at "',TRIM(dir),'"'
+   d(1:128) = ' '
+   DO i=1,len
+      IF ( dir(i:i) == '/' ) THEN
+         IF ( i > 1 ) THEN
+          ! CALL execute_command_line("mkdir " // TRIM(d), exitstat=sys)
+! print*,'making dir at "',TRIM(d),'"'
+#ifdef __INTEL_COMPILER
+             sys = system("mkdir " // TRIM(d))
+#else
+             CALL system("mkdir " // TRIM(d))
+#endif
+         ENDIF
+         d(i:i) = DIRSEP
+      ELSE
+         d(i:i) = dir(i:i)
+      ENDIF
+   ENDDO
+! MAKEDIRQQ is an intel fortran extension
+! MAKEDIRQQ can create only one directory at a time. You cannot create a new
+! directory and a subdirectory below it in a single command. MAKEDIRQQ does not
+! translate path delimiters. You can use either slash (/) or backslash (\) as
+! valid delimiters.
+!  CALL MAKEDIRQQ(d)
+!  if not intel ...
+!  CALL SYSTEM("mkdir "//d)
+!  but the f2008 standard introduces execute_command_line as a standard way
+!  however it seems the ifort version we have been using doesnt support it?
+   make_dir_path = res
+END FUNCTION make_dir_path
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+INTEGER FUNCTION param_file_type(fname)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: fname
+!LOCALS
+   INTEGER :: len, i, ic
+   CHARACTER(len=4) :: ext
+!BEGIN
+!-------------------------------------------------------------------------------
+   param_file_type = -1
+   len = LEN_TRIM(fname)
+   IF (fname(len-3:len-3) == '.' ) THEN
+      ext = '   '
+      DO i=1, 3
+         ic = ichar(fname(len:len))
+         IF (ic >= 65 .AND. ic < 90) ext(i:i) = char(ic+32)
+         len = len - 1
+      ENDDO
+
+      IF (ext == 'csv') THEN
+         param_file_type = CSV_TYPE
+      ELSEIF (ext == 'nml') THEN
+         param_file_type = NML_TYPE
+      ENDIF
+   ENDIF
+END FUNCTION param_file_type
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 END MODULE aed2_util

@@ -51,12 +51,14 @@ MODULE aed2_phytoplankton
 !  aed2_phytoplankton --- phytoplankton biogeochemical model
 !-------------------------------------------------------------------------------
    USE aed2_core
-   USE aed2_util,ONLY : find_free_lun, &
-                        exp_integral, &
-                        aed2_bio_temp_function, &
-                        fTemp_function, &
-                        water_viscosity, &
-                        in_zone_set
+!  USE aed2_util,ONLY : find_free_lun, &
+!                       exp_integral, &
+!                       aed2_bio_temp_function, &
+!                       fTemp_function, &
+!                       water_viscosity, &
+!                       in_zone_set,
+!                       CSV_TYPE, NML_TYPE
+   USE aed2_util
    USE aed2_bio_utils
 
    IMPLICIT NONE
@@ -123,6 +125,103 @@ CONTAINS
 
 
 !###############################################################################
+INTEGER FUNCTION load_csv(dbase,pd)
+!-------------------------------------------------------------------------------
+   USE aed2_csv_reader
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(len=*),INTENT(in) :: dbase
+   TYPE(phyto_nml_data) :: pd(MAX_PHYTO_TYPES)
+!
+!LOCALS
+   INTEGER :: unit, nccols, ccol
+   CHARACTER(len=32),POINTER,DIMENSION(:) :: csvnames
+   CHARACTER(len=32) :: name
+   TYPE(AED_SYMBOL),DIMENSION(:),ALLOCATABLE :: values
+   INTEGER :: idx_col = 0
+   LOGICAL :: meh
+   INTEGER :: ret = 0
+!
+!BEGIN
+!-------------------------------------------------------------------------------
+   unit = aed_csv_read_header(dbase, csvnames, nccols)
+   IF (unit <= 0) THEN
+      load_csv = -1
+      RETURN !# No file found
+   ENDIF
+
+   ALLOCATE(values(nccols))
+
+   DO WHILE ( aed_csv_read_row(unit, values) )
+      DO ccol=2,nccols
+         pd(ccol)%p_name = csvnames(ccol)
+
+         CALL copy_name(values(1), name)
+         SELECT CASE (name)
+            CASE ('p0')            ; pd(ccol)%p0            = extract_double(values(ccol))
+            CASE ('w_p')           ; pd(ccol)%w_p           = extract_double(values(ccol))
+            CASE ('Xcc')           ; pd(ccol)%Xcc           = extract_double(values(ccol))
+            CASE ('R_growth')      ; pd(ccol)%R_growth      = extract_double(values(ccol))
+            CASE ('fT_Method')     ; pd(ccol)%fT_Method     = extract_integer(values(ccol))
+            CASE ('theta_growth')  ; pd(ccol)%theta_growth  = extract_double(values(ccol))
+            CASE ('T_std')         ; pd(ccol)%T_std         = extract_double(values(ccol))
+            CASE ('T_opt')         ; pd(ccol)%T_opt         = extract_double(values(ccol))
+            CASE ('T_max')         ; pd(ccol)%T_max         = extract_double(values(ccol))
+            CASE ('lightModel')    ; pd(ccol)%lightModel    = extract_integer(values(ccol))
+            CASE ('I_K')           ; pd(ccol)%I_K           = extract_double(values(ccol))
+            CASE ('I_S')           ; pd(ccol)%I_S           = extract_double(values(ccol))
+            CASE ('KePHY')         ; pd(ccol)%KePHY         = extract_double(values(ccol))
+            CASE ('f_pr')          ; pd(ccol)%f_pr          = extract_double(values(ccol))
+            CASE ('R_resp')        ; pd(ccol)%R_resp        = extract_double(values(ccol))
+            CASE ('theta_resp')    ; pd(ccol)%theta_resp    = extract_double(values(ccol))
+            CASE ('k_fres')        ; pd(ccol)%k_fres        = extract_double(values(ccol))
+            CASE ('k_fdom')        ; pd(ccol)%k_fdom        = extract_double(values(ccol))
+            CASE ('salTol')        ; pd(ccol)%salTol        = extract_integer(values(ccol))
+            CASE ('S_bep')         ; pd(ccol)%S_bep         = extract_double(values(ccol))
+            CASE ('S_maxsp')       ; pd(ccol)%S_maxsp       = extract_double(values(ccol))
+            CASE ('S_opt')         ; pd(ccol)%S_opt         = extract_double(values(ccol))
+            CASE ('simDINUptake')  ; pd(ccol)%simDINUptake  = extract_integer(values(ccol))
+            CASE ('simDONUptake')  ; pd(ccol)%simDONUptake  = extract_integer(values(ccol))
+            CASE ('simNFixation')  ; pd(ccol)%simNFixation  = extract_integer(values(ccol))
+            CASE ('simINDynamics') ; pd(ccol)%simINDynamics = extract_integer(values(ccol))
+            CASE ('N_o')           ; pd(ccol)%N_o           = extract_double(values(ccol))
+            CASE ('K_N')           ; pd(ccol)%K_N           = extract_double(values(ccol))
+            CASE ('X_ncon')        ; pd(ccol)%X_ncon        = extract_double(values(ccol))
+            CASE ('X_nmin')        ; pd(ccol)%X_nmin        = extract_double(values(ccol))
+            CASE ('X_nmax')        ; pd(ccol)%X_nmax        = extract_double(values(ccol))
+            CASE ('R_nuptake')     ; pd(ccol)%R_nuptake     = extract_double(values(ccol))
+            CASE ('k_nfix')        ; pd(ccol)%k_nfix        = extract_double(values(ccol))
+            CASE ('R_nfix')        ; pd(ccol)%R_nfix        = extract_double(values(ccol))
+            CASE ('simDIPUptake')  ; pd(ccol)%simDIPUptake  = extract_integer(values(ccol))
+            CASE ('simIPDynamics') ; pd(ccol)%simIPDynamics = extract_integer(values(ccol))
+            CASE ('P_0')           ; pd(ccol)%P_0           = extract_double(values(ccol))
+            CASE ('K_P')           ; pd(ccol)%K_P           = extract_double(values(ccol))
+            CASE ('X_pcon')        ; pd(ccol)%X_pcon        = extract_double(values(ccol))
+            CASE ('X_pmin')        ; pd(ccol)%X_pmin        = extract_double(values(ccol))
+            CASE ('X_pmax')        ; pd(ccol)%X_pmax        = extract_double(values(ccol))
+            CASE ('R_puptake')     ; pd(ccol)%R_puptake     = extract_double(values(ccol))
+            CASE ('simSiUptake')   ; pd(ccol)%simSiUptake   = extract_integer(values(ccol))
+            CASE ('Si_0')          ; pd(ccol)%Si_0          = extract_double(values(ccol))
+            CASE ('K_Si')          ; pd(ccol)%K_Si          = extract_double(values(ccol))
+            CASE ('X_sicon')       ; pd(ccol)%X_sicon       = extract_double(values(ccol))
+
+            CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
+         END SELECT
+      ENDDO
+   ENDDO
+
+   meh = aed_csv_close(unit)
+   !# don't care if close fails
+
+   IF (ASSOCIATED(csvnames)) DEALLOCATE(csvnames)
+   IF (ALLOCATED(values))    DEALLOCATE(values)
+
+   load_csv = ret
+END FUNCTION load_csv
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, resuspension)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
@@ -142,11 +241,18 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, re
    NAMELIST /phyto_data/ pd
 !-------------------------------------------------------------------------------
 !BEGIN
-    tfil = find_free_lun()
-    open(tfil,file=dbase, status='OLD', iostat=status)
-    IF (status /= 0) STOP 'Cannot open phyto_data namelist file'
-    read(tfil,nml=phyto_data,iostat=status)
-    close(tfil)
+    SELECT CASE (param_file_type(dbase))
+       CASE (CSV_TYPE)
+           status = load_csv(dbase, pd)
+       CASE (NML_TYPE)
+           tfil = find_free_lun()
+           open(tfil,file=dbase, status='OLD',iostat=status)
+           IF (status /= 0) STOP 'Cannot open phyto_data namelist file'
+           read(tfil,nml=phyto_data,iostat=status)
+           close(tfil)
+       CASE DEFAULT
+           print *,'Unknown file type "',TRIM(dbase),'"'; status=1
+    END SELECT
     IF (status /= 0) STOP 'Error reading namelist phyto_data'
 
     data%num_phytos = count
