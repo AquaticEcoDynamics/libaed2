@@ -1131,7 +1131,7 @@ INTEGER FUNCTION param_file_type(fname)
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: fname
 !LOCALS
-   INTEGER :: len, i, ic
+   INTEGER :: len, i, ic, j
    CHARACTER(len=4) :: ext
 !BEGIN
 !-------------------------------------------------------------------------------
@@ -1141,7 +1141,12 @@ INTEGER FUNCTION param_file_type(fname)
       ext = '   '
       DO i=1, 3
          ic = ichar(fname(len:len))
-         IF (ic >= 65 .AND. ic < 90) ext(i:i) = char(ic+32)
+         j = 4 - i
+         IF (ic >= 65 .AND. ic <= 90) THEN
+            ext(j:j) = char(ic+32)
+         ELSE
+            ext(j:j) = char(ic)
+         ENDIF
          len = len - 1
       ENDDO
 
