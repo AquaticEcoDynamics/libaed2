@@ -1,18 +1,4 @@
 !###############################################################################
-!                                                                              !
-!         .----------------.  .----------------.  .----------------.           !
-!         | .--------------. || .--------------. || .--------------. |         !
-!         | |     ______   | || |      __      | || |  _______     | |         !
-!         | |   .' ___  |  | || |     /  \     | || | |_   __ \    | |         !
-!         | |  / .'   \_|  | || |    / /\ \    | || |   | |__) |   | |         !
-!         | |  | |         | || |   / ____ \   | || |   |  __ /    | |         !
-!         | |  \ `.___.'\  | || | _/ /    \ \_ | || |  _| |  \ \_  | |         !
-!         | |   `._____.'  | || ||____|  |____|| || | |____| |___| | |         !
-!         | |              | || |              | || |              | |         !
-!         | '--------------' || '--------------' || '--------------' |         !
-!         '----------------'  '----------------'  '----------------'           !
-!                                                                              !
-!###############################################################################
 !#                                                                             #
 !# aed2_carbon.F90                                                             #
 !#                                                                             #
@@ -23,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2019 -  The University of Western Australia               #
+!#  Copyright 2013 - 2020 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -42,6 +28,20 @@
 !#                                                                             #
 !# Created March 2012                                                          #
 !#                                                                             #
+!###############################################################################
+!                                                                              !
+!         .----------------.  .----------------.  .----------------.           !
+!         | .--------------. || .--------------. || .--------------. |         !
+!         | |     ______   | || |      __      | || |  _______     | |         !
+!         | |   .' ___  |  | || |     /  \     | || | |_   __ \    | |         !
+!         | |  / .'   \_|  | || |    / /\ \    | || |   | |__) |   | |         !
+!         | |  | |         | || |   / ____ \   | || |   |  __ /    | |         !
+!         | |  \ `.___.'\  | || | _/ /    \ \_ | || |  _| |  \ \_  | |         !
+!         | |   `._____.'  | || ||____|  |____|| || | |____| |___| | |         !
+!         | |              | || |              | || |              | |         !
+!         | '--------------' || '--------------' || '--------------' |         !
+!         '----------------'  '----------------'  '----------------'           !
+!                                                                              !
 !###############################################################################
 
 #include "aed2.h"
@@ -72,18 +72,21 @@ MODULE aed2_carbon
       INTEGER  :: id_temp, id_salt
       INTEGER  :: id_wind, id_vel, id_depth
       INTEGER  :: id_ch4ox, id_pco2
-      INTEGER  :: id_sed_dic, id_sed_ch4, id_sed_ch4_ebb
-      INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb
-      INTEGER  :: id_par, id_extc, id_dz, id_tau
+      INTEGER  :: id_sed_dic, id_sed_ch4, id_sed_ch4_ebb, id_sed_ch4_ebb_3d
+      INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb, id_sed_ch4_ebb_df
+      INTEGER  :: id_par, id_extc, id_dz, id_tau, id_Fsed_ch4_ebb
 
       !# Model parameters
       AED_REAL :: Fsed_dic, Ksed_dic, theta_sed_dic
       AED_REAL :: Fsed_ch4, Ksed_ch4, theta_sed_ch4, Fsed_ch4_ebb, ch4_bub_tau0
       AED_REAL :: Rch4ox, Kch4ox, vTch4ox, atm_co2, atm_ch4, ionic
       AED_REAL :: maxMPBProdn, IkMPB
+      AED_REAL :: ch4_bub_aLL, ch4_bub_cLL, ch4_bub_kLL, ch4_bub_disf, ch4_bub_ws
+      AED_REAL :: ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp
+
 
       !# Model options
-      LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4
+      LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4, use_sed_model_ebb
       LOGICAL  :: simDIC, simCH4, simCH4ebb
       INTEGER  :: alk_mode, co2_model, co2_piston_model, ch4_piston_model
 
@@ -152,8 +155,18 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    INTEGER           :: ch4_piston_model = 1
 
    LOGICAL           :: simCH4ebb
-   AED_REAL          :: Fsed_ch4_ebb  = zero_
-   AED_REAL          :: ch4_bub_tau0  = one_
+   AED_REAL          :: Fsed_ch4_ebb     = zero_
+   AED_REAL          :: ch4_bub_tau0     = one_
+   CHARACTER(len=64) :: Fsed_ebb_variable=''
+   AED_REAL          :: ch4_bub_aLL      = 42.9512677
+   AED_REAL          :: ch4_bub_cLL      = 0.634
+   AED_REAL          :: ch4_bub_kLL      = -0.8247
+   AED_REAL          :: ch4_bub_disf1    = 0.07
+   AED_REAL          :: ch4_bub_disf2    = 0.33
+   AED_REAL          :: ch4_bub_disdp    = 20.0
+   AED_REAL          :: ch4_bub_ws       = zero_
+
+
 !  %% END NAMELIST VARS
 
    NAMELIST /aed2_carbon/ dic_initial,pH_initial,ch4_initial,ionic,         &
@@ -164,7 +177,11 @@ SUBROUTINE aed2_define_carbon(data, namlst)
                          maxMPBProdn, IkMPB,                                &
                          co2_model, alk_mode,                               &
                          co2_piston_model, ch4_piston_model,                &
-                         simCH4ebb, Fsed_ch4_ebb, ch4_bub_tau0
+                         simCH4ebb, Fsed_ch4_ebb, Fsed_ebb_variable,        &
+                         ch4_bub_aLL,ch4_bub_cLL, ch4_bub_kLL,              &
+                         ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp,       &
+                         ch4_bub_ws, ch4_bub_tau0
+
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -205,11 +222,16 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    data%simCH4ebb        = simCH4ebb
    data%Fsed_ch4_ebb     = Fsed_ch4_ebb
    data%ch4_bub_tau0     = ch4_bub_tau0
+   data%ch4_bub_aLL      = ch4_bub_aLL
+   data%ch4_bub_cLL      = ch4_bub_cLL
+   data%ch4_bub_kLL      = ch4_bub_kLL
+   data%ch4_bub_disf1    = ch4_bub_disf1
+   data%ch4_bub_disf2    = ch4_bub_disf2
+   data%ch4_bub_disdp    = ch4_bub_disdp
+   data%ch4_bub_ws       = ch4_bub_ws
 
    data%maxMPBProdn      = maxMPBProdn
    data%IkMPB            = IkMPB
-
-
 
    !# Register state variables
    IF (dic_initial>MISVAL) THEN
@@ -244,6 +266,10 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    IF (data%use_sed_model_ch4) &
       data%id_Fsed_ch4 = aed2_locate_global_sheet(Fsed_ch4_variable)
 
+   data%use_sed_model_ebb = Fsed_ebb_variable .NE. ''
+   IF (data%use_sed_model_ch4) &
+      data%id_Fsed_ch4_ebb = aed2_locate_global_sheet(Fsed_ebb_variable)
+
    !# Register diagnostic variables
    data%id_pco2 = aed2_define_diag_variable('pCO2','atm', 'pCO2')
 
@@ -260,11 +286,14 @@ SUBROUTINE aed2_define_carbon(data, namlst)
      data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4_flux',        &
                             'mmol/m**2/d', 'CH4 exchange across atm/water interface')
      IF( data%simCH4ebb ) THEN
+       data%id_sed_ch4_ebb_3d = aed2_define_diag_variable('sed_ch4_ebb_3d','mmol/m**2/d', &
+                            'CH4 ebullition across sed/water interface (layer)')
+       data%id_sed_ch4_ebb_df = aed2_define_diag_variable('sed_ch4_ebb_df','mmol/m**3/d', &
+                            'CH4 bubble dissolution rate')
        data%id_sed_ch4_ebb = aed2_define_sheet_diag_variable('sed_ch4_ebb','mmol/m**2/d', &
-                            'CH4 ebullition across sed/water interface')
+                            'CH4 ebullition across sed/water interface (zone)')
        data%id_atm_ch4_ebb = aed2_define_sheet_diag_variable('atm_ch4_ebb_flux', &
                             'mmol/m**2/d', 'CH4 ebullition across atm/water interface')
-
      ENDIF
    ENDIF
 
@@ -594,13 +623,13 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp, par, extc, dz
+   AED_REAL :: temp, par, extc, dz, depth
 
    ! State
    AED_REAL :: dic, oxy, mpb, ph
 
    ! Temporary variables
-   AED_REAL :: dic_flux, ch4_flux, Fsed_dic, Fsed_ch4
+   AED_REAL :: dic_flux, ch4_flux, Fsed_dic, Fsed_ch4, ebb_flux, Fsed_ch4_ebb
    !AED_REAL, PARAMETER :: maxMPBProdn = 40.     ! mmolC/m2/day                     !
    !AED_REAL, PARAMETER :: IkMPB       = 180.0   ! Light sensitivity of MPB  !
 
@@ -613,7 +642,8 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
    par  = _STATE_VAR_(data%id_par)  ! local par
-   dz   = _STATE_VAR_(data%id_dz)   ! local layer depth
+   dz   = _STATE_VAR_(data%id_dz)   ! local layer thickness
+   depth= _STATE_VAR_(data%id_depth)! local layer depth
    extc = _STATE_VAR_(data%id_extc) ! local extinction
 
     ! Retrieve current (local) state variable values.
@@ -623,12 +653,14 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
    IF ( data%use_sed_model_dic ) THEN
       Fsed_dic = _STATE_VAR_S_(data%id_Fsed_dic)
    ELSE
-       Fsed_dic = data%Fsed_dic
+      Fsed_dic = data%Fsed_dic
    ENDIF
    IF ( data%use_sed_model_ch4 ) THEN
       Fsed_ch4 = _STATE_VAR_S_(data%id_Fsed_ch4)
+      IF( data%simCH4ebb ) Fsed_ch4_ebb = _STATE_VAR_S_(data%id_Fsed_ch4_ebb)
    ELSE
-       Fsed_ch4 = data%Fsed_ch4
+      Fsed_ch4 = data%Fsed_ch4
+      IF( data%simCH4ebb ) Fsed_ch4_ebb = data%Fsed_ch4_ebb
    ENDIF
 
    IF (data%use_oxy) THEN
@@ -636,10 +668,16 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
       oxy = _STATE_VAR_(data%id_oxy)
       dic_flux = Fsed_dic * oxy/(data%Ksed_dic+oxy) * (data%theta_sed_dic**(temp-20.0))
       ch4_flux = Fsed_ch4 * data%Ksed_ch4/(data%Ksed_ch4+oxy) * (data%theta_sed_ch4**(temp-20.0))
+      IF( data%simCH4ebb ) ebb_flux = Fsed_ch4_ebb * (data%theta_sed_ch4**(temp-20.0))
    ELSE
       ! Sediment flux dependent on temperature only.
       dic_flux = Fsed_dic * (data%theta_sed_dic**(temp-20.0))
       ch4_flux = Fsed_ch4 * (data%theta_sed_ch4**(temp-20.0))
+      IF( data%simCH4ebb ) THEN
+        ebb_flux = Fsed_ch4_ebb * (data%theta_sed_ch4**(temp-20.0))
+        ! Kinneret special lake level equations
+        ebb_flux = ebb_flux * data%ch4_bub_cLL * exp(data%ch4_bub_kLL*(data%ch4_bub_aLL-depth))
+      ENDIF
    ENDIF
 
 
@@ -664,12 +702,30 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
    _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (dic_flux)
    _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
 
+
+   IF( data%simCH4ebb ) THEN
+     ! Add bubbles to layer
+    !  _FLUX_VAR_(data%id_ch4_bub) = _FLUX_VAR_(data%id_ch4_bub) + (ebb_flux)
+     ! Dissolve bubbles in this bottom layer
+      _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*data%ch4_bub_disf
+      _DIAG_VAR_S_(data%id_sed_ch4_ebb_df) = ebb_flux*data%ch4_bub_disf * secs_per_day ! (1/dz)
+     ! Release the remainder to the atmosphere (mmol/m2/day)
+      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-data%ch4_bub_disf) * secs_per_day
+     ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
+      _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
+      ! Note the bubble flux, as the water sees it  (mmol/m2/day)
+      _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day
+    ENDIF
+
+
    ! Set sink and source terms for the benthos (change per surface area per second)
    ! Note that this must include the fluxes to and from the pelagic.
    !_FLUX_VAR_B_(data%id_ben_dic) = _FLUX_VAR_B_(data%id_ben_dic) + (-dic_flux/secs_per_day)
 
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_dic) = dic_flux
+
+
 
 END SUBROUTINE aed2_calculate_benthic_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1119,7 +1175,7 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
 
   REAL                 :: H, Denom, CAlk, BAlk, OH, PhosTop, PhosBot, PAlk, SiAlk, &
                         & FREEtoTOT, Hfree, HSO4, HF, Residual, Slope, deltapH, pHTol, ln10
- 
+
   INTEGER :: count
   INTEGER :: max_count
 
@@ -1127,7 +1183,7 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
   pHTol    = 0.0001    !tolerance for iterations end
   ln10     = log(10.)
   deltapH  = pHTol + 1
-  
+
   count = 0
   max_count = 100
 

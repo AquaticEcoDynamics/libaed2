@@ -52,7 +52,7 @@ MODULE aed2_dummy
 ! aed2_dummy --- dummy model
 !
 ! The AED module "dummy" contains only variables to provide vars required in
-! other modules but we dont provide (usually for debugging purposes
+! other modules that we didnt provide (usually for debugging purposes)
 !-------------------------------------------------------------------------------
    USE aed2_core
 
@@ -71,6 +71,7 @@ MODULE aed2_dummy
      CONTAINS
          PROCEDURE :: define            => aed2_define_dummy
          PROCEDURE :: calculate         => aed2_calculate_dummy
+         PROCEDURE :: calculate_benthic => aed2_calculate_benthic_dummy
    END TYPE
 
 ! MODULE GLOBALS
@@ -174,8 +175,6 @@ END SUBROUTINE aed2_define_dummy
 !###############################################################################
 SUBROUTINE aed2_calculate_dummy(data,column,layer_idx)
 !-------------------------------------------------------------------------------
-! Right hand sides of aed2_dummy model
-!-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed2_dummy_data_t),INTENT(in) :: data
    TYPE (aed2_column_t),INTENT(inout) :: column(:)
@@ -188,6 +187,27 @@ SUBROUTINE aed2_calculate_dummy(data,column,layer_idx)
 !-------------------------------------------------------------------------------
 !BEGIN
 END SUBROUTINE aed2_calculate_dummy
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed2_calculate_benthic_dummy(data,column,layer_idx)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed2_dummy_data_t),INTENT(in) :: data
+   TYPE (aed2_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+   ! Environment
+   AED_REAL :: temp
+
+   ! State
+   AED_REAL :: ss, bottom_stress, matz
+
+!-------------------------------------------------------------------------------
+!BEGIN
+END SUBROUTINE aed2_calculate_benthic_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

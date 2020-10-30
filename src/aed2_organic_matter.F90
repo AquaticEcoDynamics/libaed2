@@ -1126,7 +1126,7 @@ SUBROUTINE aed2_mobility_organic_matter(data,column,layer_idx,mobility)
           rho_pom = data%rho_pom
           vvel = -9.807*(data%d_pom**2.)*( rho_pom-pw ) / ( 18.*mu )
           IF(data%simRPools) &
-          vvel_cpom = -9.807*(data%d_cpom**2.)*( data%rho_cpom-pw ) / ( 18.*mu )
+            vvel_cpom = -9.807*(data%d_cpom**2.)*( data%rho_cpom-pw ) / ( 18.*mu )
         CASE DEFAULT
           ! unknown settling/migration option selection
           vvel = data%w_pom

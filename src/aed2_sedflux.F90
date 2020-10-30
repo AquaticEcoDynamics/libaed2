@@ -71,7 +71,7 @@ MODULE aed2_sedflux
       INTEGER  :: id_Fsed_oxy, id_Fsed_rsi, id_Fsed_amm, id_Fsed_nit
       INTEGER  :: id_Fsed_frp, id_Fsed_pon, id_Fsed_don
       INTEGER  :: id_Fsed_pop, id_Fsed_dop, id_Fsed_poc, id_Fsed_doc
-      INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_feii
+      INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_feii, id_Fsed_ch4_ebb
       INTEGER  :: id_Fsed_n2o, id_Fsed_oxy_pel
       INTEGER  :: id_zones
 
@@ -79,11 +79,13 @@ MODULE aed2_sedflux
       INTEGER  :: sed_modl, n_zones
       AED_REAL :: Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp, &
                   Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, &
-                  Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii, Fsed_n2o
+                  Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii, Fsed_n2o, &
+                  Fsed_ch4_ebb
       AED_REAL,DIMENSION(:),ALLOCATABLE :: &
                   Fsed_oxy_P, Fsed_rsi_P, Fsed_amm_P, Fsed_nit_P, Fsed_frp_P, &
                   Fsed_pon_P, Fsed_don_P, Fsed_pop_P, Fsed_dop_P, Fsed_n2o_P, &
-                  Fsed_poc_P, Fsed_doc_P, Fsed_dic_P, Fsed_ch4_P, Fsed_feii_P
+                  Fsed_poc_P, Fsed_doc_P, Fsed_dic_P, Fsed_ch4_P, Fsed_feii_P, &
+                  Fsed_ch4_ebb_P
 
      CONTAINS
          PROCEDURE :: define            => aed2_define_sedflux
@@ -196,6 +198,12 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% 0
                                                !% 0 - XX
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
+   AED_REAL :: Fsed_ch4_ebb(_MAX_ZONES_)  = MISVAL !% bubble methane flux in each sediment zone
+                                               !% $$mmol/,m^{-2}/s$$
+                                               !% float
+                                               !% 0
+                                               !% 0 - XX
+                                               !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
    AED_REAL :: Fsed_feii(_MAX_ZONES_)  = MISVAL !% dissolved reduced iron in each sediment zone
                                                !% $$mmol/,m^{-2}/s$$
                                                !% float
@@ -213,7 +221,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
    NAMELIST /aed2_sed_const2d/ n_zones, &
                               Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,&
                               Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, Fsed_n2o,&
-                              Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii
+                              Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii, Fsed_ch4_ebb
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -260,6 +268,9 @@ SUBROUTINE load_sed_zone_data(data,namlst)
    ENDIF
    IF (Fsed_ch4(1) .NE. MISVAL ) THEN
       ALLOCATE(data%Fsed_ch4_P(n_zones)) ; data%Fsed_ch4_P(1:n_zones) = Fsed_ch4(1:n_zones)/secs_per_day
+   ENDIF
+   IF (Fsed_ch4_ebb(1) .NE. MISVAL ) THEN
+      ALLOCATE(data%Fsed_ch4_ebb_P(n_zones)) ; data%Fsed_ch4_ebb_P(1:n_zones) = Fsed_ch4_ebb(1:n_zones)/secs_per_day
    ENDIF
    IF (Fsed_feii(1) .NE. MISVAL ) THEN
       ALLOCATE(data%Fsed_feii_P(n_zones)) ; data%Fsed_feii_P(1:n_zones) = Fsed_feii(1:n_zones)/secs_per_day
@@ -327,6 +338,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
    AED_REAL :: Fsed_dic  = MISVAL
    AED_REAL :: Fsed_frp  = MISVAL
    AED_REAL :: Fsed_ch4  = MISVAL
+   AED_REAL :: Fsed_ch4_ebb  = MISVAL
    AED_REAL :: Fsed_feii = MISVAL
    AED_REAL :: Fsed_n2o  = MISVAL
 !  %% END NAMELIST
@@ -334,7 +346,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
    NAMELIST /aed2_sed_constant/ nzones,                                           &
                                 Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp, &
                                 Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, Fsed_n2o, &
-                                Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii
+                                Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii, Fsed_ch4_ebb
 
 !
 !-------------------------------------------------------------------------------
@@ -371,6 +383,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
       data%Fsed_doc  = Fsed_doc / secs_per_day
       data%Fsed_dic  = Fsed_dic / secs_per_day
       data%Fsed_ch4  = Fsed_ch4 / secs_per_day
+      data%Fsed_ch4_ebb  = Fsed_ch4_ebb / secs_per_day
       data%Fsed_feii = Fsed_feii/ secs_per_day
    ELSEIF ( sedflux_model .EQ. "dynamic" ) THEN
       data%sed_modl = SED_DYNAMIC
@@ -402,10 +415,11 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
       IF (ALLOCATED(data%Fsed_dic_P))  Fsed_dic  = data%Fsed_dic_P(1)
       IF (ALLOCATED(data%Fsed_ch4_P))  Fsed_ch4  = data%Fsed_ch4_P(1)
       IF (ALLOCATED(data%Fsed_feii_P)) Fsed_feii = data%Fsed_feii_P(1)
+      IF (ALLOCATED(data%Fsed_ch4_ebb_P))  Fsed_ch4_ebb  = data%Fsed_ch4_ebb_P(1)
    ELSE
       PRINT*,"**ERROR : Unknown sedflux model type :", TRIM(sedflux_model)
    ENDIF
-   
+
    data%id_Fsed_oxy = 0
    data%id_Fsed_rsi = 0
    data%id_Fsed_amm = 0
@@ -421,6 +435,7 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
    data%id_Fsed_ch4 = 0
    data%id_Fsed_feii = 0
    data%id_Fsed_n2o = 0
+   data%id_Fsed_ch4_ebb = 0
 
 
    ! Register state variables
@@ -467,6 +482,9 @@ SUBROUTINE aed2_define_sedflux(data, namlst)
    IF ( Fsed_ch4 .GT. MISVAL ) &
       data%id_Fsed_ch4 = aed2_define_sheet_diag_variable('Fsed_ch4','mmol/m**2',   &
                                           'flux rate of ch4 across the swi')
+   IF ( Fsed_ch4_ebb .GT. MISVAL ) &
+      data%id_Fsed_ch4_ebb = aed2_define_sheet_diag_variable('Fsed_ch4_ebb','mmol/m**2',   &
+                                          'flux rate of ch4 bubbles across the swi')
    IF ( Fsed_feii .GT. MISVAL ) &
       data%id_Fsed_feii = aed2_define_sheet_diag_variable('Fsed_feii','mmol/m**2', &
                                           'flux rate of feii across the swi')
@@ -500,7 +518,7 @@ SUBROUTINE aed2_initialize_sedflux(data, column, layer_idx)
    AED_REAL :: Fsed_poc = 0., Fsed_doc = 0.
    AED_REAL :: Fsed_dic = 0., Fsed_frp = 0.
    AED_REAL :: Fsed_ch4 = 0., Fsed_feii = 0.
-   AED_REAL :: Fsed_n2o = 0.
+   AED_REAL :: Fsed_n2o = 0., Fsed_ch4_ebb = 0.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -523,6 +541,7 @@ SUBROUTINE aed2_initialize_sedflux(data, column, layer_idx)
        Fsed_dic  = data%Fsed_dic
        Fsed_ch4  = data%Fsed_ch4
        Fsed_feii = data%Fsed_feii
+       Fsed_ch4_ebb  = data%Fsed_ch4_ebb
    ELSEIF ( data%sed_modl .EQ. SED_CONSTANT_2D .OR. data%sed_modl .EQ. SED_DYNAMIC_2D ) THEN
        !# Do the 2D variants - zone variant
        !# Get the zone array dependency
@@ -549,6 +568,7 @@ SUBROUTINE aed2_initialize_sedflux(data, column, layer_idx)
        IF ( data%id_Fsed_dic  > 0 ) Fsed_dic  = data%Fsed_dic_P(zone)
        IF ( data%id_Fsed_ch4  > 0 ) Fsed_ch4  = data%Fsed_ch4_P(zone)
        IF ( data%id_Fsed_feii > 0 ) Fsed_feii = data%Fsed_feii_P(zone)
+       IF ( data%id_Fsed_ch4_ebb  > 0 ) Fsed_ch4_ebb  = data%Fsed_ch4_ebb_P(zone)
    ENDIF
 
    !# Also store sediment flux as diagnostic variable
@@ -567,6 +587,7 @@ SUBROUTINE aed2_initialize_sedflux(data, column, layer_idx)
    IF ( data%id_Fsed_dic  > 0 ) _DIAG_VAR_S_(data%id_Fsed_dic)  = Fsed_dic
    IF ( data%id_Fsed_ch4  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4)  = Fsed_ch4
    IF ( data%id_Fsed_feii > 0 ) _DIAG_VAR_S_(data%id_Fsed_feii) = Fsed_feii
+   IF ( data%id_Fsed_ch4_ebb  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4_ebb)  = Fsed_ch4_ebb
 END SUBROUTINE aed2_initialize_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
