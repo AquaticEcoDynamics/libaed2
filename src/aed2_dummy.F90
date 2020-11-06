@@ -64,7 +64,8 @@ MODULE aed2_dummy
 !
    TYPE,extends(aed2_model_data_t) :: aed2_dummy_data_t
       !# Variable identifiers
-      INTEGER  :: num_v, num_dv, num_sv, num_dsv
+      INTEGER :: num_v, num_dv, num_sv, num_dsv
+      INTEGER :: id_sine, id_vsine
       INTEGER,ALLOCATABLE :: id_dummy_v(:), id_dummy_dv(:),           &
                              id_dummy_sv(:), id_dummy_dsv(:)
 
@@ -76,6 +77,7 @@ MODULE aed2_dummy
 
 ! MODULE GLOBALS
    INTEGER :: diag_level = 10
+   AED_REAL :: today = 1.
 
 !===============================================================================
 CONTAINS
@@ -168,6 +170,9 @@ SUBROUTINE aed2_define_dummy(data, namlst)
       data%id_dummy_dsv(i) = aed2_define_sheet_diag_variable(dm_dsvars(i), '', '', .FALSE.)
    ENDDO
 
+   data%id_vsine = aed2_define_diag_variable('DUM_vol_sine', 'no units', 'DBG volume sine between 0.0 and 1.0')
+   data%id_sine = aed2_define_sheet_diag_variable('DUM_sine', 'no units', 'DBG sine wave between 0.0 and 1.0', .FALSE.)
+
 END SUBROUTINE aed2_define_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -181,11 +186,13 @@ SUBROUTINE aed2_calculate_dummy(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   INTEGER  :: i, count
-   AED_REAL :: val, tot
+!  INTEGER  :: i, count
+!  AED_REAL :: val, tot
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   _DIAG_VAR_(data%id_vsine) = &
+        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
 END SUBROUTINE aed2_calculate_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -200,13 +207,18 @@ SUBROUTINE aed2_calculate_benthic_dummy(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp
+!  AED_REAL :: temp
 
    ! State
-   AED_REAL :: ss, bottom_stress, matz
+!  AED_REAL :: ss, bottom_stress, matz
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
+   IF (layer_idx .EQ. 1) today = today + 1.0/36.5
+   _DIAG_VAR_S_(data%id_sine) = &
+        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
+
 END SUBROUTINE aed2_calculate_benthic_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

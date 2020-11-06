@@ -73,7 +73,7 @@ MODULE aed2_carbon
       INTEGER  :: id_wind, id_vel, id_depth
       INTEGER  :: id_ch4ox, id_pco2
       INTEGER  :: id_sed_dic, id_sed_ch4, id_sed_ch4_ebb, id_sed_ch4_ebb_3d
-      INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb, id_sed_ch4_ebb_df
+      INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb, id_ch4_ebb_df
       INTEGER  :: id_par, id_extc, id_dz, id_tau, id_Fsed_ch4_ebb
 
       !# Model parameters
@@ -81,7 +81,7 @@ MODULE aed2_carbon
       AED_REAL :: Fsed_ch4, Ksed_ch4, theta_sed_ch4, Fsed_ch4_ebb, ch4_bub_tau0
       AED_REAL :: Rch4ox, Kch4ox, vTch4ox, atm_co2, atm_ch4, ionic
       AED_REAL :: maxMPBProdn, IkMPB
-      AED_REAL :: ch4_bub_aLL, ch4_bub_cLL, ch4_bub_kLL, ch4_bub_disf, ch4_bub_ws
+      AED_REAL :: ch4_bub_aLL, ch4_bub_cLL, ch4_bub_kLL, ch4_bub_ws
       AED_REAL :: ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp
 
 
@@ -288,7 +288,7 @@ SUBROUTINE aed2_define_carbon(data, namlst)
      IF( data%simCH4ebb ) THEN
        data%id_sed_ch4_ebb_3d = aed2_define_diag_variable('sed_ch4_ebb_3d','mmol/m**2/d', &
                             'CH4 ebullition across sed/water interface (layer)')
-       data%id_sed_ch4_ebb_df = aed2_define_diag_variable('sed_ch4_ebb_df','mmol/m**3/d', &
+       data%id_ch4_ebb_df = aed2_define_diag_variable('ch4_ebb_df','mmol/m**3/d', &
                             'CH4 bubble dissolution rate')
        data%id_sed_ch4_ebb = aed2_define_sheet_diag_variable('sed_ch4_ebb','mmol/m**2/d', &
                             'CH4 ebullition across sed/water interface (zone)')
@@ -707,10 +707,10 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
      ! Add bubbles to layer
     !  _FLUX_VAR_(data%id_ch4_bub) = _FLUX_VAR_(data%id_ch4_bub) + (ebb_flux)
      ! Dissolve bubbles in this bottom layer
-      _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*data%ch4_bub_disf
-      _DIAG_VAR_S_(data%id_sed_ch4_ebb_df) = ebb_flux*data%ch4_bub_disf * secs_per_day ! (1/dz)
+      _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*data%ch4_bub_disf1
+      _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*data%ch4_bub_disf1 * secs_per_day ! (1/dz)
      ! Release the remainder to the atmosphere (mmol/m2/day)
-      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-data%ch4_bub_disf) * secs_per_day
+      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-data%ch4_bub_disf1) * secs_per_day
      ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
       _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
       ! Note the bubble flux, as the water sees it  (mmol/m2/day)
@@ -724,7 +724,6 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
 
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_dic) = dic_flux
-
 
 
 END SUBROUTINE aed2_calculate_benthic_carbon
@@ -1226,8 +1225,7 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
   H           = 10.**(-pHx)
   fCO2x       = TCx*H*H/(H*H + K1*H + K1*K2)/K0
 
-  END SUBROUTINE Cal_fCO2fromTCpH
-
+END SUBROUTINE Cal_fCO2fromTCpH
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
