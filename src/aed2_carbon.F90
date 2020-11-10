@@ -286,12 +286,12 @@ SUBROUTINE aed2_define_carbon(data, namlst)
      data%id_atm_ch4 = aed2_define_sheet_diag_variable('atm_ch4_flux',        &
                             'mmol/m**2/d', 'CH4 exchange across atm/water interface')
      IF( data%simCH4ebb ) THEN
-       data%id_sed_ch4_ebb_3d = aed2_define_diag_variable('sed_ch4_ebb_3d','mmol/m**2/d', &
-                            'CH4 ebullition across sed/water interface (layer)')
+       data%id_sed_ch4_ebb_3d = aed2_define_diag_variable('sed_ch4_ebb_3d','mmol/m**3/d', &
+                            'CH4 ebullition release rate')
        data%id_ch4_ebb_df = aed2_define_diag_variable('ch4_ebb_df','mmol/m**3/d', &
                             'CH4 bubble dissolution rate')
        data%id_sed_ch4_ebb = aed2_define_sheet_diag_variable('sed_ch4_ebb','mmol/m**2/d', &
-                            'CH4 ebullition across sed/water interface (zone)')
+                            'CH4 ebullition across sed/water interface')
        data%id_atm_ch4_ebb = aed2_define_sheet_diag_variable('atm_ch4_ebb_flux', &
                             'mmol/m**2/d', 'CH4 ebullition across atm/water interface')
      ENDIF
@@ -304,7 +304,8 @@ SUBROUTINE aed2_define_carbon(data, namlst)
    data%id_par  = aed2_locate_global('par')
    data%id_dz   = aed2_locate_global('layer_ht')
    data%id_vel  = aed2_locate_global('cell_vel')           ! needed for k600
-   data%id_depth= aed2_locate_global('layer_ht')
+   data%id_depth= aed2_locate_global('depth')
+!  data%id_depth= aed2_locate_global('layer_ht')
    data%id_wind = aed2_locate_global_sheet('wind_speed')
    IF( data%simCH4ebb ) data%id_tau  = aed2_locate_global_sheet('taub')
 
@@ -331,28 +332,28 @@ SUBROUTINE aed2_calculate_carbon(data,column,layer_idx)
 
    IF(data%simDIC .AND. data%simCH4) THEN
       ! Retrieve current (local) state variable values.
-      dic = _STATE_VAR_(data%id_dic)! carbon
-      ch4 = _STATE_VAR_(data%id_ch4)! carbon
+      dic = _STATE_VAR_(data%id_dic)    ! DIC
+      ch4 = _STATE_VAR_(data%id_ch4).   ! CH4
 
       !# Retrieve current dependent state variable values.
-      IF (data%use_oxy) THEN ! & use_oxy
-         oxy = _STATE_VAR_(data%id_oxy)! oxygen
+      IF (data%use_oxy) THEN 
+         oxy = _STATE_VAR_(data%id_oxy) ! O2
       ELSE
          oxy = 0.0
       ENDIF
 
       !# Retrieve current environmental conditions.
-      temp = _STATE_VAR_(data%id_temp) ! temperature
+      temp = _STATE_VAR_(data%id_temp)  ! temperature
 
-      !# Define some intermediate quantities units mmol C/m3/day
+      !# Compute rates of change (mmol C/m3/day)
       ch4oxidation = aed2_carbon_fch4ox(data%use_oxy,data%Rch4ox,data%Kch4ox,data%vTch4ox,oxy,temp)
 
       !# Set temporal derivatives
       _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (ch4*ch4oxidation)
       _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (-ch4*ch4oxidation)
 
-      !# If an externally maintained oxygen pool is present, take nitrification from it
-      IF (data%use_oxy) then ! & use_oxy
+      !# If a linked oxygen pool is present, take oxidation from it
+      IF (data%use_oxy) THEN
          _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + (-(32./12.)*ch4*ch4oxidation)
       ENDIF
 
@@ -629,7 +630,7 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
    AED_REAL :: dic, oxy, mpb, ph
 
    ! Temporary variables
-   AED_REAL :: dic_flux, ch4_flux, Fsed_dic, Fsed_ch4, ebb_flux, Fsed_ch4_ebb
+   AED_REAL :: dic_flux, ch4_flux, Fsed_dic, Fsed_ch4, ebb_flux, Fsed_ch4_ebb, ch4_bub_disf
    !AED_REAL, PARAMETER :: maxMPBProdn = 40.     ! mmolC/m2/day                     !
    !AED_REAL, PARAMETER :: IkMPB       = 180.0   ! Light sensitivity of MPB  !
 
@@ -637,7 +638,6 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
 !BEGIN
 
    IF(.NOT.data%simDIC) RETURN
-
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
@@ -691,39 +691,41 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
   !   ENDIF
   ! ENDIF
 
-   ! TODO:
-   ! (1) Get benthic sink and source terms (sccb?) for current environment
-   ! (2) Get pelagic bttom fluxes (per surface area - division by layer height will be handled at a higher level)
 
-   ! Set bottom fluxes for the pelagic (change per surface area per second)
-   ! Transfer sediment flux value to AED2.
-   !_SET_BOTTOM_FLUX_(data%id_dic,dic_flux/secs_per_day)
-   !_SET_SED_FLUX_(data%id_dic,dic_flux)
+   ! Set bottom fluxes for the pelagic (flux per surface area, per second)
+   ! Increment sediment flux value into derivative of water column variable
    _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (dic_flux)
-   _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
+   IF( data%simCH4) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
 
+   ! Store dissolved sediment fluxes as diagnostic variables (flux per surface area, per day)
+   _DIAG_VAR_S_(data%id_sed_dic) = dic_flux * secs_per_day
+   IF( data%simCH4) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
 
+   ! Re-distribute bubbles to the water or atmosphere, or dissolve
    IF( data%simCH4ebb ) THEN
      ! Add bubbles to layer
-    !  _FLUX_VAR_(data%id_ch4_bub) = _FLUX_VAR_(data%id_ch4_bub) + (ebb_flux)
-     ! Dissolve bubbles in this bottom layer
-      _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*data%ch4_bub_disf1
-      _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*data%ch4_bub_disf1 * secs_per_day ! (1/dz)
+      !_FLUX_VAR_(data%id_ch4_bub) = _FLUX_VAR_(data%id_ch4_bub) + (ebb_flux)
+
+      ! Dissolve bubbles in this bottom layer, depending on depth
+      ch4_bub_disf = data%ch4_bub_disf1
+      IF( depth > data%ch4_bub_disdp) ch4_bub_disf = data%ch4_bub_disf2
+      IF( data%simCH4) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*ch4_bub_disf
+      _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*data%ch4_bub_disf1 * secs_per_day / dz
+
      ! Release the remainder to the atmosphere (mmol/m2/day)
-      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-data%ch4_bub_disf1) * secs_per_day
+      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
+      
      ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
       _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
-      ! Note the bubble flux, as the water sees it  (mmol/m2/day)
-      _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day
+      
+      ! Note the bubble flux, as the water sees it  (mmol/m3/day)
+      _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
     ENDIF
 
 
    ! Set sink and source terms for the benthos (change per surface area per second)
    ! Note that this must include the fluxes to and from the pelagic.
    !_FLUX_VAR_B_(data%id_ben_dic) = _FLUX_VAR_B_(data%id_ben_dic) + (-dic_flux/secs_per_day)
-
-   ! Also store sediment flux as diagnostic variable.
-   _DIAG_VAR_S_(data%id_sed_dic) = dic_flux
 
 
 END SUBROUTINE aed2_calculate_benthic_carbon
