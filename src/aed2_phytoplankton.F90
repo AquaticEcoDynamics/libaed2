@@ -571,8 +571,8 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%do_Puptake = .FALSE.
    IF (data%npup>0) data%do_Puptake=.TRUE.
    IF (data%do_Puptake) THEN
-     IF (data%npup>0) THEN ; data%id_Pupttarget(1) = aed2_locate_variable(p1_uptake_target_variable); ifrp=1 ; ENDIF
-     IF (data%npup>1) THEN ; data%id_Pupttarget(2) = aed2_locate_variable(p2_uptake_target_variable); idop=2 ; ENDIF
+     IF (data%npup>0) THEN ; data%id_Pupttarget(1) = aed2_locate_variable(p1_uptake_target_variable) ; ENDIF
+     IF (data%npup>1) THEN ; data%id_Pupttarget(2) = aed2_locate_variable(p2_uptake_target_variable) ; ENDIF
    ENDIF
    data%nnup = 0
    IF (n1_uptake_target_variable .NE. '') data%nnup = 1
@@ -582,10 +582,10 @@ SUBROUTINE aed2_define_phytoplankton(data, namlst)
    data%do_Nuptake = .false.
    IF (data%nnup>0) data%do_Nuptake=.true.
    IF (data%do_Nuptake) THEN
-     IF (data%nnup>0) THEN ; data%id_Nupttarget(1) = aed2_locate_variable( n1_uptake_target_variable); ino3=1 ; ENDIF
-     IF (data%nnup>1) THEN ; data%id_Nupttarget(2) = aed2_locate_variable( n2_uptake_target_variable); inh4=2 ; ENDIF
-     IF (data%nnup>2) THEN ; data%id_Nupttarget(3) = aed2_locate_variable( n3_uptake_target_variable); idon=3 ; ENDIF
-     IF (data%nnup>3) THEN ; data%id_Nupttarget(4) = aed2_locate_variable( n4_uptake_target_variable); in2 =4 ; ENDIF
+     IF (data%nnup>0) THEN ; data%id_Nupttarget(1) = aed2_locate_variable( n1_uptake_target_variable) ; ENDIF
+     IF (data%nnup>1) THEN ; data%id_Nupttarget(2) = aed2_locate_variable( n2_uptake_target_variable) ; ENDIF
+     IF (data%nnup>2) THEN ; data%id_Nupttarget(3) = aed2_locate_variable( n3_uptake_target_variable) ; ENDIF
+     IF (data%nnup>3) THEN ; data%id_Nupttarget(4) = aed2_locate_variable( n4_uptake_target_variable) ; ENDIF
    ENDIF
    data%do_Cuptake = c_uptake_target_variable .NE. ''
    IF (data%do_Cuptake) THEN

@@ -267,7 +267,7 @@ SUBROUTINE aed2_define_carbon(data, namlst)
       data%id_Fsed_ch4 = aed2_locate_global_sheet(Fsed_ch4_variable)
 
    data%use_sed_model_ebb = Fsed_ebb_variable .NE. ''
-   IF (data%use_sed_model_ch4) &
+   IF (data%use_sed_model_ebb) &
       data%id_Fsed_ch4_ebb = aed2_locate_global_sheet(Fsed_ebb_variable)
 
    !# Register diagnostic variables
@@ -333,7 +333,7 @@ SUBROUTINE aed2_calculate_carbon(data,column,layer_idx)
    IF(data%simDIC .AND. data%simCH4) THEN
       ! Retrieve current (local) state variable values.
       dic = _STATE_VAR_(data%id_dic)    ! DIC
-      ch4 = _STATE_VAR_(data%id_ch4).   ! CH4
+      ch4 = _STATE_VAR_(data%id_ch4)    ! CH4
 
       !# Retrieve current dependent state variable values.
       IF (data%use_oxy) THEN 

@@ -112,7 +112,7 @@ MODULE aed2_bio_utils
    END TYPE
 
 !Module Locals
-   INTEGER  :: ino3, inh4,idon, in2, ifrp, idop
+   INTEGER,PARAMETER :: ino3 = 1, inh4 = 2, idon = 3, in2 = 4, ifrp = 1, idop = 2
 
 !===============================================================================
 CONTAINS
