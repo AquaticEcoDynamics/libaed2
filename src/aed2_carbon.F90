@@ -710,7 +710,7 @@ SUBROUTINE aed2_calculate_benthic_carbon(data,column,layer_idx)
       ch4_bub_disf = data%ch4_bub_disf1
       IF( depth > data%ch4_bub_disdp) ch4_bub_disf = data%ch4_bub_disf2
       IF( data%simCH4) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*ch4_bub_disf
-      _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*data%ch4_bub_disf1 * secs_per_day / dz
+      _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*ch4_bub_disf * secs_per_day !/ dz. MH Something wrong with dz here?
 
      ! Release the remainder to the atmosphere (mmol/m2/day)
       _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
