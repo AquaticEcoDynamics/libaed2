@@ -41,10 +41,6 @@ endif
 
 INCLUDES=-I${incdir}
 
-#ifneq ("$(wildcard ../libaed2-plus/Makefile)","")
-#  HAVEPLUS=-DHAVE_PLUS
-#endif
-
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
@@ -94,8 +90,7 @@ ifeq ($(SINGLE),true)
 endif
 
 
-FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS) $(HAVEPLUS)
-
+FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS)
 
 OBJS = \
 ${objdir}/aed2_core.o \

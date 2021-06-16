@@ -41,7 +41,7 @@ MODULE aed2_common
    USE aed2_sedflux
    USE aed2_chlorophylla
    USE aed2_oxygen
-   USE ufz_oxygen
+   USE ufz2_oxygen
    USE aed2_silica
    USE aed2_carbon
    USE aed2_nitrogen

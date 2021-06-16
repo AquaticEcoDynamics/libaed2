@@ -32,7 +32,7 @@
 
 #include "aed2.h"
 
-MODULE ufz_oxygen
+MODULE ufz2_oxygen
 !-------------------------------------------------------------------------------
 ! ufz2_oxygen --- oxygen biogeochemical model
 !
@@ -360,4 +360,4 @@ END SUBROUTINE aed2_calculate_benthic_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-END MODULE ufz_oxygen
+END MODULE ufz2_oxygen
