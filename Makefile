@@ -45,9 +45,9 @@ ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -warn all -module ${moddir} -i-static -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
+  FFLAGS=-fPIC -warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
-    FFLAGS+=-check
+    FFLAGS+=-check all -check noarg_temp_created
   endif
   ifeq ($(SINGLE),true)
     FFLAGS+=-real-size 32
