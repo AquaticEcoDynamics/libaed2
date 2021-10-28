@@ -165,7 +165,15 @@ SUBROUTINE aed2_print_version
 # ifdef __PGI
    print*,"    libaed2 built using pgfortran version ", __PGIC__, '.', __PGIC_MINOR__, '.', __PGIC_PATCHLEVEL__
 # else
-   print*,"    libaed2 built using gfortran version ", __GNUC__, '.', __GNUC_MINOR__, '.', __GNUC_PATCHLEVEL__
+#  ifdef __GNUC__
+    print*,"    libaed2 built using gfortran version ", __GNUC__, '.', __GNUC_MINOR__, '.', __GNUC_PATCHLEVEL__
+#  else
+#   ifdef __clang__
+     print*,"    libaed2 built using flang version ", __clang_major__, '.', __clang_minor__, '.', __clang_patchlevel__
+#   else
+     print*,"    libaed2 built using unknown fortran version "
+#   endif
+#  endif
 # endif
 #endif
 END SUBROUTINE aed2_print_version
