@@ -237,10 +237,11 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, re
    INTEGER  :: i,tfil
    AED_REAL :: minNut
 
-   TYPE(phyto_nml_data) :: pd(MAX_PHYTO_TYPES)
+   TYPE(phyto_nml_data),ALLOCATABLE :: pd(:)
    NAMELIST /phyto_data/ pd
 !-------------------------------------------------------------------------------
 !BEGIN
+    ALLOCATE(pd(MAX_PHYTO_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
            status = load_csv(dbase, pd)
@@ -408,6 +409,7 @@ SUBROUTINE aed2_phytoplankton_load_params(data, dbase, count, list, settling, re
           ENDIF
        ENDIF
     ENDDO
+    DEALLOCATE(pd)
 END SUBROUTINE aed2_phytoplankton_load_params
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
