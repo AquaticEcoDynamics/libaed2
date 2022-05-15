@@ -486,7 +486,7 @@ END SUBROUTINE copy_name
 FUNCTION scan_csv_header(aedr,titles) RESULT(count)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-    TYPE(AED_READER),POINTER,INTENT(in) :: aedr
+    TYPE(AED_READER),POINTER,INTENT(inout) :: aedr
     CHARACTER(len=32),POINTER,INTENT(out) :: titles(:)
 !
 !LOCALS
