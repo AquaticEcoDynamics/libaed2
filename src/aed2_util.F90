@@ -45,7 +45,7 @@ MODULE aed2_util
 
    PRIVATE
 !
-   PUBLIC find_free_lun, qsort, exp_integral
+   PUBLIC find_free_lun, qsort, exp_integral, MYTRIM, STOPIT
    PUBLIC water_viscosity
    PUBLIC aed2_gas_piston_velocity, aed2_oxygen_sat, aed2_n2o_sat
    PUBLIC aed2_bio_temp_function,fTemp_function, fSal_function
@@ -60,6 +60,34 @@ INTEGER, PARAMETER :: NML_TYPE = 2
 !===============================================================================
 CONTAINS
 
+
+
+!###############################################################################
+FUNCTION MYTRIM(str) RESULT(res)
+!-------------------------------------------------------------------------------
+! Useful for passing string arguments to C functions
+!-------------------------------------------------------------------------------
+   CHARACTER(*),TARGET :: str
+   CHARACTER(:),POINTER :: res
+   INTEGER :: len
+
+   len = LEN_TRIM(str)+1
+   str(len:len) = achar(0)
+   res => str
+END FUNCTION MYTRIM
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE STOPIT(message)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*) :: message
+!-------------------------------------------------------------------------------
+   PRINT *,message
+   STOP
+END SUBROUTINE STOPIT
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
