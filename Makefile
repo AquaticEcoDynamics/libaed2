@@ -45,7 +45,7 @@ ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
+  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check all -check noarg_temp_created
   endif
@@ -57,7 +57,7 @@ ifeq ($(F90),ifort)
 else ifeq ($(F90),pgfortran)
   DEBUG_FFLAGS=-g
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -module ${moddir} $(DEFINES) $(INCLUDES)
+  FFLAGS=-module ${moddir} $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-Mbounds
   endif
@@ -65,7 +65,7 @@ else ifeq ($(F90),pgfortran)
 else ifeq ($(F90),flang)
   DEBUG_FFLAGS=-g
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -module ${moddir} $(DEFINES) $(INCLUDES)
+  FFLAGS=-module ${moddir} $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-Mbounds
   endif
@@ -73,12 +73,15 @@ else ifeq ($(F90),flang)
 else
   DEBUG_FFLAGS=-g -fbacktrace
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -Wall -J ${moddir} -ffree-line-length-none -std=f2008 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused -Wno-unused-dummy-argument -fno-range-check -Wno-integer-division
+  FFLAGS=-Wall -J ${moddir} -ffree-line-length-none -std=f2008 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused -Wno-unused-dummy-argument -fno-range-check -Wno-integer-division
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-fcheck=all
   endif
   FFLAGS+=-fdefault-real-8 -fdefault-double-8
 endif
+
+# only building static lib
+FFLAGS+=-fPIE
 
 ifeq ($(DEBUG),true)
   DEBUG_CFLAGS=-g
