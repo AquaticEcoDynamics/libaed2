@@ -54,6 +54,16 @@ ifeq ($(F90),ifort)
   else
     FFLAGS+=-real-size 64
   endif
+else ifeq ($(F90),ifx)
+# INCLUDES+=-I/opt/intel/oneapi/compiler/latest/include
+  DEBUG_FFLAGS=-g -traceback
+  OMPFLAG=-qopenmp
+  OPT_FFLAGS=-O3
+  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused
+  ifeq ($(WITH_CHECKS),true)
+    FFLAGS+=-check all -check noarg_temp_created
+  endif
+  FFLAGS+=-real-size 64
 else ifeq ($(F90),pgfortran)
   DEBUG_FFLAGS=-g
   OPT_FFLAGS=-O3
