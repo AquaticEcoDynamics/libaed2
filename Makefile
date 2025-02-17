@@ -59,7 +59,7 @@ else ifeq ($(F90),ifx)
   DEBUG_FFLAGS=-g -traceback
   OMPFLAG=-qopenmp
   OPT_FFLAGS=-O3
-  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused
+  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check all -check noarg_temp_created
   endif
@@ -83,7 +83,7 @@ else ifeq ($(F90),flang)
 else
   DEBUG_FFLAGS=-g -fbacktrace
   OPT_FFLAGS=-O3
-  FFLAGS=-Wall -J ${moddir} -ffree-line-length-none -std=f2008 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused -Wno-unused-dummy-argument -fno-range-check -Wno-integer-division
+  FFLAGS=-Wall -J ${moddir} -ffree-line-length-none -std=f2008 $(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused -Wno-unused-dummy-argument -fno-range-check -Wno-integer-division $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-fcheck=all
   endif
