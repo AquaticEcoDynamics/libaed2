@@ -6,6 +6,7 @@ libaed2.a
 .DS*
 ._.DS*
 *.i90
+*.u2d
 cnv
 aed2_sedcandi_o.F90
 aed2_sedcandi_n.F90
